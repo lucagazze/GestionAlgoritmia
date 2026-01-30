@@ -1,152 +1,156 @@
-import { Service, Proposal, Client, Project, Task, ServiceType, ProjectStatus, TaskStatus } from '../types';
-import { initialServices } from '../seed';
+import { supabase } from './supabase';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus } from '../types';
 
-const uuid = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-const SERVICES_KEY = 'algoritmia_services';
-const PROPOSALS_KEY = 'algoritmia_proposals';
-const CLIENTS_KEY = 'algoritmia_clients'; // Used for Projects as well
-const TASKS_KEY = 'algoritmia_tasks';
-
-const loadData = <T>(key: string, defaults: any[] = []): T[] => {
-  const stored = localStorage.getItem(key);
-  if (!stored) {
-    if (defaults.length > 0) {
-      const seeded = defaults.map(d => ({ ...d, id: uuid() }));
-      localStorage.setItem(key, JSON.stringify(seeded));
-      return seeded;
-    }
-    return [];
+// Utility to handle Supabase responses
+const handleResponse = async <T>(query: any): Promise<T[]> => {
+  const { data, error } = await query;
+  if (error) {
+    console.error('Supabase Error:', error);
+    throw error;
   }
-  return JSON.parse(stored);
+  return data || [];
 };
 
 export const db = {
   services: {
     getAll: async (): Promise<Service[]> => {
-      await new Promise(r => setTimeout(r, 200));
-      return loadData<Service>(SERVICES_KEY, initialServices);
+      return handleResponse<Service>(supabase.from('Service').select('*'));
     },
     create: async (data: Omit<Service, 'id'>): Promise<Service> => {
-      const services = loadData<Service>(SERVICES_KEY);
-      const newService = { ...data, id: uuid() };
-      services.push(newService);
-      localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
-      return newService;
+      const { data: created, error } = await supabase.from('Service').insert(data).select().single();
+      if (error) throw error;
+      return created;
     },
     update: async (id: string, data: Partial<Service>): Promise<Service> => {
-      let services = loadData<Service>(SERVICES_KEY);
-      const index = services.findIndex(s => s.id === id);
-      if (index === -1) throw new Error("Service not found");
-      
-      services[index] = { ...services[index], ...data };
-      localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
-      return services[index];
+      const { data: updated, error } = await supabase.from('Service').update(data).eq('id', id).select().single();
+      if (error) throw error;
+      return updated;
     },
     delete: async (id: string): Promise<void> => {
-      let services = loadData<Service>(SERVICES_KEY);
-      services = services.filter(s => s.id !== id);
-      localStorage.setItem(SERVICES_KEY, JSON.stringify(services));
+      const { error } = await supabase.from('Service').delete().eq('id', id);
+      if (error) throw error;
     }
   },
   
   projects: {
-    // Treat Clients as Projects for this simple OS
+    // Mapping "Projects" in UI to "Client" table in DB as per schema logic
     getAll: async (): Promise<Project[]> => {
-      const clients = loadData<any>(CLIENTS_KEY);
-      // Ensure they have project fields if created via Proposal
-      return clients.map((c: any) => ({
+      const { data, error } = await supabase.from('Client').select('*');
+      if (error) throw error;
+      
+      // Adapt DB fields to UI types if necessary (assuming DB has these columns)
+      return data.map((c: any) => ({
         ...c,
         status: c.status || ProjectStatus.ACTIVE,
         monthlyRevenue: c.monthlyRevenue || 0,
+        billingDay: c.billingDay || 1,
         notes: c.notes || ''
       }));
     },
-    update: async (id: string, data: Partial<Project>): Promise<void> => {
-      let projects = loadData<Project>(CLIENTS_KEY);
-      const index = projects.findIndex(p => p.id === id);
-      if (index !== -1) {
-        projects[index] = { ...projects[index], ...data };
-        localStorage.setItem(CLIENTS_KEY, JSON.stringify(projects));
-      }
-    },
     create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
-       const projects = loadData<Project>(CLIENTS_KEY);
-       const newProject = { ...data, id: uuid(), createdAt: new Date() };
-       projects.push(newProject);
-       localStorage.setItem(CLIENTS_KEY, JSON.stringify(projects));
-       return newProject;
+      // We manually add createdAt for consistency if DB doesn't default it
+       const payload = { ...data, createdAt: new Date().toISOString() };
+       const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
+       if (error) throw error;
+       return created;
+    },
+    update: async (id: string, data: Partial<Project>): Promise<void> => {
+      const { error } = await supabase.from('Client').update(data).eq('id', id);
+      if (error) throw error;
+    },
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase.from('Client').delete().eq('id', id);
+        if (error) throw error;
     }
   },
 
   tasks: {
+    // Assuming a 'Task' table exists
     getAll: async (): Promise<Task[]> => {
-      return loadData<Task>(TASKS_KEY);
+      return handleResponse<Task>(supabase.from('Task').select('*'));
     },
     create: async (data: Omit<Task, 'id'>): Promise<Task> => {
-      const tasks = loadData<Task>(TASKS_KEY);
-      const newTask = { ...data, id: uuid() };
-      tasks.push(newTask);
-      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
-      return newTask;
+      const { data: created, error } = await supabase.from('Task').insert(data).select().single();
+      if (error) throw error;
+      return created;
     },
     updateStatus: async (id: string, status: TaskStatus): Promise<void> => {
-      let tasks = loadData<Task>(TASKS_KEY);
-      const task = tasks.find(t => t.id === id);
-      if (task) {
-        task.status = status;
-        localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
-      }
+      const { error } = await supabase.from('Task').update({ status }).eq('id', id);
+      if (error) throw error;
     },
     delete: async (id: string): Promise<void> => {
-      let tasks = loadData<Task>(TASKS_KEY);
-      tasks = tasks.filter(t => t.id !== id);
-      localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+      const { error } = await supabase.from('Task').delete().eq('id', id);
+      if (error) throw error;
     }
   },
 
   proposals: {
     create: async (data: Omit<Proposal, 'id' | 'createdAt' | 'clientId'>, clientName: string): Promise<Proposal> => {
-        await new Promise(r => setTimeout(r, 600));
-
-        let clients = loadData<Project>(CLIENTS_KEY);
-        let client = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
         
-        if (!client) {
-            client = { 
-              id: uuid(), 
-              name: clientName, 
-              createdAt: new Date(),
-              status: ProjectStatus.ONBOARDING,
-              monthlyRevenue: data.totalRecurringPrice // Auto-set revenue
-            };
-            clients.push(client);
-            localStorage.setItem(CLIENTS_KEY, JSON.stringify(clients));
+        // 1. Check if client exists, otherwise create it
+        let clientId = '';
+        const { data: existingClient } = await supabase.from('Client').select('id, monthlyRevenue').ilike('name', clientName).single();
+        
+        if (existingClient) {
+            clientId = existingClient.id;
+            // Update MRR if changed
+            await supabase.from('Client').update({ monthlyRevenue: data.totalRecurringPrice }).eq('id', clientId);
         } else {
-             // Update existing client revenue if proposal is accepted logic (simplified here)
-             client.monthlyRevenue = data.totalRecurringPrice;
-             localStorage.setItem(CLIENTS_KEY, JSON.stringify(clients));
+            const { data: newClient, error: clientError } = await supabase.from('Client').insert({
+                name: clientName,
+                createdAt: new Date().toISOString(),
+                status: ProjectStatus.ONBOARDING,
+                monthlyRevenue: data.totalRecurringPrice,
+                billingDay: 1
+            }).select().single();
+            
+            if (clientError) throw clientError;
+            clientId = newClient.id;
         }
 
-        const proposals = loadData<Proposal>(PROPOSALS_KEY);
-        const newProposal: Proposal = {
-            ...data,
-            id: uuid(),
-            clientId: client.id,
-            createdAt: new Date(),
+        // 2. Create Proposal
+        const proposalPayload = {
+            clientId,
+            status: data.status,
+            objective: data.objective,
+            durationMonths: data.durationMonths,
+            marginMultiplier: data.marginMultiplier,
+            totalOneTimePrice: data.totalOneTimePrice,
+            totalRecurringPrice: data.totalRecurringPrice,
+            totalContractValue: data.totalContractValue,
+            aiPromptGenerated: data.aiPromptGenerated,
+            createdAt: new Date().toISOString()
         };
-        proposals.push(newProposal);
-        localStorage.setItem(PROPOSALS_KEY, JSON.stringify(proposals));
-        
+
+        const { data: newProposal, error: proposalError } = await supabase.from('Proposal').insert(proposalPayload).select().single();
+        if (proposalError) throw proposalError;
+
+        // 3. Create Proposal Items
+        if (data.items && data.items.length > 0) {
+            const itemsPayload = data.items.map(item => ({
+                proposalId: newProposal.id,
+                serviceId: item.serviceId,
+                serviceSnapshotName: item.serviceSnapshotName,
+                serviceSnapshotCost: item.serviceSnapshotCost
+            }));
+            
+            const { error: itemsError } = await supabase.from('ProposalItem').insert(itemsPayload);
+            if (itemsError) console.error("Error creating items", itemsError);
+        }
+
         return newProposal;
     },
     getAll: async (): Promise<Proposal[]> => {
-         const proposals = loadData<Proposal>(PROPOSALS_KEY);
-         const clients = loadData<Client>(CLIENTS_KEY);
-         return proposals.map(p => ({
-             ...p,
-             client: clients.find(c => c.id === p.clientId)
-         })).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+         const { data, error } = await supabase
+            .from('Proposal')
+            .select(`
+                *,
+                client:Client(*)
+            `)
+            .order('createdAt', { ascending: false });
+            
+         if (error) throw error;
+         return data as Proposal[];
     }
   }
 };

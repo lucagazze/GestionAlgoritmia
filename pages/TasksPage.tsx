@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Task, TaskStatus } from '../types';
 import { Button, Card, Input, Label, Badge, Modal } from '../components/UIComponents';
-import { CheckCircle2, Circle, Clock, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Plus, Trash2, GripVertical } from 'lucide-react';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -21,77 +22,84 @@ export default function TasksPage() {
   const createTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskTitle) return;
-    await db.tasks.create({
-      title: newTaskTitle,
-      status: TaskStatus.TODO
-    });
+    await db.tasks.create({ title: newTaskTitle, status: TaskStatus.TODO });
     setNewTaskTitle('');
     setIsModalOpen(false);
     loadTasks();
   };
 
-  const moveTask = async (task: Task, newStatus: TaskStatus) => {
-    // Optimistic update
-    setTasks(tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
-    await db.tasks.updateStatus(task.id, newStatus);
-  };
-
   const deleteTask = async (id: string) => {
-    if(confirm('¿Eliminar tarea?')) {
+    if(confirm('¿Eliminar?')) {
         await db.tasks.delete(id);
         loadTasks();
     }
   }
 
-  const Column = ({ title, status, icon: Icon }: { title: string, status: TaskStatus, icon: any }) => {
+  // --- Drag & Drop Logic ---
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedTaskId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault(); // Necessary to allow dropping
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
+    e.preventDefault();
+    if (!draggedTaskId) return;
+
+    // Optimistic UI Update
+    const updatedTasks = tasks.map(t => 
+        t.id === draggedTaskId ? { ...t, status: targetStatus } : t
+    );
+    setTasks(updatedTasks);
+    setDraggedTaskId(null);
+
+    // DB Update
+    await db.tasks.updateStatus(draggedTaskId, targetStatus);
+  };
+
+  const Column = ({ title, status, icon: Icon, color }: { title: string, status: TaskStatus, icon: any, color: string }) => {
     const columnTasks = tasks.filter(t => t.status === status);
     
     return (
-      <div className="flex-1 min-w-[300px]">
-        <div className="flex items-center gap-2 mb-4">
-          <Icon className="w-5 h-5 text-gray-400" />
+      <div 
+        className={`flex-1 min-w-[300px] flex flex-col h-full rounded-2xl bg-gray-50/50 border border-dashed ${draggedTaskId ? 'border-gray-300' : 'border-transparent'} transition-colors`}
+        onDragOver={handleDragOver}
+        onDrop={(e) => handleDrop(e, status)}
+      >
+        <div className="p-4 flex items-center gap-2 border-b border-gray-100">
+          <Icon className={`w-5 h-5 ${color}`} />
           <h3 className="font-bold text-gray-700">{title}</h3>
-          <Badge variant="outline" className="ml-auto">{columnTasks.length}</Badge>
+          <Badge variant="outline" className="ml-auto bg-white">{columnTasks.length}</Badge>
         </div>
-        <div className="space-y-3">
+        
+        <div className="p-3 space-y-3 overflow-y-auto flex-1">
           {columnTasks.map(task => (
-            <Card key={task.id} className="p-4 hover:shadow-md transition-all cursor-default group border-l-4 border-l-transparent hover:border-l-black">
-              <div className="flex justify-between items-start mb-2">
-                 <p className="font-medium text-gray-900">{task.title}</p>
-                 <button onClick={() => deleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+            <div 
+              key={task.id} 
+              draggable 
+              onDragStart={(e) => handleDragStart(e, task.id)}
+              className="group bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing transition-all select-none relative"
+            >
+              <div className="flex justify-between items-start">
+                 <div className="flex gap-2">
+                    <GripVertical className="w-4 h-4 text-gray-300 mt-0.5" />
+                    <p className="font-medium text-sm text-gray-900 leading-snug">{task.title}</p>
+                 </div>
               </div>
-              
-              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                {status !== TaskStatus.TODO && (
-                  <button 
-                    onClick={() => moveTask(task, TaskStatus.TODO)}
-                    className="text-xs font-medium text-gray-400 hover:text-black bg-gray-50 px-2 py-1 rounded"
-                  >
-                    ← Pendiente
-                  </button>
-                )}
-                {status !== TaskStatus.IN_PROGRESS && (
-                  <button 
-                    onClick={() => moveTask(task, TaskStatus.IN_PROGRESS)}
-                    className="text-xs font-medium text-gray-400 hover:text-blue-600 bg-gray-50 px-2 py-1 rounded"
-                  >
-                   {status === TaskStatus.TODO ? 'Iniciar →' : '← Retomar'}
-                  </button>
-                )}
-                {status !== TaskStatus.DONE && (
-                  <button 
-                    onClick={() => moveTask(task, TaskStatus.DONE)}
-                    className="text-xs font-medium text-gray-400 hover:text-green-600 bg-gray-50 px-2 py-1 rounded ml-auto"
-                  >
-                    Terminar ✓
-                  </button>
-                )}
-              </div>
-            </Card>
+              <button 
+                onClick={() => deleteTask(task.id)} 
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity p-1"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))}
           {columnTasks.length === 0 && (
-             <div className="h-24 border-2 border-dashed border-gray-100 rounded-xl flex items-center justify-center text-gray-300 text-sm">
-                Vacío
+             <div className="h-24 flex items-center justify-center text-gray-300 text-sm italic">
+                Arrastra tareas aquí
              </div>
           )}
         </div>
@@ -101,29 +109,28 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center px-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Tablero de Tareas</h1>
-          <p className="text-gray-500 mt-2">Organiza tu flujo de trabajo diario.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tablero Kanban</h1>
         </div>
-        <Button onClick={() => setIsModalOpen(true)}>
+        <Button onClick={() => setIsModalOpen(true)} className="shadow-lg">
           <Plus className="w-4 h-4 mr-2" /> Nueva Tarea
         </Button>
       </div>
 
-      <div className="flex gap-6 overflow-x-auto pb-4 h-full">
-        <Column title="Pendientes" status={TaskStatus.TODO} icon={Circle} />
-        <Column title="En Progreso" status={TaskStatus.IN_PROGRESS} icon={Clock} />
-        <Column title="Completado" status={TaskStatus.DONE} icon={CheckCircle2} />
+      <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 h-full">
+        <Column title="Por Hacer" status={TaskStatus.TODO} icon={Circle} color="text-gray-400" />
+        <Column title="En Progreso" status={TaskStatus.IN_PROGRESS} icon={Clock} color="text-blue-500" />
+        <Column title="Completado" status={TaskStatus.DONE} icon={CheckCircle2} color="text-green-500" />
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Agregar Tarea">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Agregar Tarea Rápida">
         <form onSubmit={createTask}>
-          <Label>Título de la Tarea</Label>
+          <Label>¿Qué hay que hacer?</Label>
           <Input 
             value={newTaskTitle} 
             onChange={e => setNewTaskTitle(e.target.value)} 
-            placeholder="Ej: Enviar reporte mensual a Cliente X" 
+            placeholder="Ej: Revisar campaña de Rocio" 
             autoFocus 
           />
           <div className="mt-4 flex gap-2">

@@ -40,11 +40,11 @@ export interface Client {
   createdAt: Date;
 }
 
-// Extendemos Client para usarlo como Proyecto en la vista de gestión
 export interface Project extends Client {
   status: ProjectStatus;
-  monthlyRevenue: number; // Cuánto nos paga al mes
-  nextBillingDate?: string;
+  monthlyRevenue: number;
+  billingDay: number; // Día del mes que se cobra (ej: 1, 5, 15)
+  nextBillingDate?: string; // Calculado o guardado
   notes?: string;
 }
 
@@ -53,7 +53,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
-  projectId?: string; // Vinculado a un cliente/proyecto
+  projectId?: string;
   dueDate?: string;
 }
 

@@ -2,13 +2,14 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../services/db';
 import { Service, ServiceType, ProposalStatus } from '../types';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Slider, Badge, Textarea } from '../components/UIComponents';
-import { Calculator, Check, Copy, Save, Wand2, DollarSign, TrendingUp, Layers, FileDown, Loader2 } from 'lucide-react';
+import { Calculator, Check, Copy, Save, Wand2, DollarSign, TrendingUp, Layers, FileDown, Loader2, Edit2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 export default function CalculatorPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -37,6 +38,18 @@ export default function CalculatorPage() {
     );
   };
 
+  const handlePriceChange = (id: string, newPrice: string) => {
+    const price = parseFloat(newPrice);
+    setCustomPrices(prev => ({
+        ...prev,
+        [id]: isNaN(price) ? 0 : price
+    }));
+  };
+
+  const getEffectiveCost = (service: Service) => {
+    return customPrices[service.id] !== undefined ? customPrices[service.id] : service.baseCost;
+  };
+
   const servicesByCategory = useMemo(() => {
     const grouped: Record<string, Service[]> = {};
     services.forEach(s => {
@@ -48,8 +61,16 @@ export default function CalculatorPage() {
 
   const calculations = useMemo(() => {
     const selected = services.filter(s => selectedServiceIds.includes(s.id));
-    const oneTimeCost = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + s.baseCost, 0);
-    const recurringCost = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + s.baseCost, 0);
+    
+    // Calculate costs using effective (custom) prices
+    const oneTimeCost = selected
+        .filter(s => s.type === ServiceType.ONE_TIME)
+        .reduce((acc, s) => acc + getEffectiveCost(s), 0);
+        
+    const recurringCost = selected
+        .filter(s => s.type === ServiceType.RECURRING)
+        .reduce((acc, s) => acc + getEffectiveCost(s), 0);
+        
     const totalInternalCost = oneTimeCost + (recurringCost * duration);
 
     const roundPrice = (price: number) => Math.ceil(price / 50) * 50;
@@ -62,7 +83,7 @@ export default function CalculatorPage() {
     const profitMargin = contractValue > 0 ? (profit / contractValue) * 100 : 0;
 
     return { selected, setupFee, monthlyFee, contractValue, profit, profitMargin };
-  }, [services, selectedServiceIds, margin, duration]);
+  }, [services, selectedServiceIds, margin, duration, customPrices]);
 
   // --- PDF GENERATION ---
   const generatePDF = () => {
@@ -215,7 +236,7 @@ ${Object.entries(phases).map(([phase, items]: [string, string[]]) => `\n${phase}
           id: '', 
           serviceId: s.id,
           serviceSnapshotName: s.name,
-          serviceSnapshotCost: s.baseCost
+          serviceSnapshotCost: getEffectiveCost(s) // Guardamos el costo real usado
         }))
       }, clientName);
       
@@ -297,6 +318,8 @@ ${Object.entries(phases).map(([phase, items]: [string, string[]]) => `\n${phase}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map(service => {
                     const isSelected = selectedServiceIds.includes(service.id);
+                    const effectiveCost = getEffectiveCost(service);
+                    
                     return (
                       <div 
                         key={service.id}
@@ -313,7 +336,21 @@ ${Object.entries(phases).map(([phase, items]: [string, string[]]) => `\n${phase}
                         </div>
                         <div className={`text-xs mt-2 flex justify-between items-center ${isSelected ? 'text-gray-400' : 'text-gray-500'}`}>
                           <span>{service.type === ServiceType.ONE_TIME ? 'Único' : 'Mensual'}</span>
-                          <span className="font-mono opacity-60">${service.baseCost}</span>
+                          
+                          {/* Price Display / Edit */}
+                          {isSelected ? (
+                             <div className="flex items-center gap-1 bg-gray-800 rounded px-1.5 py-0.5" onClick={(e) => e.stopPropagation()}>
+                                <span className="text-gray-400">$</span>
+                                <input 
+                                    type="number"
+                                    className="w-16 bg-transparent text-white text-right font-mono focus:outline-none focus:text-green-400 font-bold"
+                                    value={customPrices[service.id] !== undefined ? customPrices[service.id] : service.baseCost}
+                                    onChange={(e) => handlePriceChange(service.id, e.target.value)}
+                                />
+                             </div>
+                          ) : (
+                             <span className="font-mono opacity-60">${service.baseCost} Base</span>
+                          )}
                         </div>
                       </div>
                     );
