@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
@@ -83,7 +82,7 @@ export default function CalculatorPage() {
 
   const getEffectivePrice = (service: Service) => customPrices[service.id] !== undefined ? customPrices[service.id] : service.baseCost;
 
-  const servicesByCategory = useMemo(() => {
+  const servicesByCategory = useMemo<Record<string, Service[]>>(() => {
     const grouped: Record<string, Service[]> = {};
     services.forEach(s => {
       if (!grouped[s.category]) grouped[s.category] = [];
@@ -187,7 +186,7 @@ Actúa como Estratega de Agencia Senior. Escribe una propuesta para "${clientInf
 - Presupuesto Disponible: ${clientInfo.budget || 'No especificado'}
 
 **Oferta (Hoja de Ruta):**
-${Object.entries(phases).map(([phase, items]: [string, string[]]) => `\n${phase}\n${items.join('\n')}`).join('\n')}
+${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${phase}\n${items.join('\n')}`).join('\n')}
 
 **Inversión:**
 - Setup: $${setupFee.toLocaleString()} (Único)
@@ -335,7 +334,7 @@ ${Object.entries(phases).map(([phase, items]: [string, string[]]) => `\n${phase}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {Object.entries(servicesByCategory).map(([cat, items]) => (
+                      {(Object.entries(servicesByCategory) as [string, Service[]][]).map(([cat, items]) => (
                           <div key={cat} className="space-y-3">
                               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{cat}</h3>
                               {items.map(s => {
