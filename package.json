@@ -1,3 +1,4 @@
+
 {
   "name": "algoritmia-os",
   "private": true,
@@ -17,7 +18,8 @@
     "tailwind-merge": "^2.2.2",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
-    "@supabase/supabase-js": "^2.39.8"
+    "@supabase/supabase-js": "^2.39.8",
+    "@google/genai": "^0.1.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.66",

@@ -1,3 +1,4 @@
+
 export enum ServiceType {
   ONE_TIME = 'ONE_TIME',
   RECURRING = 'RECURRING',
@@ -48,6 +49,15 @@ export interface Project extends Client {
   notes?: string;
 }
 
+export interface Contractor {
+  id: string;
+  name: string;
+  role: string;
+  hourlyRate: number;
+  email?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -55,6 +65,9 @@ export interface Task {
   status: TaskStatus;
   projectId?: string;
   dueDate?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  assigneeId?: string;
+  assignee?: Contractor; // Joined data
 }
 
 export interface ProposalItem {

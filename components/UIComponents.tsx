@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // --- Card (Glass Effect) ---
-export const Card = ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+export const Card: React.FC<{ children?: React.ReactNode; className?: string }> = ({ children, className }) => (
   <div className={cn("glass-panel shadow-sm rounded-2xl overflow-hidden transition-all duration-300", className)}>
     {children}
   </div>
@@ -28,7 +28,7 @@ export const CardContent = ({ children, className }: { children?: React.ReactNod
 );
 
 // --- Modal ---
-export const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => {
+export const Modal: React.FC<{ isOpen: boolean, onClose: () => void, title: string, children?: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">

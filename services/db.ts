@@ -1,5 +1,6 @@
+
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -34,16 +35,12 @@ export const db = {
   },
   
   projects: {
-    // Mapping "Projects" in UI to "Client" table in DB as per schema logic
     getAll: async (): Promise<Project[]> => {
       const { data, error } = await supabase.from('Client').select('*');
       if (error) {
         console.error('Supabase Error (Client):', error);
         return [];
       }
-      
-      // Adapt DB fields to UI types if necessary (assuming DB has these columns)
-      // If columns are missing in DB, we provide defaults to prevent crashes
       return (data || []).map((c: any) => ({
         ...c,
         status: c.status || ProjectStatus.ACTIVE,
@@ -53,7 +50,6 @@ export const db = {
       }));
     },
     create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
-      // We manually add createdAt for consistency if DB doesn't default it
        const payload = { ...data, createdAt: new Date().toISOString() };
        const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
        if (error) throw error;
@@ -70,11 +66,30 @@ export const db = {
   },
 
   tasks: {
-    // Assuming a 'Task' table exists
     getAll: async (): Promise<Task[]> => {
-      return handleResponse<Task>(supabase.from('Task').select('*'));
+      // 1. Try fetching tasks WITH Contractor details
+      const { data, error } = await supabase
+          .from('Task')
+          .select('*, assignee:Contractor(*)')
+          .order('created_at', { ascending: false });
+
+      // 2. If it fails due to missing relationship (PGRST200), fallback to simple fetch
+      if (error && error.code === 'PGRST200') {
+          console.warn("⚠️ Relation Task -> Contractor missing in DB. Running fallback query (Tasks will load without assignees). Please run the SQL migration.");
+          return handleResponse<Task>(
+             supabase.from('Task').select('*').order('created_at', { ascending: false })
+          );
+      }
+
+      // 3. Handle other errors
+      if (error) {
+          console.error('Supabase Error:', error);
+          return [];
+      }
+
+      return data as Task[];
     },
-    create: async (data: Omit<Task, 'id'>): Promise<Task> => {
+    create: async (data: Partial<Task>): Promise<Task> => {
       const { data: created, error } = await supabase.from('Task').insert(data).select().single();
       if (error) throw error;
       return created;
@@ -90,9 +105,9 @@ export const db = {
   },
 
   proposals: {
-    create: async (data: Omit<Proposal, 'id' | 'createdAt' | 'clientId'>, clientName: string): Promise<Proposal> => {
+    create: async (data: Omit<Proposal, 'id' | 'createdAt' | 'clientId'>, clientName: string, industry?: string): Promise<Proposal> => {
         
-        // 1. Check if client exists, otherwise create it
+        // 1. Create or Get Client
         let clientId = '';
         const { data: existingClient } = await supabase.from('Client').select('id, monthlyRevenue').ilike('name', clientName).maybeSingle();
         
@@ -103,6 +118,7 @@ export const db = {
         } else {
             const { data: newClient, error: clientError } = await supabase.from('Client').insert({
                 name: clientName,
+                industry: industry || '',
                 createdAt: new Date().toISOString(),
                 status: ProjectStatus.ONBOARDING,
                 monthlyRevenue: data.totalRecurringPrice,
@@ -130,7 +146,7 @@ export const db = {
         const { data: newProposal, error: proposalError } = await supabase.from('Proposal').insert(proposalPayload).select().single();
         if (proposalError) throw proposalError;
 
-        // 3. Create Proposal Items
+        // 3. Create Proposal Items & Generate Tasks
         if (data.items && data.items.length > 0) {
             const itemsPayload = data.items.map(item => ({
                 proposalId: newProposal.id,
@@ -141,6 +157,23 @@ export const db = {
             
             const { error: itemsError } = await supabase.from('ProposalItem').insert(itemsPayload);
             if (itemsError) console.error("Error creating items", itemsError);
+
+            // AUTOMATIC TASK GENERATION
+            // We create a task for each service sold
+            const tasksPayload = data.items.map(item => ({
+                title: `Implementar: ${item.serviceSnapshotName}`,
+                description: `Servicio vendido en propuesta. Cliente: ${clientName}. Objetivo: ${data.objective}`,
+                status: TaskStatus.TODO,
+                priority: 'HIGH', // New sales are high priority
+                projectId: clientId 
+            }));
+
+            // Insert tasks one by one or bulk if supported by simple logic
+            // Using a loop for safety to ensure all get inserted even if one fails
+            for (const task of tasksPayload) {
+                 const { error: taskError } = await supabase.from('Task').insert(task);
+                 if (taskError) console.error("Error auto-creating task", taskError);
+            }
         }
 
         return newProposal;
@@ -148,14 +181,25 @@ export const db = {
     getAll: async (): Promise<Proposal[]> => {
          const { data, error } = await supabase
             .from('Proposal')
-            .select(`
-                *,
-                client:Client(*)
-            `)
+            .select(`*, client:Client(*)`)
             .order('createdAt', { ascending: false });
-            
          if (error) throw error;
          return data as Proposal[];
+    }
+  },
+
+  contractors: {
+    getAll: async (): Promise<Contractor[]> => {
+      return handleResponse<Contractor>(supabase.from('Contractor').select('*'));
+    },
+    create: async (data: Omit<Contractor, 'id' | 'created_at'>): Promise<Contractor> => {
+      const { data: created, error } = await supabase.from('Contractor').insert(data).select().single();
+      if (error) throw error;
+      return created;
+    },
+    delete: async (id: string): Promise<void> => {
+      const { error } = await supabase.from('Contractor').delete().eq('id', id);
+      if (error) throw error;
     }
   }
 };
