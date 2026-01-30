@@ -25,10 +25,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      const [p, t] = await Promise.all([db.projects.getAll(), db.tasks.getAll()]);
-      setProjects(p);
-      setTasks(t);
-      setLoading(false);
+      try {
+        const [p, t] = await Promise.all([db.projects.getAll(), db.tasks.getAll()]);
+        setProjects(p);
+        setTasks(t);
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, []);
@@ -55,7 +60,7 @@ export default function DashboardPage() {
 
   const upcomingBilling = billingAlerts.filter(p => p.billingStatus === 'today' || (p.daysDiff > 0 && p.daysDiff <= 5));
 
-  if (loading) return <div className="flex h-screen items-center justify-center">Cargando Algoritmia OS...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center text-gray-400">Cargando Algoritmia OS...</div>;
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-6">

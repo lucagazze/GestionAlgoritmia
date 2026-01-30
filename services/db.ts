@@ -6,7 +6,8 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
   const { data, error } = await query;
   if (error) {
     console.error('Supabase Error:', error);
-    throw error;
+    // Return empty array on error to prevent UI crash, but log it
+    return [];
   }
   return data || [];
 };
@@ -36,10 +37,14 @@ export const db = {
     // Mapping "Projects" in UI to "Client" table in DB as per schema logic
     getAll: async (): Promise<Project[]> => {
       const { data, error } = await supabase.from('Client').select('*');
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase Error (Client):', error);
+        return [];
+      }
       
       // Adapt DB fields to UI types if necessary (assuming DB has these columns)
-      return data.map((c: any) => ({
+      // If columns are missing in DB, we provide defaults to prevent crashes
+      return (data || []).map((c: any) => ({
         ...c,
         status: c.status || ProjectStatus.ACTIVE,
         monthlyRevenue: c.monthlyRevenue || 0,
@@ -89,7 +94,7 @@ export const db = {
         
         // 1. Check if client exists, otherwise create it
         let clientId = '';
-        const { data: existingClient } = await supabase.from('Client').select('id, monthlyRevenue').ilike('name', clientName).single();
+        const { data: existingClient } = await supabase.from('Client').select('id, monthlyRevenue').ilike('name', clientName).maybeSingle();
         
         if (existingClient) {
             clientId = existingClient.id;
