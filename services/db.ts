@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -22,7 +22,7 @@ export const db = {
         const { data, error } = await supabase
             .from('AgencySettings')
             .select('value')
-            .eq('key', 'gemini_api_key')
+            .eq('key', 'openai_api_key')
             .maybeSingle();
         
         if (error || !data) return null;
@@ -30,12 +30,12 @@ export const db = {
     },
     setApiKey: async (apiKey: string): Promise<void> => {
         // Check if exists first to decide update or insert (or use upsert if constraint exists)
-        const { data: existing } = await supabase.from('AgencySettings').select('id').eq('key', 'gemini_api_key').maybeSingle();
+        const { data: existing } = await supabase.from('AgencySettings').select('id').eq('key', 'openai_api_key').maybeSingle();
         
         if (existing) {
             await supabase.from('AgencySettings').update({ value: apiKey }).eq('id', existing.id);
         } else {
-            await supabase.from('AgencySettings').insert({ key: 'gemini_api_key', value: apiKey });
+            await supabase.from('AgencySettings').insert({ key: 'openai_api_key', value: apiKey });
         }
     }
   },
@@ -99,6 +99,21 @@ export const db = {
         const { error } = await supabase.from('Client').delete().eq('id', id);
         if (error) throw error;
     }
+  },
+
+  clientNotes: {
+      getByClient: async (clientId: string): Promise<ClientNote[]> => {
+          return handleResponse<ClientNote>(
+              supabase.from('ClientNote').select('*').eq('clientId', clientId).order('createdAt', { ascending: false })
+          );
+      },
+      create: async (data: Omit<ClientNote, 'id' | 'createdAt'>): Promise<void> => {
+          const { error } = await supabase.from('ClientNote').insert({
+              ...data,
+              createdAt: new Date().toISOString()
+          });
+          if (error) throw error;
+      }
   },
 
   tasks: {

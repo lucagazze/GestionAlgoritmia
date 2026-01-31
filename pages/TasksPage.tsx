@@ -92,14 +92,9 @@ export default function TasksPage() {
   }
 
   // --- Optimized Drag & Drop Logic ---
-  // Note: We avoid setting "draggedItem" in React State to prevent re-renders that delay the drag start.
-  // We use the native dataTransfer object.
-
   const handleDragStart = (e: React.DragEvent, id: string) => {
     e.dataTransfer.setData('text/plain', id);
     e.dataTransfer.effectAllowed = 'move';
-    // Optional: Add a class to the element being dragged for visual feedback via DOM if needed, 
-    // but default opacity usually works well.
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -112,7 +107,6 @@ export default function TasksPage() {
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
 
-    // 1. Optimistic Update (Immediate UI response)
     const taskIndex = tasks.findIndex(t => t.id === id);
     if (taskIndex === -1) return;
     
@@ -122,12 +116,10 @@ export default function TasksPage() {
     updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], status: targetStatus };
     setTasks(updatedTasks);
 
-    // 2. Network Update (Background)
     try {
         await db.tasks.updateStatus(id, targetStatus);
     } catch (err) {
         console.error("Failed to update task status", err);
-        // Revert on error
         loadData();
     }
   };
@@ -138,6 +130,19 @@ export default function TasksPage() {
         case 'LOW': return 'bg-blue-50 text-blue-700 border-blue-200';
         default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
+  };
+
+  // Helper to format date nicely
+  const formatDateDisplay = (isoString: string) => {
+      const date = new Date(isoString);
+      const today = new Date();
+      const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
+      const isTomorrow = date.getDate() === today.getDate() + 1 && date.getMonth() === today.getMonth();
+      
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const dayStr = isToday ? 'Hoy' : isTomorrow ? 'Mañana' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+      
+      return `${dayStr} ${timeStr}`;
   };
 
   const Column = ({ title, status, icon: Icon, color }: { title: string, status: TaskStatus, icon: any, color: string }) => {
@@ -199,7 +204,7 @@ export default function TasksPage() {
                             {task.dueDate && (
                                 <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md ${isOverdue ? 'bg-red-50 text-red-600 font-medium' : 'bg-gray-50 text-gray-500'}`}>
                                     <CalendarIcon className="w-3 h-3" />
-                                    {new Date(task.dueDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                    {formatDateDisplay(task.dueDate)}
                                 </div>
                             )}
                         </div>
@@ -316,7 +321,7 @@ export default function TasksPage() {
           <div>
              <Label>Fecha de Entrega</Label>
              <Input 
-                type="date" 
+                type="datetime-local" 
                 value={formData.dueDate} 
                 onChange={e => setFormData({...formData, dueDate: e.target.value})} 
              />

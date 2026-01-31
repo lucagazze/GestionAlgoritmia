@@ -1,9 +1,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
-import { Project, ProjectStatus, Contractor } from '../types';
-import { Card, Badge, Button, Modal, Input, Label } from '../components/UIComponents';
-import { MoreHorizontal, DollarSign, Calendar, TrendingUp, Plus, Trash2, Edit2, MessageCircle, FileText, User, ArrowRight, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { Project, ProjectStatus, Contractor, ClientNote, Task } from '../types';
+import { Card, Badge, Button, Modal, Input, Label, Textarea } from '../components/UIComponents';
+import { MoreHorizontal, DollarSign, Calendar, TrendingUp, Plus, Trash2, Edit2, MessageCircle, FileText, User, ArrowRight, Link as LinkIcon, ExternalLink, History, StickyNote, CheckCircle2, Mic } from 'lucide-react';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -12,7 +12,14 @@ export default function ProjectsPage() {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'HISTORY'>('PROFILE');
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Data for History Tab
+  const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
+  const [clientTasks, setClientTasks] = useState<Task[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [noteType, setNoteType] = useState<'MEETING' | 'NOTE' | 'CALL'>('NOTE');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -47,13 +54,25 @@ export default function ProjectsPage() {
     setIsLoading(false);
   };
 
+  const loadClientHistory = async (clientId: string) => {
+      // Fetch Notes
+      const notes = await db.clientNotes.getByClient(clientId);
+      // Fetch Tasks for this client
+      const allTasks = await db.tasks.getAll();
+      const relevantTasks = allTasks.filter(t => t.projectId === clientId);
+      
+      setClientNotes(notes);
+      setClientTasks(relevantTasks);
+  };
+
   const openCreateModal = () => {
       setEditingId(null);
       setFormData({ name: '', monthlyRevenue: '', billingDay: '1', phone: '', assignedPartnerId: '', outsourcingCost: '', proposalUrl: '' });
+      setActiveTab('PROFILE');
       setIsModalOpen(true);
   };
 
-  const openEditModal = (p: Project) => {
+  const openEditModal = async (p: Project) => {
       setEditingId(p.id);
       setFormData({
           name: p.name,
@@ -64,10 +83,12 @@ export default function ProjectsPage() {
           outsourcingCost: p.outsourcingCost ? p.outsourcingCost.toString() : '',
           proposalUrl: p.proposalUrl || ''
       });
+      setActiveTab('PROFILE');
+      await loadClientHistory(p.id);
       setIsModalOpen(true);
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
       e.preventDefault();
       if(!formData.name) return;
 
@@ -83,12 +104,23 @@ export default function ProjectsPage() {
 
       if (editingId) {
           await db.projects.update(editingId, payload);
+          alert('Datos actualizados');
       } else {
           await db.projects.create({ ...payload, status: ProjectStatus.ACTIVE });
+          setIsModalOpen(false); // Close on create
       }
-
-      setIsModalOpen(false);
       loadData();
+  }
+
+  const handleAddNote = async () => {
+      if (!editingId || !newNote.trim()) return;
+      await db.clientNotes.create({
+          clientId: editingId,
+          content: newNote,
+          type: noteType
+      });
+      setNewNote('');
+      loadClientHistory(editingId); // Refresh history
   }
 
   const handleDelete = async (id: string) => {
@@ -125,78 +157,161 @@ export default function ProjectsPage() {
       return { label: `Día ${billingDay}`, color: 'text-gray-500' };
   }
 
+  // Combined History Timeline
+  const getCombinedTimeline = () => {
+      const notes = clientNotes.map(n => ({ type: 'NOTE', data: n, date: new Date(n.createdAt) }));
+      const tasks = clientTasks.filter(t => t.status === 'DONE').map(t => ({ type: 'TASK', data: t, date: new Date(t.created_at || new Date()) })); // Fallback date if missing
+      
+      return [...notes, ...tasks].sort((a, b) => b.date.getTime() - a.date.getTime());
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Mis Proyectos</h1>
-          <p className="text-gray-500 mt-2">Gestiona cobros, márgenes y relaciones con socios.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Mis Clientes & Proyectos</h1>
+          <p className="text-gray-500 mt-2">Gestiona cobros, márgenes, historial y notas de seguimiento.</p>
         </div>
         <Button onClick={openCreateModal} className="shadow-lg">
             <Plus className="w-4 h-4 mr-2" /> Nuevo Proyecto
         </Button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? "Editar Proyecto" : "Nuevo Proyecto"}>
-          <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                  <Label>Nombre del Cliente</Label>
-                  <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Nike Argentina" autoFocus />
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? `Expediente: ${formData.name}` : "Nuevo Proyecto"}>
+          
+          {/* TABS */}
+          {editingId && (
+              <div className="flex border-b border-gray-100 mb-6">
+                  <button onClick={() => setActiveTab('PROFILE')} className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'PROFILE' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                      Perfil & Config
+                  </button>
+                  <button onClick={() => setActiveTab('HISTORY')} className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'HISTORY' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                      Bitácora & Historial
+                  </button>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+          )}
+
+          {activeTab === 'PROFILE' && (
+              <form onSubmit={handleSaveProfile} className="space-y-4">
                   <div>
-                    <Label>Fee Mensual ($)</Label>
-                    <Input type="number" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: e.target.value})} placeholder="1500" />
+                      <Label>Nombre del Cliente</Label>
+                      <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Nike Argentina" autoFocus />
                   </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Fee Mensual ($)</Label>
+                        <Input type="number" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: e.target.value})} placeholder="1500" />
+                      </div>
+                      <div>
+                        <Label>Día de Cobro (1-31)</Label>
+                        <Input type="number" min="1" max="31" value={formData.billingDay} onChange={e => setFormData({...formData, billingDay: e.target.value})} />
+                      </div>
+                  </div>
+
                   <div>
-                    <Label>Día de Cobro (1-31)</Label>
-                    <Input type="number" min="1" max="31" value={formData.billingDay} onChange={e => setFormData({...formData, billingDay: e.target.value})} />
+                      <Label>WhatsApp (Cobros Automáticos)</Label>
+                      <Input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="Ej: 54911..." />
+                      <p className="text-[10px] text-gray-400 mt-1">Ingresa el código de país (ej: 549 para Arg) para que funcione el link.</p>
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                          <User className="w-4 h-4 text-gray-500"/>
+                          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Outsourcing & Socios</span>
+                      </div>
+                      
+                      <div>
+                          <Label>Socio Asignado (Quién lo hace)</Label>
+                          <select 
+                                className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                                value={formData.assignedPartnerId}
+                                onChange={e => setFormData({...formData, assignedPartnerId: e.target.value})}
+                          >
+                              <option value="">(Lo hago yo internamente)</option>
+                              {contractors.map(c => <option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
+                          </select>
+                      </div>
+
+                      {formData.assignedPartnerId && (
+                          <div>
+                                <Label>Costo del Socio ($)</Label>
+                                <Input type="number" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: e.target.value})} placeholder="Monto que le pagas al socio" />
+                          </div>
+                      )}
+                  </div>
+
+                  <div>
+                      <Label>Link de Propuesta (PDF)</Label>
+                      <Input value={formData.proposalUrl} onChange={e => setFormData({...formData, proposalUrl: e.target.value})} placeholder="https://drive.google.com/..." />
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                      <Button type="submit" className="w-full">Guardar Cambios</Button>
+                  </div>
+              </form>
+          )}
+
+          {activeTab === 'HISTORY' && (
+              <div className="space-y-6 h-[400px] flex flex-col">
+                  {/* Add Note */}
+                  <div className="flex gap-2 items-start">
+                      <div className="flex-1">
+                          <Textarea 
+                             value={newNote} 
+                             onChange={e => setNewNote(e.target.value)} 
+                             placeholder="Escribe una nota, reunión o hito..." 
+                             className="min-h-[60px] text-xs"
+                          />
+                          <div className="flex gap-2 mt-2">
+                              <button onClick={() => setNoteType('NOTE')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'NOTE' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Nota</button>
+                              <button onClick={() => setNoteType('MEETING')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'MEETING' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Reunión</button>
+                              <button onClick={() => setNoteType('CALL')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'CALL' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Llamada</button>
+                          </div>
+                      </div>
+                      <Button onClick={handleAddNote} size="sm" disabled={!newNote.trim()}>
+                          Agregar
+                      </Button>
+                  </div>
+
+                  {/* Timeline */}
+                  <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar bg-gray-50/50 p-4 rounded-xl border border-gray-100">
+                      {getCombinedTimeline().length === 0 && <p className="text-center text-xs text-gray-400 py-4">No hay historial registrado.</p>}
+                      
+                      {getCombinedTimeline().map((item: any, idx) => (
+                          <div key={idx} className="flex gap-3">
+                              <div className="flex flex-col items-center">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 ${item.type === 'TASK' ? 'bg-green-400' : 'bg-blue-400'}`}></div>
+                                  <div className="w-px h-full bg-gray-200 my-1"></div>
+                              </div>
+                              <div className="pb-4">
+                                  <p className="text-[10px] text-gray-400 font-mono mb-0.5">
+                                      {item.date.toLocaleDateString()}
+                                  </p>
+                                  {item.type === 'TASK' ? (
+                                      <div className="bg-white border border-gray-100 p-2 rounded-lg shadow-sm">
+                                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                                              <CheckCircle2 className="w-3 h-3 text-green-500"/> Tarea Completada
+                                          </div>
+                                          <p className="text-xs text-gray-600 mt-1">{item.data.title}</p>
+                                      </div>
+                                  ) : (
+                                      <div className="bg-white border border-gray-100 p-2 rounded-lg shadow-sm">
+                                           <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wide">
+                                              {item.data.type === 'MEETING' && <Mic className="w-3 h-3 text-purple-500"/>}
+                                              {item.data.type === 'NOTE' && <StickyNote className="w-3 h-3 text-yellow-500"/>}
+                                              {item.data.type}
+                                          </div>
+                                          <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{item.data.content}</p>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      ))}
                   </div>
               </div>
+          )}
 
-              <div>
-                  <Label>WhatsApp (Cobros Automáticos)</Label>
-                  <Input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="Ej: 54911..." />
-                  <p className="text-[10px] text-gray-400 mt-1">Ingresa el código de país (ej: 549 para Arg) para que funcione el link.</p>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-                   <div className="flex items-center gap-2 mb-2">
-                       <User className="w-4 h-4 text-gray-500"/>
-                       <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Outsourcing & Socios</span>
-                   </div>
-                   
-                   <div>
-                       <Label>Socio Asignado (Quién lo hace)</Label>
-                       <select 
-                            className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-black"
-                            value={formData.assignedPartnerId}
-                            onChange={e => setFormData({...formData, assignedPartnerId: e.target.value})}
-                       >
-                           <option value="">(Lo hago yo internamente)</option>
-                           {contractors.map(c => <option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
-                       </select>
-                   </div>
-
-                   {formData.assignedPartnerId && (
-                       <div>
-                            <Label>Costo del Socio ($)</Label>
-                            <Input type="number" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: e.target.value})} placeholder="Monto que le pagas al socio" />
-                       </div>
-                   )}
-              </div>
-
-              <div>
-                  <Label>Link de Propuesta (PDF)</Label>
-                  <Input value={formData.proposalUrl} onChange={e => setFormData({...formData, proposalUrl: e.target.value})} placeholder="https://drive.google.com/..." />
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                   <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">Cancelar</Button>
-                   <Button type="submit" className="flex-1">Guardar</Button>
-              </div>
-          </form>
       </Modal>
 
       {isLoading ? (
@@ -281,17 +396,22 @@ export default function ProjectsPage() {
                       <span className={`text-sm ${billingInfo.color}`}>{billingInfo.label}</span>
                   </div>
                   
-                  {waLink ? (
-                      <a href={waLink} target="_blank" rel="noreferrer">
-                          <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white border-none shadow-green-200">
-                              <MessageCircle className="w-4 h-4 mr-2" /> Cobrar
-                          </Button>
-                      </a>
-                  ) : (
-                      <Button size="sm" variant="outline" disabled className="opacity-50">
-                          <MessageCircle className="w-4 h-4 mr-2" /> Sin Tel
+                  <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => openEditModal(project)}>
+                          <History className="w-4 h-4 mr-2" /> Historial
                       </Button>
-                  )}
+                      {waLink ? (
+                          <a href={waLink} target="_blank" rel="noreferrer">
+                              <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white border-none shadow-green-200 px-3">
+                                  <MessageCircle className="w-4 h-4" />
+                              </Button>
+                          </a>
+                      ) : (
+                          <Button size="sm" variant="outline" disabled className="opacity-50 px-3">
+                              <MessageCircle className="w-4 h-4" />
+                          </Button>
+                      )}
+                  </div>
                 </div>
 
               </div>

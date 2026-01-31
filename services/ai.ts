@@ -1,172 +1,143 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
 
+const CALL_OPENAI = async (messages: any[], jsonMode: boolean = false) => {
+    // 1. Get Key from DB
+    const apiKey = await db.settings.getApiKey();
+
+    if (!apiKey) throw new Error("API Key missing. Por favor configúrala en la sección Ajustes.");
+
+    try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                messages: messages,
+                response_format: jsonMode ? { type: "json_object" } : undefined,
+                temperature: 0.7
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || "OpenAI API Error");
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+
+    } catch (error) {
+        console.error("OpenAI Error:", error);
+        throw error;
+    }
+};
+
 export const ai = {
-  // --- CHAT GENERAL (Para la calculadora y asistentes simples) ---
+  // --- CHAT GENERAL ---
   chat: async (messages: {role: 'system' | 'user' | 'assistant', content: string}[]) => {
     try {
-      // 1. Try env var, 2. Try Database Settings
-      let apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === '""') {
-          apiKey = await db.settings.getApiKey() || "";
-      }
-
-      if (!apiKey) return "Error: API Key no configurada. Ve a Ajustes > Configuración.";
-
-      const aiClient = new GoogleGenAI({ apiKey });
-      
-      const contents = messages.map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-      }));
-      // Filter out system message from contents array for the model, pass it as config
-      const systemMsg = messages.find(m => m.role === 'system')?.content;
-      const chatContents = messages.filter(m => m.role !== 'system').map(m => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }]
-      }));
-
-      const response = await aiClient.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: chatContents,
-        config: { systemInstruction: systemMsg }
-      });
-
-      return response.text;
+      return await CALL_OPENAI(messages);
     } catch (error) {
-      console.error("AI Error:", error);
-      return "Error de conexión con IA. Verifica tu API Key.";
+      return "Error: No se pudo conectar con la IA. Verifica tu API Key en Ajustes.";
     }
   },
 
-  // --- AGENTE DE VENTAS (SALES COPILOT) ---
+  // --- AGENTE DE VENTAS ---
   salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
       try {
-        let apiKey = process.env.API_KEY;
-        if (!apiKey || apiKey === '""') {
-            apiKey = await db.settings.getApiKey() || "";
-        }
-        if (!apiKey) throw new Error("API Key missing");
-        
-        const aiClient = new GoogleGenAI({ apiKey });
-
         let systemPrompt = `
-        Eres el Director Comercial Senior de "Algoritmia". Eres experto en metodologías de venta consultiva (SPIN Selling, Challenger Sale, Sandler).
-        Tu tono es: Seguro, Profesional, Persuasivo pero ético, y Psicológicamente astuto.
-        Nunca des respuestas genéricas. Ve al grano.
+        Eres el Director Comercial Senior de "Algoritmia".
+        Objetivo: Ayudar a cerrar ventas high-ticket.
         `;
 
         let userPrompt = "";
 
         if (mode === 'SCRIPT') {
-            systemPrompt += " Tu objetivo es redactar el guion perfecto para la situación descrita.";
-            userPrompt = `
-            Contexto: ${inputData.context}
-            Cliente: ${inputData.clientName} (${inputData.industry})
-            Situación/Objetivo: ${inputData.goal}
-            
-            Genera:
-            1. Un asunto (si es email) o gancho de apertura (si es chat/llamada) irresistible.
-            2. El cuerpo del mensaje (conciso, enfocado en el beneficio del cliente).
-            3. Una explicación breve de por qué funcionará este enfoque (psicología).
-            `;
+            userPrompt = `Genera un guion de ventas para: ${inputData.context}. Cliente: ${inputData.clientName}. Objetivo: ${inputData.goal}`;
         } 
         else if (mode === 'ANALYSIS') {
-            systemPrompt += " Tu objetivo es analizar la conversación, detectar objeciones ocultas, medir la temperatura del lead y decirme qué responder.";
-            userPrompt = `
-            Cliente: ${inputData.clientName}
-            Último mensaje del cliente/Situación: "${inputData.lastMessage}"
-            Historial reciente: ${inputData.history || 'N/A'}
-
-            Analiza:
-            1. ¿Qué está pensando realmente el cliente? (Subtexto).
-            2. Temperatura del Lead (0-100%).
-            3. Estrategia recomendada.
-            4. Respuesta sugerida (lista para copiar y pegar).
-            `;
+            userPrompt = `Analiza esta respuesta del cliente: "${inputData.lastMessage}". Dame una estrategia y respuesta.`;
         }
 
-        const response = await aiClient.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-            config: { systemInstruction: systemPrompt }
-        });
+        const messages = [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ];
 
-        return response.text;
+        return await CALL_OPENAI(messages);
 
       } catch (error) {
-          console.error("Sales Coach Error", error);
-          return "Error consultando al experto en ventas. Verifica la API Key en Ajustes.";
+          return "Error consultando al experto en ventas.";
       }
   },
 
   // --- AGENTE DEL SISTEMA (Router & Ejecutor) ---
   agent: async (userInput: string, contextHistory: any[] = []) => {
       try {
-        let apiKey = process.env.API_KEY;
-        if (!apiKey || apiKey === '""') {
-            apiKey = await db.settings.getApiKey() || "";
-        }
-        if (!apiKey) throw new Error("API Key missing");
-
-        const aiClient = new GoogleGenAI({ apiKey });
+        // INJECT PRECISE DATE CONTEXT
+        const now = new Date();
+        const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        
+        const dateContext = `
+        CONTEXTO TEMPORAL ACTUAL:
+        - HOY ES: ${localDate}
+        - HORA ACTUAL: ${localTime}
+        - ISO STRING BASE: ${now.toISOString()}
+        
+        INSTRUCCIONES PARA FECHAS ("dueDate"):
+        1. Si el usuario dice "mañana a las 19:00", calcula la fecha de mañana y ajusta la hora a las 19:00:00.
+        2. Si dice "el viernes", busca el próximo viernes.
+        3. Devuelve SIEMPRE el formato ISO 8601 completo (ej: 2024-05-20T19:00:00.000Z).
+        `;
 
         const systemPrompt = `
-        Eres el Sistema Operativo Inteligente de "Algoritmia OS" (una agencia). Tu objetivo es ejecutar acciones o navegar por la app.
+        Eres el Sistema Operativo Inteligente de "Algoritmia OS".
         
-        RUTAS DISPONIBLES:
-        - Calculadora/Propuestas: '/calculator'
-        - Clientes/Proyectos: '/projects'
-        - Tareas: '/tasks'
-        - Servicios: '/services'
-        - Socios: '/partners'
-        - Ajustes: '/settings'
-        - Copiloto de Ventas: '/sales-copilot'
+        ${dateContext}
 
-        ACCIONES DISPONIBLES (Tu puedes ejecutarlas generando el JSON correcto):
-        - CREATE_TASK: Requiere 'title'. Opcional: 'priority' (LOW, MEDIUM, HIGH).
-        - CREATE_PROJECT: Requiere 'name'. Opcional: 'monthlyRevenue'.
+        ACCIONES DISPONIBLES (Responde SOLO JSON):
+        
+        1. CREATE_TASK:
+           - 'title': string (Resumen corto).
+           - 'priority': 'LOW' | 'MEDIUM' | 'HIGH' (Si menciona urgencia es HIGH).
+           - 'dueDate': string (ISO 8601). OBLIGATORIO si menciona tiempo. Si no, null.
 
-        REGLAS:
-        1. Si el usuario quiere ir a un lugar, devuelve type: "NAVIGATE".
-        2. Si el usuario quiere crear algo y tienes toda la info, devuelve type: "ACTION".
-        3. Si el usuario quiere crear algo pero FALTA información (ej: "crear tarea" pero no dice cual), devuelve type: "QUESTION" para preguntar.
-        4. Si es charla casual, devuelve type: "CHAT".
+        2. CREATE_PROJECT: 
+           - 'name': string
+           - 'monthlyRevenue': number
 
-        Debes responder SIEMPRE un objeto JSON con este formato:
+        3. NAVIGATE:
+           - payload: '/tasks', '/projects', '/settings', etc.
+
+        FORMATO JSON:
         {
             "type": "NAVIGATE" | "ACTION" | "QUESTION" | "CHAT",
-            "payload": { ...datos de la acción o ruta... },
-            "message": "Texto corto y amigable para el usuario"
+            "action": "CREATE_TASK" | "CREATE_PROJECT" | null,
+            "payload": { ... },
+            "message": "Texto corto confirmando la acción (ej: 'Agendado para mañana 19hs')."
         }
         `;
 
-        const history = contextHistory.map(m => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }]
-        }));
+        const messages = [
+            { role: "system", content: systemPrompt },
+            ...contextHistory.map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: userInput }
+        ];
 
-        history.push({ role: 'user', parts: [{ text: userInput }] });
-
-        const response = await aiClient.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: history,
-            config: {
-                systemInstruction: systemPrompt,
-                responseMimeType: "application/json"
-            }
-        });
-
-        const text = response.text;
-        if (!text) throw new Error("No response");
+        const responseText = await CALL_OPENAI(messages, true); // Enable JSON mode
         
-        const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanJson);
+        if (!responseText) throw new Error("No response from AI");
+        
+        return JSON.parse(responseText);
 
       } catch (error) {
           console.error("Agent Error", error);
-          return { type: "CHAT", message: "Lo siento, verifica que la API Key esté guardada en Ajustes." };
+          return { type: "CHAT", message: "Error procesando solicitud. Verifica tu API Key en Ajustes." };
       }
   }
 };

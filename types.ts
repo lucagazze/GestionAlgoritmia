@@ -77,6 +77,15 @@ export interface Task {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   assigneeId?: string;
   assignee?: Contractor; // Joined data
+  created_at?: string; // Supabase default
+}
+
+export interface ClientNote {
+    id: string;
+    clientId: string;
+    content: string;
+    type: 'MEETING' | 'NOTE' | 'CALL' | 'PAYMENT';
+    createdAt: string;
 }
 
 export interface ProposalItem {
