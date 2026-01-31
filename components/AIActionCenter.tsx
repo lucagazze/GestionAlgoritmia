@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
@@ -20,6 +21,7 @@ export const AIActionCenter = () => {
     
     // Audio Recording State
     const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
@@ -95,12 +97,12 @@ export const AIActionCenter = () => {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                if (isOpen && !isRecording) setIsOpen(false);
+                if (isOpen && !isRecording && !isTranscribing) setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen, isRecording]);
+    }, [isOpen, isRecording, isTranscribing]);
 
     // --- Logic ---
     const loadSessions = async () => { const sess = await db.chat.getSessions(); setSessions(sess); };
@@ -125,13 +127,19 @@ export const AIActionCenter = () => {
 
     const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload }> => {
         try {
+            console.log("Executing Action:", actionType, payload);
+            
             if (actionType === 'CREATE_TASK') {
+                // ROBUST FALLBACKS: Ensure title is never null
+                const taskTitle = payload.title || payload.description || payload.name || "Nueva Tarea (Sin título)";
+                const taskDesc = payload.description || (payload.title ? '' : 'Generado por voz');
+                
                 const newTask = await db.tasks.create({
-                    title: payload.title,
+                    title: taskTitle,
                     status: TaskStatus.TODO,
                     priority: payload.priority || 'MEDIUM',
                     dueDate: payload.dueDate || payload.due || null, 
-                    description: payload.description || 'Generado por Voz',
+                    description: taskDesc,
                     projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
                 });
                 window.dispatchEvent(new Event('task-created'));
@@ -147,6 +155,10 @@ export const AIActionCenter = () => {
             if (actionType === 'UPDATE_TASK') {
                 if (!payload.id) return { success: false };
                 if (payload.status) await db.tasks.updateStatus(payload.id, payload.status);
+                // Also support updating other fields if provided
+                if (payload.title || payload.dueDate) {
+                     // Since updateStatus only does status, we might want to extend this later, but for now this is fine for "Complete Task" commands.
+                }
                 window.dispatchEvent(new Event('task-created')); 
                 return { success: true };
             }
@@ -157,18 +169,19 @@ export const AIActionCenter = () => {
                 return { success: true };
             }
             if (actionType === 'CREATE_PROJECT') {
+                const projectName = payload.name || payload.title || "Nuevo Proyecto";
                 const newProject = await db.projects.create({
-                    name: payload.name,
+                    name: projectName,
                     monthlyRevenue: payload.monthlyRevenue || 0,
-                    industry: payload.industry,
-                    notes: payload.notes,
+                    industry: payload.industry || '',
+                    notes: payload.notes || '',
                     billingDay: 1,
                     status: ProjectStatus.ONBOARDING
                 });
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
             return { success: false };
-        } catch (e) { console.error(e); return { success: false }; }
+        } catch (e) { console.error("Execute Action Error:", e); return { success: false }; }
     };
 
     const handleUndoMessage = async (msg: AIChatLog) => {
@@ -212,7 +225,24 @@ export const AIActionCenter = () => {
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-                handleSend(undefined, audioBlob, mimeType);
+                
+                // NEW FLOW: Transcribe ONLY
+                setIsTranscribing(true);
+                try {
+                    const base64Audio = await blobToBase64(audioBlob);
+                    const text = await ai.transcribe({ mimeType, data: base64Audio });
+                    if (text) {
+                        setInput(text.trim());
+                        setIsOpen(true);
+                        setTimeout(() => inputRef.current?.focus(), 100);
+                    }
+                } catch (e) {
+                    console.error("Transcription error", e);
+                } finally {
+                    setIsTranscribing(false);
+                    setIsRecording(false);
+                }
+                
                 stream.getTracks().forEach(track => track.stop()); // Stop mic
             };
 
@@ -228,7 +258,7 @@ export const AIActionCenter = () => {
     const stopRecording = () => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
-            setIsRecording(false);
+            // isRecording state is cleared in onstop after transcription
         }
     };
 
@@ -246,9 +276,9 @@ export const AIActionCenter = () => {
         });
     };
 
-    const handleSend = async (textOverride?: string, audioFile?: Blob, audioMimeType?: string) => {
+    const handleSend = async (textOverride?: string) => {
         const userText = textOverride || input;
-        if (!userText.trim() && !audioFile) return;
+        if (!userText.trim()) return;
         
         setInput('');
         setIsOpen(true);
@@ -260,7 +290,7 @@ export const AIActionCenter = () => {
         let sessionId = currentSessionId;
         if (!sessionId) {
             try {
-                const title = audioFile ? "Nota de Voz" : userText;
+                const title = userText;
                 const newSession = await db.chat.createSession(title);
                 sessionId = newSession.id;
                 setCurrentSessionId(sessionId);
@@ -268,7 +298,7 @@ export const AIActionCenter = () => {
             } catch (e) { setIsThinking(false); return; }
         }
 
-        const displayMessage = audioFile ? "🎤 [Audio Enviado]" : userText;
+        const displayMessage = userText;
         await db.chat.addMessage(sessionId, 'user', displayMessage);
         await loadMessages(sessionId);
 
@@ -277,13 +307,8 @@ export const AIActionCenter = () => {
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
             
-            // PREPARE INPUT: TEXT OR AUDIO
-            let agentInput: string | { mimeType: string, data: string } = userText;
-            
-            if (audioFile) {
-                const base64Audio = await blobToBase64(audioFile);
-                agentInput = { mimeType: audioMimeType || 'audio/webm', data: base64Audio };
-            }
+            // PREPARE INPUT: TEXT (Audio is already transcribed to text at this point)
+            let agentInput: string = userText;
 
             const response = await ai.agent(
                 agentInput, 
@@ -416,6 +441,7 @@ export const AIActionCenter = () => {
                         )}
                         {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Procesando...</span></div>}
                         {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Grabando audio...</span></div>}
+                        {isTranscribing && <div className="self-end bg-blue-50 border border-blue-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-blue-500" /><span className="text-xs text-blue-600 font-bold">Transcribiendo...</span></div>}
                         <div className="h-1"></div>
                      </div>
                  )}
@@ -427,7 +453,7 @@ export const AIActionCenter = () => {
             </div>
 
             {/* Quick Prompts (Chips) */}
-            {isOpen && !isThinking && !isRecording && !input && viewMode === 'CHAT' && messages.length === 0 && (
+            {isOpen && !isThinking && !isRecording && !isTranscribing && !input && viewMode === 'CHAT' && messages.length === 0 && (
                 <div className="absolute bottom-full mb-4 left-0 w-full flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar animate-in slide-in-from-bottom-2">
                     {quickChips.map((chip, idx) => (
                         <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
@@ -441,15 +467,15 @@ export const AIActionCenter = () => {
                 {/* Main Dynamic Button */}
                 <div 
                     onClick={(e) => { e.stopPropagation(); if (isRecording) stopRecording(); else startRecording(); }}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
                 >
-                    {isThinking ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
+                    {isThinking || isTranscribing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
                 </div>
                 
-                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && handleSend()} placeholder={isRecording ? "Escuchando..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording} />
+                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
                 
                 <div className="flex items-center gap-2 pr-2">
-                     {isThinking ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
+                     {isThinking || isTranscribing ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>
         </div>

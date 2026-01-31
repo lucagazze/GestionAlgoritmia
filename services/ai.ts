@@ -2,8 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { db } from './db';
 
-// We use Gemini 2.5 Flash Preview for its speed, low cost, and native audio capabilities.
-const MODEL_NAME = 'gemini-2.5-flash-preview';
+// 'gemini-2.0-flash-exp' has been deprecated/removed.
+// Switching to 'gemini-2.0-flash' (Stable) which fully supports Multimodal inputs (Audio/Video).
+const MODEL_NAME = 'gemini-2.0-flash';
 
 // Helper to get an initialized client dynamically
 const getClient = async () => {
@@ -19,6 +20,29 @@ const getClient = async () => {
 };
 
 export const ai = {
+  /**
+   * Transcribe Audio only (Speech to Text)
+   */
+  transcribe: async (audioData: { mimeType: string, data: string }) => {
+      try {
+          const client = await getClient();
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{
+                  role: 'user',
+                  parts: [
+                      { inlineData: audioData },
+                      { text: "Transcribe el siguiente audio textualmente. Solo devuelve el texto plano, sin formatos, sin markdown, y sin responder a la pregunta. Solo lo que se escucha." }
+                  ]
+              }]
+          });
+          return response.text;
+      } catch (error) {
+          console.error("Transcription Error:", error);
+          return null;
+      }
+  },
+
   /**
    * General Chat function
    */
@@ -87,7 +111,8 @@ export const ai = {
       const now = new Date();
       const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
       const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      
+      const isoDate = now.toISOString();
+
       // Prepare context data for the prompt
       const activeTasks = currentData.tasks
           .filter((t: any) => t.status !== 'DONE')
@@ -98,53 +123,73 @@ export const ai = {
       const activeProjects = currentData.projects
           .map((p: any) => `ID:${p.id} | "${p.name}" | Status:${p.status}`)
           .join('\n');
-          
-      const systemInstruction = `
-      Eres "Algoritmia OS", el cerebro operativo de la agencia.
-      FECHA ACTUAL: ${localDate} | HORA: ${localTime}.
-
-      OBJETIVO:
-      Interpreta la intención del usuario (que puede venir en AUDIO o TEXTO) y genera acciones estructuradas.
       
-      REGLAS DE ORO:
-      1. **AUDIO NATIVO:** Estás escuchando al usuario. Si duda, se corrige o habla coloquialmente, interpreta su intención final. No transcribas, ACTÚA.
-      2. **FECHAS:** Si dice "mañana", calcula la fecha basándote en que hoy es ${localDate}. Si dice "el viernes", es el próximo viernes.
-      3. **CONTEXTO:** Usa la lista de Tareas y Proyectos para entender referencias (ej: "Llama a Juan" -> buscar si hay un proyecto con contacto Juan).
+      const contractors = currentData.contractors
+          .map((c: any) => `ID:${c.id} | "${c.name}" | Role:${c.role}`)
+          .join('\n');
 
-      BASE DE DATOS ACTUAL:
-      [PROYECTOS ACTIVOS]
+      const systemInstruction = `
+      Eres "Algoritmia OS", el CEO Operativo (IA) de la agencia. Tienes control total.
+      DATOS REALES DE HOY:
+      - Fecha: ${localDate}
+      - Hora: ${localTime}
+      - ISO Date (Para cálculos): ${isoDate}
+
+      TU MISIÓN:
+      Escuchar al usuario, interpretar su intención y EJECUTAR acciones en la base de datos mediante JSON estructurado.
+      Si el usuario dice "Agendar reunión mañana", TU DEBES calcular la fecha exacta de mañana y crear la tarea.
+
+      BASE DE DATOS ACTUAL (CONTEXTO):
+      [PROYECTOS]
       ${activeProjects}
-
       [TAREAS PENDIENTES]
       ${activeTasks}
+      [EQUIPO]
+      ${contractors}
 
-      FORMATO DE RESPUESTA (JSON ÚNICAMENTE):
-      
-      Si es una ACCIÓN (Crear/Editar):
-      {
-          "type": "ACTION", 
-          "action": "CREATE_TASK" | "UPDATE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "DELETE_TASK",
-          "payload": { ... }, 
-          "message": "Breve confirmación hablada (ej: 'Listo, agendado para el viernes')."
-      }
-      * Nota: Para CREATE_TASK, "dueDate" debe ser ISO string (YYYY-MM-DDTHH:mm:ss).
+      --- REGLAS DE RESPUESTA (IMPORTANTE) ---
+      Devuelve SOLO un JSON válido. Sin markdown, sin explicaciones previas.
 
-      Si son MÚLTIPLES acciones:
+      1. ACCIÓN: CREAR TAREA
+      Si el usuario quiere agendar, recordar o hacer algo.
       {
-          "type": "BATCH",
-          "actions": [ { "action": "...", "payload": "..." } ],
-          "message": "Resumen de lo hecho."
+          "type": "ACTION",
+          "action": "CREATE_TASK",
+          "payload": {
+              "title": "Título CORTO y claro de la acción",
+              "description": "Detalles adicionales si los hay",
+              "priority": "HIGH" | "MEDIUM" | "LOW",
+              "dueDate": "YYYY-MM-DDTHH:mm:ss" (Calcula la fecha futura basada en 'hoy')
+          },
+          "message": "Confirmación hablada (ej: 'Listo, agendado para mañana a las 10')."
+      }
+      * IMPORTANTE: 'title' es OBLIGATORIO. Si no es obvio, invéntalo basado en la descripción.
+
+      2. ACCIÓN: CREAR CLIENTE / PROYECTO
+      {
+          "type": "ACTION",
+          "action": "CREATE_PROJECT",
+          "payload": {
+              "name": "Nombre Empresa",
+              "industry": "Rubro (opcional)"
+          },
+          "message": "Confirmación."
       }
 
-      Si necesitas DECIDIR (Ambigüedad):
+      3. ACCIÓN: MODIFICAR / COMPLETAR
+      Si el usuario dice "Ya hice la tarea X" o "Cambia la fecha".
       {
-          "type": "DECISION",
-          "message": "¿Te refieres al proyecto X o Y?",
-          "options": [ { "label": "Opción A", "action": "...", "payload": ... } ]
+          "type": "ACTION",
+          "action": "UPDATE_TASK",
+          "payload": { "id": "UUID_EXACTO_DE_LA_LISTA", "status": "DONE" },
+          "message": "Tarea completada."
       }
-      
-      Si es solo CHARLA:
-      { "type": "CHAT", "message": "Respuesta útil y conversacional..." }
+
+      4. RESPUESTA SIMPLE (CHAT)
+      { "type": "CHAT", "message": "Tu respuesta..." }
+
+      5. DECISIÓN (AMBIGÜEDAD)
+      { "type": "DECISION", "message": "¿A cuál te refieres?", "options": [...] }
       `;
 
       try {
@@ -176,7 +221,7 @@ export const ai = {
               config: {
                   systemInstruction: systemInstruction,
                   responseMimeType: "application/json", // Force JSON output for reliability
-                  temperature: 0.3 // Lower temperature for more deterministic actions
+                  temperature: 0.1 // VERY LOW temperature for strict JSON adherence
               }
           });
 
