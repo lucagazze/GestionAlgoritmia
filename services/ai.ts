@@ -55,11 +55,76 @@ export const ai = {
   },
 
   salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
-      // ... (Existing Sales Coach Logic kept brief for this file update) ...
       return await fetchOpenAI([
           { role: 'system', content: "Eres director comercial." },
           { role: 'user', content: JSON.stringify(inputData) }
       ]);
+  },
+
+  analyzeAgencyHealth: async (projects: any[], tasks: any[]) => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Filter only relevant data to save tokens
+      const riskProjects = projects.filter(p => {
+          if (p.status !== 'ACTIVE' && p.status !== 'ONBOARDING') return false;
+          // Check ghosting (>7 days)
+          const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : new Date(p.createdAt);
+          const diffDays = Math.ceil(Math.abs(new Date().getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
+          return diffDays > 7;
+      }).map(p => ({
+          id: p.id,
+          name: p.name,
+          industry: p.industry,
+          phone: p.phone,
+          lastContactDays: Math.ceil(Math.abs(new Date().getTime() - (p.lastContactDate ? new Date(p.lastContactDate).getTime() : new Date(p.createdAt).getTime())) / (1000 * 60 * 60 * 24))
+      }));
+
+      const overdueTasksCount = tasks.filter(t => t.status !== 'DONE' && t.dueDate && t.dueDate < new Date().toISOString()).length;
+      
+      const prompt = `
+      Eres un "Auditor de Agencia" experto y proactivo. Analiza la situación hoy (${today}).
+      
+      DATA:
+      - Clientes en Riesgo (Ghosting > 7 días): ${JSON.stringify(riskProjects)}
+      - Tareas Vencidas: ${overdueTasksCount}
+      
+      TAREA:
+      Genera un reporte JSON accionable.
+      
+      Para cada cliente en riesgo ("riskClients"), REDACTA UN MENSAJE DE REACTIVACIÓN ("recoveryMessage") para enviar por WhatsApp. 
+      El mensaje debe ser casual, empático y profesional (ej: "Hola [Nombre], hace mucho no hablamos, quería contarte que...").
+      
+      FORMATO JSON:
+      {
+        "overallScore": 0-100, (100 es perfecto)
+        "summary": "Resumen corto de 1 linea",
+        "actionItems": [
+            {
+                "type": "CLIENT_GHOSTING",
+                "clientId": "...",
+                "title": "Cliente Descuidado: [Nombre]",
+                "description": "Hace X días no hay contacto.",
+                "actionLabel": "Enviar Mensaje",
+                "generatedMessage": "Hola [Nombre]..." 
+            },
+            {
+                "type": "OVERDUE_TASKS",
+                "title": "Limpieza de Tareas",
+                "description": "Tienes X tareas vencidas.",
+                "actionLabel": "Reprogramar para Hoy",
+                "count": ${overdueTasksCount}
+            }
+        ]
+      }
+      `;
+
+      const response = await fetchOpenAI([{ role: 'system', content: "Eres un auditor operativo." }, { role: 'user', content: prompt }], true);
+      try {
+          return JSON.parse(response || "{}");
+      } catch (e) {
+          console.error("Error parsing health scan", e);
+          return null;
+      }
   },
 
   agent: async (userInput: string, contextHistory: any[] = [], currentData: any, signal?: AbortSignal) => {

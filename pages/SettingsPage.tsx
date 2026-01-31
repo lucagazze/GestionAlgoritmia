@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { Card, CardContent, CardHeader, CardTitle, Input, Button, Label } from '../components/UIComponents';
-import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy } from 'lucide-react';
 
 export default function SettingsPage() {
     const [apiKey, setApiKey] = useState('');
@@ -35,32 +35,74 @@ export default function SettingsPage() {
             setTimeout(() => setSuccess(false), 3000);
         } catch (e) {
             console.error("Error saving settings", e);
-            alert("Error guardando la clave. Verifica que la tabla 'AgencySettings' exista en Supabase.");
+            alert("Error guardando la clave. Asegúrate de correr el Script de Base de Datos de abajo.");
         } finally {
             setSaving(false);
         }
     };
 
+    const sqlScript = `
+-- 1. Crear tabla de Procedimientos (SOPs)
+create table if not exists "SOP" (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  category text not null,
+  content text,
+  "updatedAt" timestamp with time zone default now()
+);
+
+-- 2. Crear tabla de Notas de Cliente (Para Bitácora IA)
+create table if not exists "ClientNote" (
+  id uuid default gen_random_uuid() primary key,
+  "clientId" uuid references "Client"(id) on delete cascade,
+  content text not null,
+  type text not null, -- 'MEETING', 'NOTE', 'CALL', 'PAYMENT'
+  "createdAt" timestamp with time zone default now()
+);
+
+-- 3. Actualizar tabla Clientes (Scanner y Portal)
+alter table "Client" add column if not exists phone text;
+alter table "Client" add column if not exists "outsourcingCost" numeric default 0;
+alter table "Client" add column if not exists "assignedPartnerId" uuid references "Contractor"(id);
+alter table "Client" add column if not exists "proposalUrl" text;
+alter table "Client" add column if not exists "healthScore" text default 'GOOD';
+alter table "Client" add column if not exists "lastPaymentDate" timestamp with time zone;
+alter table "Client" add column if not exists "lastContactDate" timestamp with time zone;
+alter table "Client" add column if not exists resources jsonb default '[]'::jsonb;
+alter table "Client" add column if not exists contacts jsonb default '[]'::jsonb;
+alter table "Client" add column if not exists "brandColors" text[];
+alter table "Client" add column if not exists "brandFonts" text[];
+alter table "Client" add column if not exists "internalCost" numeric default 0;
+alter table "Client" add column if not exists "publicToken" text;
+alter table "Client" add column if not exists progress integer default 0;
+alter table "Client" add column if not exists "growthStrategy" text;
+
+-- 4. Actualizar otras tablas
+alter table "Contractor" add column if not exists phone text;
+alter table "Task" add column if not exists "sopId" uuid references "SOP"(id);
+alter table "AgencySettings" add column if not exists key text unique;
+    `.trim();
+
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 max-w-3xl mx-auto pb-20">
+        <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto pb-20">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">Ajustes del Sistema</h1>
-                <p className="text-gray-500 mt-2">Configura las conexiones externas y credenciales de tu Algoritmia OS.</p>
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Ajustes del Sistema</h1>
+                <p className="text-gray-500 dark:text-gray-400 mt-2">Configura las conexiones externas y la base de datos.</p>
             </div>
 
-            <Card className="border-indigo-100 shadow-lg shadow-indigo-500/5 overflow-visible">
-                <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
-                    <CardTitle className="flex items-center gap-2 text-indigo-900">
-                        <Key className="w-5 h-5 text-indigo-600" /> API Keys & IA
+            <Card className="border-indigo-100 dark:border-indigo-900/50 shadow-lg shadow-indigo-500/5 overflow-visible">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-indigo-100 dark:border-slate-800">
+                    <CardTitle className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
+                        <Key className="w-5 h-5 text-indigo-600" /> Inteligencia Artificial
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6 pt-6">
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm text-blue-800">
-                        <ShieldCheck className="w-5 h-5 flex-shrink-0 text-blue-600 mt-0.5" />
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 rounded-xl p-4 flex gap-3 text-sm text-blue-800 dark:text-blue-200">
+                        <ShieldCheck className="w-5 h-5 flex-shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
                         <div>
                             <p className="font-bold">Conexión Segura</p>
                             <p className="opacity-90 mt-1">
-                                Estamos utilizando <strong>OpenAI (GPT-4o-mini)</strong>. Tu clave de API se guarda en tu base de datos privada o se usa la configurada por defecto.
+                                Estamos utilizando <strong>OpenAI (GPT-4o-mini)</strong>. Tu clave de API se guarda encriptada en tu base de datos.
                             </p>
                         </div>
                     </div>
@@ -87,28 +129,35 @@ export default function SettingsPage() {
                                 {success ? "Guardado" : "Guardar"}
                             </Button>
                         </div>
-                        <p className="text-xs text-gray-400 pl-1">
-                           Actualmente hay una clave hardcodeada activa, pero si escribes una aquí, el sistema usará esta.
-                        </p>
                     </div>
                 </CardContent>
             </Card>
 
-            <Card>
-                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-gray-700">
-                        <AlertTriangle className="w-5 h-5" /> Base de Datos
+            <Card className="border-orange-100 dark:border-orange-900/30">
+                 <CardHeader className="bg-orange-50/50 dark:bg-orange-900/10 border-b border-orange-100 dark:border-orange-900/30">
+                    <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
+                        <Database className="w-5 h-5 text-orange-600" /> Diagnóstico de Base de Datos
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-sm text-gray-600 space-y-2">
-                        <p>Si tienes errores al guardar, asegúrate de correr este SQL en tu Supabase:</p>
-                        <div className="bg-gray-900 text-gray-300 p-4 rounded-xl font-mono text-xs overflow-x-auto selection:bg-indigo-500 selection:text-white">
-                            create table if not exists "AgencySettings" (<br/>
-                            &nbsp;&nbsp;id uuid default gen_random_uuid() primary key,<br/>
-                            &nbsp;&nbsp;key text unique not null,<br/>
-                            &nbsp;&nbsp;value text<br/>
-                            );
+                <CardContent className="pt-6">
+                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                            <p>
+                                Si ves errores como <strong>"Table not found"</strong> o funcionalidades faltantes (Scanner incompleto, error en SOPs), 
+                                copia y ejecuta este script en el <strong>SQL Editor</strong> de Supabase:
+                            </p>
+                        </div>
+                        
+                        <div className="relative group">
+                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button size="sm" variant="secondary" onClick={() => {navigator.clipboard.writeText(sqlScript); alert("Script copiado!")}}>
+                                    <Copy className="w-3 h-3 mr-2" /> Copiar SQL
+                                </Button>
+                            </div>
+                            <div className="bg-gray-900 text-gray-300 p-4 rounded-xl font-mono text-[10px] md:text-xs overflow-x-auto leading-relaxed border border-gray-700 h-64 custom-scrollbar">
+                                <pre>{sqlScript}</pre>
+                            </div>
                         </div>
                     </div>
                 </CardContent>

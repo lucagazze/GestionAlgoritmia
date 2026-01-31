@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
-import { Task, TaskStatus, Contractor } from '../types';
+import { Task, TaskStatus, Contractor, SOP } from '../types';
 import { Button, Input, Label, Modal, Textarea, Badge } from '../components/UIComponents';
 import { ContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { 
@@ -23,7 +23,8 @@ import {
   Sparkles,
   LayoutGrid,
   Sun,
-  MessageCircle
+  MessageCircle,
+  Book
 } from 'lucide-react';
 
 // View Modes
@@ -32,6 +33,7 @@ type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR';
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [sops, setSops] = useState<SOP[]>([]); // Load SOPs
   
   const [viewMode, setViewMode] = useState<ViewMode>('CALENDAR'); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,6 +43,8 @@ export default function TasksPage() {
 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sopModalOpen, setSopModalOpen] = useState(false);
+  const [selectedSop, setSelectedSop] = useState<SOP | null>(null);
   
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; task: Task | null }>({ x: 0, y: 0, task: null });
 
@@ -54,13 +58,15 @@ export default function TasksPage() {
     dueDate: string;
     priority: 'LOW' | 'MEDIUM' | 'HIGH';
     status: TaskStatus;
+    sopId: string; // New
   }>({
     title: '',
     description: '',
     assigneeId: '',
     dueDate: '',
     priority: 'MEDIUM',
-    status: TaskStatus.TODO
+    status: TaskStatus.TODO,
+    sopId: ''
   });
 
   useEffect(() => {
@@ -72,12 +78,14 @@ export default function TasksPage() {
 
   const loadData = async () => {
     try {
-      const [tasksData, contractorsData] = await Promise.all([
+      const [tasksData, contractorsData, sopsData] = await Promise.all([
         db.tasks.getAll(),
-        db.contractors.getAll()
+        db.contractors.getAll(),
+        db.sops.getAll()
       ]);
       setTasks(tasksData);
       setContractors(contractorsData);
+      setSops(sopsData);
     } catch (err) {
       console.error("Failed to load tasks", err);
     } finally {
@@ -117,6 +125,14 @@ export default function TasksPage() {
       setContextMenu({ ...contextMenu, task: null });
   };
 
+  const handleViewSOP = (sopId: string) => {
+      const sop = sops.find(s => s.id === sopId);
+      if(sop) {
+          setSelectedSop(sop);
+          setSopModalOpen(true);
+      }
+  };
+
   const sendPartnerReminder = (task: Task) => {
       if (!task.assigneeId) return;
       const partner = contractors.find(c => c.id === task.assigneeId);
@@ -147,7 +163,8 @@ export default function TasksPage() {
           assigneeId: '', 
           dueDate: localISOTime, 
           priority: 'MEDIUM', 
-          status: TaskStatus.TODO 
+          status: TaskStatus.TODO,
+          sopId: ''
       });
       setIsModalOpen(true);
   };
@@ -156,7 +173,6 @@ export default function TasksPage() {
       // Rotate: TODO -> DONE -> TODO (Removed IN_PROGRESS)
       let newStatus = TaskStatus.TODO;
       if (task.status === TaskStatus.TODO) newStatus = TaskStatus.DONE;
-      // else if done -> todo (default)
       
       const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t);
       setTasks(updatedTasks);
@@ -169,7 +185,7 @@ export default function TasksPage() {
       const tzOffset = defaultDate.getTimezoneOffset() * 60000;
       const localISOTime = (new Date(defaultDate.getTime() - tzOffset)).toISOString().slice(0, 16);
 
-      setFormData({ title: '', description: '', assigneeId: '', dueDate: localISOTime, priority: 'MEDIUM', status: TaskStatus.TODO });
+      setFormData({ title: '', description: '', assigneeId: '', dueDate: localISOTime, priority: 'MEDIUM', status: TaskStatus.TODO, sopId: '' });
       setIsModalOpen(true);
   };
 
@@ -188,7 +204,8 @@ export default function TasksPage() {
           assigneeId: task.assigneeId || '',
           dueDate: dueIso,
           priority: task.priority || 'MEDIUM',
-          status: task.status
+          status: task.status,
+          sopId: task.sopId || ''
       });
       setIsModalOpen(true);
   };
@@ -204,7 +221,8 @@ export default function TasksPage() {
             status: formData.status,
             assigneeId: formData.assigneeId || null,
             dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
-            priority: formData.priority
+            priority: formData.priority,
+            sopId: formData.sopId || null
         };
 
         if (formData.id) {
@@ -289,9 +307,9 @@ export default function TasksPage() {
   const getTaskStyles = (status: TaskStatus) => {
       switch(status) {
           case TaskStatus.DONE: 
-              return 'bg-emerald-50 border-l-4 border-l-emerald-500 text-emerald-900 opacity-60 line-through decoration-emerald-500/50';
+              return 'bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-l-emerald-500 text-emerald-900 dark:text-emerald-300 opacity-60 line-through decoration-emerald-500/50';
           default: 
-              return 'bg-white border-l-4 border-l-blue-500 text-gray-900 shadow-sm';
+              return 'bg-white dark:bg-slate-800 border-l-4 border-l-blue-500 text-gray-900 dark:text-white shadow-sm';
       }
   };
 
@@ -310,7 +328,7 @@ export default function TasksPage() {
           <div className="flex-1 overflow-y-auto">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
                   <div className="flex flex-col gap-4">
-                      {todayTasks.length === 0 ? <p className="text-gray-400">Sin tareas para hoy.</p> : todayTasks.map(t => (
+                      {todayTasks.length === 0 ? <p className="text-gray-400 dark:text-slate-600">Sin tareas para hoy.</p> : todayTasks.map(t => (
                           <div key={t.id} onClick={() => openEditModal(t)} className={`p-4 rounded-xl border ${getTaskStyles(t.status)} cursor-pointer`}>
                               <div className="font-bold">{t.title}</div>
                               <div className="text-xs">{new Date(t.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
@@ -333,26 +351,26 @@ export default function TasksPage() {
     const hours = Array.from({length: 13}, (_, i) => i + 8); 
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in overflow-hidden border border-gray-300 rounded-xl bg-white shadow-sm">
-            <div className="flex items-center justify-between p-2 border-b border-gray-300 bg-gray-50/50 flex-shrink-0">
-                <button onClick={() => {const d=new Date(referenceDate); d.setDate(d.getDate()-7); setReferenceDate(d)}} className="p-1 hover:bg-gray-200 rounded"><ChevronLeft className="w-5 h-5 text-gray-500"/></button>
-                <div className="font-bold text-gray-900 text-sm">{startOfWeek.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
-                <button onClick={() => {const d=new Date(referenceDate); d.setDate(d.getDate()+7); setReferenceDate(d)}} className="p-1 hover:bg-gray-200 rounded"><ChevronRight className="w-5 h-5 text-gray-500"/></button>
+        <div className="flex flex-col h-full animate-in fade-in overflow-hidden border border-gray-300 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-900 shadow-sm">
+            <div className="flex items-center justify-between p-2 border-b border-gray-300 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50 flex-shrink-0">
+                <button onClick={() => {const d=new Date(referenceDate); d.setDate(d.getDate()-7); setReferenceDate(d)}} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded"><ChevronLeft className="w-5 h-5 text-gray-500 dark:text-gray-300"/></button>
+                <div className="font-bold text-gray-900 dark:text-white text-sm">{startOfWeek.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
+                <button onClick={() => {const d=new Date(referenceDate); d.setDate(d.getDate()+7); setReferenceDate(d)}} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded"><ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-300"/></button>
             </div>
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto"> 
                 <div className="flex min-h-[600px]">
-                    <div className="w-12 flex-shrink-0 border-r border-gray-300 bg-gray-50/30">
-                         <div className="h-8 border-b border-gray-300"></div>
-                        {hours.map(h => <div key={h} className="h-20 border-b border-gray-200 text-[10px] text-gray-400 flex justify-center pt-1">{h}:00</div>)}
+                    <div className="w-12 flex-shrink-0 border-r border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30">
+                         <div className="h-8 border-b border-gray-300 dark:border-slate-700"></div>
+                        {hours.map(h => <div key={h} className="h-20 border-b border-gray-200 dark:border-slate-800 text-[10px] text-gray-400 flex justify-center pt-1">{h}:00</div>)}
                     </div>
                     {weekDays.map((date, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 last:border-r-0 min-w-[100px]">
-                            <div className="h-8 flex items-center justify-center border-b border-gray-300 bg-gray-50/30 text-xs font-bold text-gray-600">
+                        <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 dark:border-slate-700 last:border-r-0 min-w-[100px]">
+                            <div className="h-8 flex items-center justify-center border-b border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30 text-xs font-bold text-gray-600 dark:text-gray-300">
                                 {date.getDate()} {date.toLocaleDateString('es-ES', { weekday: 'short' })}
                             </div>
-                            <div className="flex-1 relative bg-white">
+                            <div className="flex-1 relative bg-white dark:bg-slate-900">
                                 {hours.map(h => (
-                                    <div key={h} className="h-20 border-b border-gray-100" onDrop={(e)=>handleDrop(e, date, h)} onDragOver={(e)=>handleDragOver(e, `${date.toISOString()}-${h}`)}></div>
+                                    <div key={h} className="h-20 border-b border-gray-100 dark:border-slate-800" onDrop={(e)=>handleDrop(e, date, h)} onDragOver={(e)=>handleDragOver(e, `${date.toISOString()}-${h}`)}></div>
                                 ))}
                                 {tasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === date.toDateString()).map(t => {
                                     const h = new Date(t.dueDate!).getHours();
@@ -398,25 +416,25 @@ export default function TasksPage() {
     }
 
     return (
-        <div className="bg-white border border-gray-300 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
-            <div className="flex justify-between items-center p-3 border-b border-gray-300 bg-gray-50/50">
+        <div className="bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+            <div className="flex justify-between items-center p-3 border-b border-gray-300 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800/50">
                 <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-lg capitalize text-gray-900">
+                    <h2 className="font-bold text-lg capitalize text-gray-900 dark:text-white">
                         {referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
                     </h2>
                 </div>
                 <div className="flex gap-1">
-                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d); }} className="p-1.5 hover:bg-gray-200 rounded-lg"><ChevronLeft className="w-5 h-5 text-gray-600"/></button>
-                    <button onClick={() => setReferenceDate(new Date())} className="text-xs px-3 hover:bg-gray-200 rounded-lg font-bold border border-gray-300">Hoy</button>
-                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d); }} className="p-1.5 hover:bg-gray-200 rounded-lg"><ChevronRight className="w-5 h-5 text-gray-600"/></button>
+                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d); }} className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg"><ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300"/></button>
+                    <button onClick={() => setReferenceDate(new Date())} className="text-xs px-3 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg font-bold border border-gray-300 dark:border-slate-600 dark:text-white">Hoy</button>
+                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d); }} className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg"><ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300"/></button>
                 </div>
             </div>
             
-            <div className="grid grid-cols-7 text-center border-b border-gray-300 bg-gray-100">
-                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => <div key={d} className="py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">{d}</div>)}
+            <div className="grid grid-cols-7 text-center border-b border-gray-300 dark:border-slate-700 bg-gray-100 dark:bg-slate-800">
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => <div key={d} className="py-2 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{d}</div>)}
             </div>
             
-            <div className="grid grid-cols-7 flex-1 bg-gray-200 gap-px border-b border-gray-200">
+            <div className="grid grid-cols-7 flex-1 bg-gray-200 dark:bg-slate-700 gap-px border-b border-gray-200 dark:border-slate-800">
                 {days.map((date, idx) => {
                     const isCurrentMonth = date.getMonth() === month;
                     const slotId = date.toISOString();
@@ -436,12 +454,12 @@ export default function TasksPage() {
                           onDoubleClick={() => handleDoubleClickDate(date)}
                           className={`
                             relative flex flex-col gap-1 p-1 transition-all group
-                            ${isCurrentMonth ? 'bg-white' : 'bg-gray-50/60'}
-                            ${isToday ? 'bg-blue-50/40' : ''}
-                            ${isDragTarget ? '!bg-indigo-100 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-gray-50'}
+                            ${isCurrentMonth ? 'bg-white dark:bg-slate-900' : 'bg-gray-50/60 dark:bg-slate-800/60'}
+                            ${isToday ? 'bg-blue-50/40 dark:bg-blue-900/20' : ''}
+                            ${isDragTarget ? '!bg-indigo-100 dark:!bg-indigo-900 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-gray-50 dark:hover:bg-slate-800'}
                           `}
                         >
-                            <div className={`text-[10px] font-medium ml-1 mt-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : isCurrentMonth ? 'text-gray-700' : 'text-gray-400'}`}>
+                            <div className={`text-[10px] font-medium ml-1 mt-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : isCurrentMonth ? 'text-gray-700 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'}`}>
                                 {date.getDate()}
                             </div>
                             
@@ -455,8 +473,8 @@ export default function TasksPage() {
                                       onClick={(e) => { e.stopPropagation(); openEditModal(t); }}
                                       onContextMenu={(e) => handleContextMenu(e, t)}
                                       className={`text-[10px] px-1.5 py-1 rounded border-l-2 truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all ${
-                                          t.status === TaskStatus.DONE ? 'bg-gray-100 border-gray-400 text-gray-400 line-through' : 
-                                          'bg-white border-blue-400 text-gray-800'
+                                          t.status === TaskStatus.DONE ? 'bg-gray-100 dark:bg-slate-800 border-gray-400 dark:border-slate-600 text-gray-400 dark:text-gray-500 line-through' : 
+                                          'bg-white dark:bg-slate-800 border-blue-400 text-gray-800 dark:text-gray-200'
                                       }`}
                                     >
                                         {t.title}
@@ -471,22 +489,22 @@ export default function TasksPage() {
     );
   };
 
-  if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (loading) return <div className="flex h-full items-center justify-center"><Loader2 className="animate-spin text-gray-400" /></div>;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500 h-[calc(100vh-2rem)] flex flex-col pt-2">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 px-1 flex-shrink-0">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-            <div><h1 className="text-2xl font-bold tracking-tight text-gray-900">Tareas</h1></div>
-            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
-                <button onClick={() => setViewMode('TODAY')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'TODAY' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><Sun className="w-3 h-3" /> Hoy</button>
-                <button onClick={() => setViewMode('WEEK')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'WEEK' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><Columns className="w-3 h-3" /> Semana</button>
-                <button onClick={() => setViewMode('CALENDAR')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'CALENDAR' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><CalendarIcon className="w-3 h-3" /> Mes</button>
+            <div><h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Tareas</h1></div>
+            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1">
+                <button onClick={() => setViewMode('TODAY')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'TODAY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Sun className="w-3 h-3" /> Hoy</button>
+                <button onClick={() => setViewMode('WEEK')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Columns className="w-3 h-3" /> Semana</button>
+                <button onClick={() => setViewMode('CALENDAR')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><CalendarIcon className="w-3 h-3" /> Mes</button>
             </div>
         </div>
         <div className="flex gap-2 w-full xl:w-auto">
-             <div className="relative flex-1 xl:w-64"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400" /><Input placeholder="Buscar..." className="pl-9 h-9 text-sm bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-            <Button onClick={openCreateModal} className="h-9 shadow-lg shadow-black/10"><Plus className="w-3.5 h-3.5 mr-2" /> Nueva</Button>
+             <div className="relative flex-1 xl:w-64"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400 dark:text-gray-500" /><Input placeholder="Buscar..." className="pl-9 h-9 text-sm bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+            <Button onClick={openCreateModal} className="h-9 shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-3.5 h-3.5 mr-2" /> Nueva</Button>
         </div>
       </div>
 
@@ -499,6 +517,9 @@ export default function TasksPage() {
       <ContextMenu 
         x={contextMenu.x} y={contextMenu.y} isOpen={!!contextMenu.task} onClose={handleCloseContextMenu}
         items={[
+            ...(contextMenu.task?.sopId ? [{ 
+                label: 'Ver Guía (SOP)', icon: Book, onClick: () => contextMenu.task && handleViewSOP(contextMenu.task.sopId!)
+            }] : []),
             ...(contextMenu.task?.assigneeId ? [{ 
                 label: 'Reclamar a Socio (WhatsApp)', icon: MessageCircle, onClick: () => contextMenu.task && sendPartnerReminder(contextMenu.task), shortcut: "WA"
             }] : []),
@@ -508,32 +529,60 @@ export default function TasksPage() {
         ]}
       />
 
+      {/* Task Edit/Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Detalles de la Tarea">
         <form onSubmit={handleSubmit} className="space-y-0">
-          <div className="bg-gray-50 -mx-6 -mt-2 px-6 py-4 border-b border-gray-100 flex justify-between items-center mb-6">
+          <div className="bg-gray-50 dark:bg-slate-800 -mx-6 -mt-2 px-6 py-4 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center mb-6">
               <div className="flex items-center gap-3">
-                  <select value={formData.status} onChange={e => setFormData({...formData,status: e.target.value as any})} className="text-xs font-bold px-3 py-1.5 rounded-full border bg-white cursor-pointer outline-none">
+                  <select value={formData.status} onChange={e => setFormData({...formData,status: e.target.value as any})} className="text-xs font-bold px-3 py-1.5 rounded-full border bg-white dark:bg-slate-700 dark:text-white dark:border-slate-600 cursor-pointer outline-none">
                       <option value={TaskStatus.TODO}>PENDIENTE</option>
                       <option value={TaskStatus.DONE}>COMPLETADA</option>
                   </select>
-                  {formData.dueDate && new Date(formData.dueDate) < new Date() && formData.status !== TaskStatus.DONE && <span className="flex items-center text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100"><AlertCircle className="w-3 h-3 mr-1" /> ATRASADA</span>}
+                  {formData.dueDate && new Date(formData.dueDate) < new Date() && formData.status !== TaskStatus.DONE && <span className="flex items-center text-[10px] font-bold text-red-600 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded-md border border-red-100 dark:border-red-900"><AlertCircle className="w-3 h-3 mr-1" /> ATRASADA</span>}
               </div>
-              {formData.id && <button type="button" onClick={() => deleteTask(formData.id!)} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
+              {formData.id && <button type="button" onClick={() => deleteTask(formData.id!)} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
           </div>
           <div className="space-y-6">
-              <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full text-xl font-bold border-none outline-none bg-transparent p-0" placeholder="Título..." autoFocus />
+              <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full text-xl font-bold border-none outline-none bg-transparent p-0 text-gray-900 dark:text-white placeholder:text-gray-400" placeholder="Título..." autoFocus />
               <div className="grid grid-cols-2 gap-4">
-                 <div className="space-y-1.5"><Label><User className="w-3 h-3"/> Responsable</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 px-3 text-sm" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}><option value="">Sin Asignar</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
-                 <div className="space-y-1.5"><Label><Flag className="w-3 h-3"/> Prioridad</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 px-3 text-sm" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}><option value="LOW">Baja</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option></select></div>
-                 <div className="space-y-1.5 col-span-2"><Label><CalendarIcon className="w-3 h-3"/> Fecha</Label><Input type="datetime-local" className="bg-white" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} /></div>
+                 <div className="space-y-1.5"><Label><User className="w-3 h-3"/> Responsable</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 dark:bg-slate-800 dark:border-slate-700 dark:text-white px-3 text-sm" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}><option value="">Sin Asignar</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                 <div className="space-y-1.5"><Label><Flag className="w-3 h-3"/> Prioridad</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 dark:bg-slate-800 dark:border-slate-700 dark:text-white px-3 text-sm" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}><option value="LOW">Baja</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option></select></div>
+                 <div className="space-y-1.5"><Label><CalendarIcon className="w-3 h-3"/> Fecha</Label><Input type="datetime-local" className="bg-white dark:bg-slate-800" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} /></div>
+                 <div className="space-y-1.5"><Label><Book className="w-3 h-3"/> Vincular SOP</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 dark:bg-slate-800 dark:border-slate-700 dark:text-white px-3 text-sm" value={formData.sopId} onChange={e => setFormData({...formData, sopId: e.target.value})}><option value="">-- Ninguno --</option>{sops.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></div>
               </div>
+              
+              {formData.sopId && (
+                  <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg p-3 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                          <Book className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <span className="text-sm text-indigo-900 dark:text-indigo-200 font-medium truncate max-w-[200px]">{sops.find(s=>s.id===formData.sopId)?.title}</span>
+                      </div>
+                      <button type="button" onClick={() => handleViewSOP(formData.sopId)} className="text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:underline">Ver Guía</button>
+                  </div>
+              )}
+
               <div className="space-y-1.5 relative">
-                  <div className="flex justify-between items-center"><Label>Descripción & Checklist</Label><button type="button" onClick={handleAiAssist} disabled={isAiGenerating} className="text-xs flex items-center gap-1.5 text-indigo-600 font-bold hover:bg-indigo-50 px-2 py-1 rounded-md transition-colors">{isAiGenerating ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>} Autocompletar con IA</button></div>
+                  <div className="flex justify-between items-center"><Label>Descripción & Checklist</Label><button type="button" onClick={handleAiAssist} disabled={isAiGenerating} className="text-xs flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-2 py-1 rounded-md transition-colors">{isAiGenerating ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>} Autocompletar con IA</button></div>
                   <Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="min-h-[150px]" placeholder="Detalles o pasos a seguir..." />
               </div>
           </div>
-          <div className="pt-6 mt-6 border-t border-gray-100 flex justify-end"><Button type="submit" className="w-full md:w-auto bg-black text-white">Guardar Cambios</Button></div>
+          <div className="pt-6 mt-6 border-t border-gray-100 dark:border-slate-700 flex justify-end"><Button type="submit" className="w-full md:w-auto bg-black dark:bg-white text-white dark:text-black">Guardar Cambios</Button></div>
         </form>
+      </Modal>
+
+      {/* SOP Viewer Modal */}
+      <Modal isOpen={sopModalOpen} onClose={() => setSopModalOpen(false)} title={selectedSop?.title || "SOP"}>
+          <div className="space-y-4">
+              <Badge variant="blue" className="mb-2">{selectedSop?.category}</Badge>
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <p className="whitespace-pre-wrap text-gray-600 dark:text-gray-300 leading-relaxed font-mono text-xs md:text-sm">
+                      {selectedSop?.content || "Sin contenido."}
+                  </p>
+              </div>
+              <div className="pt-4 flex justify-end">
+                  <Button variant="secondary" onClick={() => setSopModalOpen(false)}>Cerrar</Button>
+              </div>
+          </div>
       </Modal>
     </div>
   );

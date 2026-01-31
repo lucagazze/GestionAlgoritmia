@@ -6,6 +6,11 @@ import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskSt
 const handleResponse = async <T>(query: any): Promise<T[]> => {
   const { data, error } = await query;
   if (error) {
+    // Gracefully handle missing table error (PGRST205)
+    if (error.code === 'PGRST205') {
+        console.warn(`Table not found (PGRST205). Returning empty array. Query:`, query);
+        return [];
+    }
     console.error('Supabase Error:', error);
     return [];
   }
@@ -13,30 +18,54 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
 };
 
 export const db = {
-  // --- SETTINGS (For API Keys) ---
+  // --- SETTINGS (For API Keys & Automation) ---
   settings: {
     getApiKey: async (): Promise<string | null> => {
-        const { data, error } = await supabase
-            .from('AgencySettings') 
-            .select('value')
-            .eq('key', 'openai_api_key')
-            .maybeSingle();
-        
-        if (error) console.error("Error getting API Key:", error);
+        const { data, error } = await supabase.from('AgencySettings').select('value').eq('key', 'openai_api_key').maybeSingle();
+        if (error && error.code !== 'PGRST205') console.error("Error getting API Key:", error);
         return data?.value || null;
     },
     setApiKey: async (apiKey: string): Promise<void> => {
-        const { error } = await supabase
-            .from('AgencySettings')
-            .upsert(
-                { key: 'openai_api_key', value: apiKey }, 
-                { onConflict: 'key' }
-            );
+        const { error } = await supabase.from('AgencySettings').upsert({ key: 'openai_api_key', value: apiKey }, { onConflict: 'key' });
+        if (error) throw error;
+    },
+    // AUTOMATION: Check and run recurring tasks
+    checkAndRunRecurringTasks: async () => {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+        
+        // 1. Check last run
+        const { data: setting, error } = await supabase.from('AgencySettings').select('value').eq('key', 'last_recurring_run').maybeSingle();
+        
+        // Skip if table doesn't exist yet
+        if (error && error.code === 'PGRST205') return;
 
-        if (error) {
-            console.error("Error saving API Key:", error);
-            throw error;
+        const lastRun = setting?.value;
+
+        if (lastRun === currentMonth) return; // Already ran this month
+
+        console.log("Running Monthly Automation...");
+
+        // 2. Fetch Active Projects
+        const { data: projects } = await supabase.from('Client').select('*').eq('status', ProjectStatus.ACTIVE);
+        
+        if (projects && projects.length > 0) {
+            const newTasks = [];
+            for (const p of projects) {
+                // Default recurring tasks structure
+                newTasks.push(
+                    { title: `📊 Reporte Mensual: ${p.name}`, priority: 'HIGH', status: TaskStatus.TODO, projectId: p.id, description: 'Generar métricas y enviar al cliente.' },
+                    { title: `📅 Planificación Contenido: ${p.name}`, priority: 'MEDIUM', status: TaskStatus.TODO, projectId: p.id, description: 'Definir estrategia del mes.' }
+                );
+            }
+            
+            // 3. Bulk Insert
+            if (newTasks.length > 0) {
+                await supabase.from('Task').insert(newTasks);
+            }
         }
+
+        // 4. Update Flag
+        await supabase.from('AgencySettings').upsert({ key: 'last_recurring_run', value: currentMonth }, { onConflict: 'key' });
     }
   },
 
@@ -133,7 +162,6 @@ export const db = {
   
   projects: {
     getAll: async (): Promise<Project[]> => {
-      // NOTE: Using 'Client' table for Projects as per typical agency structure mapping
       const { data, error } = await supabase.from('Client').select('*');
       if (error) {
         console.error('Supabase Error (Client):', error);
@@ -149,27 +177,22 @@ export const db = {
         outsourcingCost: c.outsourcingCost || 0,
         assignedPartnerId: c.assignedPartnerId || null,
         proposalUrl: c.proposalUrl || '',
-        // CRM fields
         healthScore: c.healthScore || 'GOOD',
         lastPaymentDate: c.lastPaymentDate || null,
-        lastContactDate: c.lastContactDate || null, // Ghosting Monitor
+        lastContactDate: c.lastContactDate || null,
         resources: c.resources || [],
         contacts: c.contacts || [],
-        // Brand Kit
         brandColors: c.brandColors || [],
         brandFonts: c.brandFonts || [],
-        // Profitability & Portal
         internalCost: c.internalCost || 0,
         publicToken: c.publicToken || '',
         progress: c.progress || 0,
         growthStrategy: c.growthStrategy || ''
       }));
     },
-    // New method for Public Portal
     getByToken: async (token: string): Promise<Project | null> => {
          const { data, error } = await supabase.from('Client').select('*').eq('publicToken', token).maybeSingle();
          if (error || !data) return null;
-         
          return {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
@@ -191,7 +214,6 @@ export const db = {
        const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
        if (error) throw error;
        
-       // --- AUTOMATION: Onboarding Tasks ---
        if (data.status === ProjectStatus.ONBOARDING) {
            const onboardingTasks = [
                { title: `📝 Enviar contrato a ${data.name}`, priority: 'HIGH' },
@@ -199,7 +221,6 @@ export const db = {
                { title: `🔑 Pedir accesos (Web, Redes, Ads) a ${data.name}`, priority: 'HIGH' },
                { title: `🚀 Agendar Call de Kick-off con ${data.name}`, priority: 'MEDIUM' }
            ];
-           
            for (const t of onboardingTasks) {
                await supabase.from('Task').insert({
                    title: t.title,
@@ -210,7 +231,6 @@ export const db = {
                });
            }
        }
-
        return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
@@ -230,29 +250,16 @@ export const db = {
           );
       },
       create: async (data: Omit<ClientNote, 'id' | 'createdAt'>): Promise<void> => {
-          const { error } = await supabase.from('ClientNote').insert({
-              ...data,
-              createdAt: new Date().toISOString()
-          });
+          const { error } = await supabase.from('ClientNote').insert({ ...data, createdAt: new Date().toISOString() });
           if (error) throw error;
-
-          // --- GHOSTING MONITOR AUTO-UPDATE ---
-          // When a note is added, we update the Last Contact Date of the Client
           await supabase.from('Client').update({ lastContactDate: new Date().toISOString() }).eq('id', data.clientId);
       }
   },
 
   tasks: {
     getAll: async (): Promise<Task[]> => {
-      const { data, error } = await supabase
-          .from('Task')
-          .select('*, assignee:Contractor(*)')
-          .order('created_at', { ascending: false });
-
-      if (error) {
-          console.error('Supabase Error (Task):', error);
-          return [];
-      }
+      const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').order('created_at', { ascending: false });
+      if (error) { console.error('Supabase Error (Task):', error); return []; }
       return data as Task[];
     },
     create: async (data: Partial<Task>): Promise<Task> => {
@@ -332,10 +339,7 @@ export const db = {
         return newProposal;
     },
     getAll: async (): Promise<Proposal[]> => {
-         const { data, error } = await supabase
-            .from('Proposal')
-            .select(`*, client:Client(*)`)
-            .order('createdAt', { ascending: false });
+         const { data, error } = await supabase.from('Proposal').select(`*, client:Client(*)`).order('createdAt', { ascending: false });
          if (error) throw error;
          return data as Proposal[];
     }
@@ -343,14 +347,12 @@ export const db = {
 
   contractors: {
     getAll: async (): Promise<Contractor[]> => {
-      // Mapping hourlyRate from DB to monthlyRate in type if needed, or assuming DB field is now treating as monthly
       return handleResponse<Contractor>(supabase.from('Contractor').select('*').then(res => ({
           ...res,
-          data: res.data?.map((c: any) => ({ ...c, monthlyRate: c.hourlyRate || 0 })) // Fallback mapping
+          data: res.data?.map((c: any) => ({ ...c, monthlyRate: c.hourlyRate || 0 }))
       })));
     },
     create: async (data: Omit<Contractor, 'id' | 'created_at'>): Promise<Contractor> => {
-      // Mapping monthlyRate to hourlyRate column in DB to reuse schema
       const payload = { ...data, hourlyRate: data.monthlyRate };
       const { data: created, error } = await supabase.from('Contractor').insert(payload).select().single();
       if (error) throw error;

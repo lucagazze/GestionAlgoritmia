@@ -9,19 +9,22 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// --- Card (Glass Effect & Apple Style) ---
+// --- Card (Glass Effect & Apple Style + Dark Mode) ---
 export const Card: React.FC<{ children?: React.ReactNode; className?: string }> = ({ children, className }) => (
-  <div className={cn("bg-white border border-gray-100 shadow-sm rounded-3xl overflow-hidden transition-all duration-300", className)}>
+  <div className={cn(
+    "bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 shadow-sm rounded-3xl overflow-hidden transition-all duration-300", 
+    className
+  )}>
     {children}
   </div>
 );
 
 export const CardHeader = ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-  <div className={cn("px-6 py-5 border-b border-gray-50", className)}>{children}</div>
+  <div className={cn("px-6 py-5 border-b border-gray-50 dark:border-slate-800", className)}>{children}</div>
 );
 
 export const CardTitle = ({ children, className }: { children?: React.ReactNode; className?: string }) => (
-  <h3 className={cn("text-lg font-bold text-gray-900 tracking-tight", className)}>{children}</h3>
+  <h3 className={cn("text-lg font-bold text-gray-900 dark:text-white tracking-tight", className)}>{children}</h3>
 );
 
 export const CardContent = ({ children, className }: { children?: React.ReactNode; className?: string }) => (
@@ -32,11 +35,11 @@ export const CardContent = ({ children, className }: { children?: React.ReactNod
 export const Modal: React.FC<{ isOpen: boolean, onClose: () => void, title: string, children?: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300 border border-white/50">
-        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
-          <h3 className="font-bold text-lg">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/20 dark:bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300 border border-white/50 dark:border-slate-700">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 dark:border-slate-800">
+          <h3 className="font-bold text-lg text-gray-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors dark:text-gray-300">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -57,11 +60,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
     const variants = {
-      primary: "bg-gray-900 text-white hover:bg-black shadow-sm border border-transparent hover:shadow-md",
-      secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 border border-transparent",
-      outline: "border border-gray-200 bg-transparent hover:bg-gray-50 text-gray-900",
-      ghost: "hover:bg-gray-100 text-gray-600 hover:text-black border-transparent",
-      destructive: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100",
+      primary: "bg-gray-900 dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-gray-200 shadow-sm border border-transparent hover:shadow-md",
+      secondary: "bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-slate-700 border border-transparent",
+      outline: "border border-gray-200 dark:border-slate-700 bg-transparent hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-900 dark:text-white",
+      ghost: "hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white border-transparent",
+      destructive: "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-100 dark:border-red-900/50",
     };
     
     const sizes = {
@@ -88,7 +91,7 @@ Button.displayName = "Button";
 
 // --- Input & Label ---
 export const Label = ({ children, className, htmlFor }: { children?: React.ReactNode; className?: string, htmlFor?: string }) => (
-  <label htmlFor={htmlFor} className={cn("text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block ml-1", className)}>
+  <label htmlFor={htmlFor} className={cn("text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 block ml-1", className)}>
     {children}
   </label>
 );
@@ -99,7 +102,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         type={type}
         className={cn(
-          "flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm",
+          "flex h-12 w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800 px-4 py-2 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-black dark:focus:border-white focus:bg-white dark:focus:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm",
           className
         )}
         ref={ref}
@@ -122,17 +125,17 @@ interface SliderProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 
 
 export const Slider = ({ value, min, max, label, suffix, className, ...props }: SliderProps) => {
   return (
-    <div className={cn("w-full bg-white p-4 rounded-xl border border-gray-100 shadow-sm", className)}>
+    <div className={cn("w-full bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm", className)}>
       {label && <div className="flex justify-between mb-4">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</span>
-          <span className="text-sm font-bold bg-black text-white px-2 py-0.5 rounded-md">{value}{suffix}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{label}</span>
+          <span className="text-sm font-bold bg-black dark:bg-white text-white dark:text-black px-2 py-0.5 rounded-md">{value}{suffix}</span>
       </div>}
       <input 
         type="range" 
         min={min} 
         max={max} 
         value={value} 
-        className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-black hover:accent-gray-800 transition-all"
+        className="w-full h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-black dark:accent-white hover:accent-gray-800 transition-all"
         {...props}
       />
     </div>
@@ -142,11 +145,11 @@ export const Slider = ({ value, min, max, label, suffix, className, ...props }: 
 // --- Badge ---
 export const Badge = ({ children, className, variant = 'default' }: { children?: React.ReactNode; className?: string, variant?: 'default' | 'outline' | 'green' | 'blue' | 'yellow' }) => {
     const variants = {
-        default: "bg-gray-900 text-white border-transparent",
-        outline: "text-gray-600 border-gray-200 bg-white",
-        green: "bg-emerald-50 text-emerald-700 border-emerald-100",
-        blue: "bg-blue-50 text-blue-700 border-blue-100",
-        yellow: "bg-amber-50 text-amber-700 border-amber-100"
+        default: "bg-gray-900 dark:bg-white text-white dark:text-black border-transparent",
+        outline: "text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900",
+        green: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800",
+        blue: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-800",
+        yellow: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800"
     }
     return (
         <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors", variants[variant], className)}>
@@ -161,7 +164,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
     return (
       <textarea
         className={cn(
-          "flex min-h-[100px] w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/5 focus:border-black focus:bg-white disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm resize-none",
+          "flex min-h-[100px] w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-800 px-4 py-3 text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-black/5 dark:focus:ring-white/10 focus:border-black dark:focus:border-white focus:bg-white dark:focus:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 shadow-sm resize-none",
           className
         )}
         ref={ref}

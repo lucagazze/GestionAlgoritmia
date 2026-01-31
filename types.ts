@@ -119,7 +119,8 @@ export interface Task {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   assigneeId?: string;
   assignee?: Contractor; 
-  created_at?: string; 
+  created_at?: string;
+  sopId?: string; // New: Link to SOP
 }
 
 export interface ClientNote {
