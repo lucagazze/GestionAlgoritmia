@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -14,6 +14,32 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
 };
 
 export const db = {
+  // --- SETTINGS (For API Keys) ---
+  settings: {
+    getApiKey: async (): Promise<string | null> => {
+        // Try fetching from a table named 'AgencySettings'
+        // Schema: id (uuid), key (text, unique), value (text)
+        const { data, error } = await supabase
+            .from('AgencySettings')
+            .select('value')
+            .eq('key', 'gemini_api_key')
+            .maybeSingle();
+        
+        if (error || !data) return null;
+        return data.value;
+    },
+    setApiKey: async (apiKey: string): Promise<void> => {
+        // Check if exists first to decide update or insert (or use upsert if constraint exists)
+        const { data: existing } = await supabase.from('AgencySettings').select('id').eq('key', 'gemini_api_key').maybeSingle();
+        
+        if (existing) {
+            await supabase.from('AgencySettings').update({ value: apiKey }).eq('id', existing.id);
+        } else {
+            await supabase.from('AgencySettings').insert({ key: 'gemini_api_key', value: apiKey });
+        }
+    }
+  },
+
   services: {
     getAll: async (): Promise<Service[]> => {
       return handleResponse<Service>(supabase.from('Service').select('*'));

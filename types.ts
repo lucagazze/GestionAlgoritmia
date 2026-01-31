@@ -93,4 +93,10 @@ export interface Proposal {
   createdAt: Date;
 }
 
+export interface AgencySettings {
+  id: string;
+  key: string;   // e.g., 'gemini_api_key'
+  value: string; // The actual key
+}
+
 export type ServiceCategory = 'Web & Tech' | 'Branding' | 'Contenido' | 'Ads / Tráfico' | 'Automatización' | 'Consultoría';
