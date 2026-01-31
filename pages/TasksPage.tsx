@@ -13,25 +13,38 @@ import {
   Loader2,
   LayoutList,
   KanbanSquare,
+  Calendar as CalendarIcon,
   Search,
   ArrowUpDown,
   ListFilter,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  AlertCircle
 } from 'lucide-react';
 
-type ViewMode = 'BOARD' | 'LIST';
+type ViewMode = 'BOARD' | 'LIST' | 'CALENDAR';
 type SortKey = 'dueDate' | 'priority' | 'status' | 'title';
+type TimeFilter = 'ALL' | 'TODAY' | 'WEEK';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  
+  // Views & Filters
   const [viewMode, setViewMode] = useState<ViewMode>('LIST');
   const [searchTerm, setSearchTerm] = useState('');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   
   // Sorting State
   const [sortKey, setSortKey] = useState<SortKey>('dueDate');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   
+  // Calendar State
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
@@ -59,6 +72,13 @@ export default function TasksPage() {
     window.addEventListener('task-created', handleTaskCreated);
     return () => { window.removeEventListener('task-created', handleTaskCreated); };
   }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+      const closeDropdown = () => setIsSortDropdownOpen(false);
+      if(isSortDropdownOpen) document.addEventListener('click', closeDropdown);
+      return () => document.removeEventListener('click', closeDropdown);
+  }, [isSortDropdownOpen]);
 
   const loadData = async () => {
     try {
@@ -154,10 +174,32 @@ export default function TasksPage() {
   };
 
   const getProcessedTasks = () => {
-      // 1. Filter
+      // 1. Filter by Search
       let result = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // 2. Sort
+      // 2. Filter by Time (Only applies to List/Board usually, but we apply global logic here)
+      if (timeFilter !== 'ALL') {
+          const now = new Date();
+          now.setHours(0,0,0,0);
+          
+          result = result.filter(t => {
+              if (!t.dueDate) return false;
+              const d = new Date(t.dueDate);
+              d.setHours(0,0,0,0);
+              
+              if (timeFilter === 'TODAY') {
+                  return d.getTime() === now.getTime();
+              }
+              if (timeFilter === 'WEEK') {
+                  const nextWeek = new Date(now);
+                  nextWeek.setDate(now.getDate() + 7);
+                  return d >= now && d <= nextWeek;
+              }
+              return true;
+          });
+      }
+
+      // 3. Sort
       result.sort((a, b) => {
           let valA: any = a[sortKey];
           let valB: any = b[sortKey];
@@ -195,7 +237,7 @@ export default function TasksPage() {
 
   const processedTasks = getProcessedTasks();
 
-  // --- Board Logic (Keep functionality) ---
+  // --- Board Logic ---
   const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
   const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
@@ -224,8 +266,88 @@ export default function TasksPage() {
       const date = new Date(isoString);
       return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
+  
+  const formatDateShort = (isoString: string) => {
+      if(!isoString) return '';
+      const date = new Date(isoString);
+      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  };
 
   // --- RENDERERS ---
+
+  const CalendarView = () => {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      
+      const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sunday
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      
+      const daysArray = [];
+      // Fill empty slots for previous month
+      for (let i = 0; i < firstDayOfMonth; i++) {
+          daysArray.push(null);
+      }
+      // Fill days
+      for (let i = 1; i <= daysInMonth; i++) {
+          daysArray.push(new Date(year, month, i));
+      }
+
+      const changeMonth = (delta: number) => {
+          const newDate = new Date(currentCalendarDate);
+          newDate.setMonth(newDate.getMonth() + delta);
+          setCurrentCalendarDate(newDate);
+      };
+
+      return (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+              <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                  <h2 className="font-bold text-lg capitalize">
+                      {currentCalendarDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                  </h2>
+                  <div className="flex gap-2">
+                      <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
+                      <button onClick={() => setCurrentCalendarDate(new Date())} className="text-sm px-3 hover:bg-gray-100 rounded-lg font-medium">Hoy</button>
+                      <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+                  </div>
+              </div>
+              <div className="grid grid-cols-7 text-center border-b border-gray-100 bg-gray-50">
+                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+                      <div key={d} className="py-2 text-xs font-bold text-gray-400 uppercase">{d}</div>
+                  ))}
+              </div>
+              <div className="grid grid-cols-7 flex-1 auto-rows-fr">
+                  {daysArray.map((date, idx) => {
+                      if (!date) return <div key={idx} className="bg-gray-50/30 border-b border-r border-gray-100"></div>;
+                      
+                      const dayTasks = tasks.filter(t => {
+                          if (!t.dueDate) return false;
+                          const tDate = new Date(t.dueDate);
+                          return tDate.getDate() === date.getDate() && tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
+                      });
+                      
+                      const isToday = new Date().toDateString() === date.toDateString();
+
+                      return (
+                          <div key={idx} className={`border-b border-r border-gray-100 p-2 min-h-[100px] hover:bg-blue-50/10 transition-colors flex flex-col gap-1 ${isToday ? 'bg-blue-50/30' : ''}`}>
+                              <div className={`text-xs font-medium mb-1 ${isToday ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
+                                  {date.getDate()}
+                              </div>
+                              {dayTasks.map(t => (
+                                  <div 
+                                    key={t.id} 
+                                    onClick={() => openEditModal(t)}
+                                    className={`text-[10px] px-1.5 py-1 rounded border truncate cursor-pointer shadow-sm transition-transform hover:scale-105 ${t.status === TaskStatus.DONE ? 'bg-gray-100 text-gray-400 line-through border-gray-200' : 'bg-white text-gray-700 border-gray-200'}`}
+                                  >
+                                      {t.title}
+                                  </div>
+                              ))}
+                          </div>
+                      );
+                  })}
+              </div>
+          </div>
+      );
+  };
 
   const ListView = () => (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col">
@@ -254,7 +376,7 @@ export default function TasksPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                       {processedTasks.length === 0 ? (
-                          <tr><td colSpan={7} className="text-center py-8 text-gray-400">No hay tareas.</td></tr>
+                          <tr><td colSpan={7} className="text-center py-8 text-gray-400">No hay tareas para mostrar.</td></tr>
                       ) : (
                           processedTasks.map(t => {
                               const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE;
@@ -346,20 +468,59 @@ export default function TasksPage() {
           <span className="ml-auto text-xs font-semibold text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200">{columnTasks.length}</span>
         </div>
         <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-          {columnTasks.map(task => (
-             <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} onClick={() => openEditModal(task)}
-                className="group bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing">
-                 <div className="flex justify-between items-start mb-2">
-                     <p className={`font-semibold text-sm leading-snug ${task.status === TaskStatus.DONE ? 'line-through text-gray-400' : 'text-gray-900'}`}>{task.title}</p>
-                 </div>
-                 <div className="flex items-center justify-between mt-2">
-                     <div className="flex -space-x-1">
-                         {task.assignee ? <div className="w-5 h-5 rounded-full bg-black text-white text-[9px] flex items-center justify-center border border-white">{task.assignee.name.charAt(0)}</div> : <User className="w-4 h-4 text-gray-300"/>}
-                     </div>
-                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>{task.priority}</span>
-                 </div>
-             </div>
-          ))}
+          {columnTasks.map(task => {
+             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== TaskStatus.DONE;
+             
+             return (
+               <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} onClick={() => openEditModal(task)}
+                  className="group bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing flex flex-col gap-3">
+                   
+                   {/* HEADER */}
+                   <div className="flex justify-between items-start">
+                       <p className={`font-semibold text-sm leading-snug ${task.status === TaskStatus.DONE ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                           {task.title}
+                       </p>
+                   </div>
+                   
+                   {/* DESCRIPTION */}
+                   {task.description && (
+                       <p className={`text-xs line-clamp-2 leading-relaxed ${task.status === TaskStatus.DONE ? 'text-gray-300' : 'text-gray-500'}`}>
+                           {task.description}
+                       </p>
+                   )}
+
+                   {/* DIVIDER */}
+                   <div className="h-px bg-gray-50 w-full" />
+
+                   {/* FOOTER */}
+                   <div className="flex items-center justify-between">
+                       {/* Date */}
+                       <div className={`flex items-center gap-1.5 text-xs ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
+                          <CalendarIcon className="w-3.5 h-3.5" />
+                          <span>{formatDateShort(task.dueDate!) || 'S/F'}</span>
+                       </div>
+
+                       {/* Meta */}
+                       <div className="flex items-center gap-2">
+                           <div className="flex -space-x-1">
+                               {task.assignee ? (
+                                   <div className="w-6 h-6 rounded-full bg-black text-white text-[9px] flex items-center justify-center border border-white font-bold" title={task.assignee.name}>
+                                       {task.assignee.name.charAt(0)}
+                                   </div>
+                               ) : (
+                                   <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-300 flex items-center justify-center border border-white">
+                                       <User className="w-3 h-3"/>
+                                   </div>
+                               )}
+                           </div>
+                           <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>
+                               {task.priority || 'MED'}
+                           </span>
+                       </div>
+                   </div>
+               </div>
+             )
+          })}
         </div>
       </div>
     );
@@ -371,8 +532,9 @@ export default function TasksPage() {
     <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
             <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tareas</h1>
+            
             {/* View Toggle */}
             <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
                 <button 
@@ -387,24 +549,51 @@ export default function TasksPage() {
                 >
                     <KanbanSquare className="w-4 h-4" />
                 </button>
+                <button 
+                    onClick={() => setViewMode('CALENDAR')} 
+                    className={`p-1.5 rounded-md transition-all ${viewMode === 'CALENDAR' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    <CalendarIcon className="w-4 h-4" />
+                </button>
             </div>
+
+            {/* Time Filters (Only active if not in calendar mode usually, but useful globally) */}
+            {viewMode !== 'CALENDAR' && (
+                <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+                    <button onClick={() => setTimeFilter('ALL')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'ALL' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Todos</button>
+                    <button onClick={() => setTimeFilter('TODAY')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'TODAY' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Hoy</button>
+                    <button onClick={() => setTimeFilter('WEEK')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'WEEK' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Semana</button>
+                </div>
+            )}
         </div>
+
         <div className="flex gap-2 w-full md:w-auto">
              
-             {/* SORT DROPDOWN */}
-             <div className="relative group">
-                <button className="h-10 px-3 bg-white border border-gray-200 rounded-xl flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-black">
-                    <ListFilter className="w-4 h-4" />
-                    <span className="hidden sm:inline">Ordenar: {sortKey === 'dueDate' ? 'Fecha' : sortKey === 'priority' ? 'Prioridad' : 'Estado'}</span>
-                </button>
-                <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-100 shadow-xl rounded-xl overflow-hidden z-20 hidden group-hover:block animate-in fade-in slide-in-from-top-2">
-                    <div className="p-1">
-                        <button onClick={() => setSortKey('dueDate')} className={`w-full text-left px-3 py-2 text-xs rounded-lg ${sortKey === 'dueDate' ? 'bg-gray-100 font-bold' : 'hover:bg-gray-50'}`}>Por Fecha</button>
-                        <button onClick={() => setSortKey('priority')} className={`w-full text-left px-3 py-2 text-xs rounded-lg ${sortKey === 'priority' ? 'bg-gray-100 font-bold' : 'hover:bg-gray-50'}`}>Por Prioridad</button>
-                        <button onClick={() => setSortKey('status')} className={`w-full text-left px-3 py-2 text-xs rounded-lg ${sortKey === 'status' ? 'bg-gray-100 font-bold' : 'hover:bg-gray-50'}`}>Por Estado</button>
-                    </div>
+             {/* SORT DROPDOWN (Click Based Fix) */}
+             {viewMode !== 'CALENDAR' && (
+                <div className="relative">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSortDropdownOpen(!isSortDropdownOpen); }}
+                        className="h-10 px-3 bg-white border border-gray-200 rounded-xl flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-black hover:border-gray-300 transition-colors"
+                    >
+                        <ListFilter className="w-4 h-4" />
+                        <span className="hidden sm:inline">
+                            {sortKey === 'dueDate' ? 'Fecha' : sortKey === 'priority' ? 'Prioridad' : 'Estado'}
+                        </span>
+                    </button>
+                    
+                    {isSortDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-xl overflow-hidden z-30 animate-in fade-in zoom-in-95 duration-200">
+                            <div className="p-1 flex flex-col">
+                                <span className="px-3 py-2 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Ordenar por</span>
+                                <button onClick={() => { setSortKey('dueDate'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'dueDate' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Fecha de Entrega</button>
+                                <button onClick={() => { setSortKey('priority'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'priority' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Prioridad</button>
+                                <button onClick={() => { setSortKey('status'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'status' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Estado</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
-             </div>
+             )}
 
              <div className="relative flex-1 md:w-64">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
@@ -416,7 +605,10 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {viewMode === 'LIST' ? <ListView /> : <BoardView />}
+      {/* VIEW SWITCHER */}
+      {viewMode === 'LIST' && <ListView />}
+      {viewMode === 'BOARD' && <BoardView />}
+      {viewMode === 'CALENDAR' && <CalendarView />}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? "Editar Tarea" : "Nueva Tarea"}>
         <form onSubmit={handleSubmit} className="space-y-4">

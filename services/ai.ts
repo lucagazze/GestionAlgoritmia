@@ -18,7 +18,7 @@ const CALL_OPENAI = async (messages: any[], jsonMode: boolean = false) => {
                 model: "gpt-4o-mini",
                 messages: messages,
                 response_format: jsonMode ? { type: "json_object" } : undefined,
-                temperature: 0.7
+                temperature: 0.5 // Lower temperature for more precision on actions
             })
         });
 
@@ -76,50 +76,60 @@ export const ai = {
   },
 
   // --- AGENTE DEL SISTEMA (Router & Ejecutor) ---
-  agent: async (userInput: string, contextHistory: any[] = []) => {
+  agent: async (userInput: string, contextHistory: any[] = [], currentData: { tasks: any[], projects: any[] }) => {
       try {
         // INJECT PRECISE DATE CONTEXT
         const now = new Date();
         const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
         
-        const dateContext = `
-        CONTEXTO TEMPORAL ACTUAL:
-        - HOY ES: ${localDate}
-        - HORA ACTUAL: ${localTime}
-        - ISO STRING BASE: ${now.toISOString()}
-        
-        INSTRUCCIONES PARA FECHAS ("dueDate"):
-        1. Si el usuario dice "mañana a las 19:00", calcula la fecha de mañana y ajusta la hora a las 19:00:00.
-        2. Si dice "el viernes", busca el próximo viernes.
-        3. Devuelve SIEMPRE el formato ISO 8601 completo (ej: 2024-05-20T19:00:00.000Z).
-        `;
+        // Simplify Data for Context Window (Optimization)
+        const tasksSummary = currentData.tasks.map(t => `- [ID: ${t.id}] "${t.title}" (Status: ${t.status}, Priority: ${t.priority})`).join('\n');
+        const projectsSummary = currentData.projects.map(p => `- [ID: ${p.id}] "${p.name}"`).join('\n');
 
         const systemPrompt = `
-        Eres el Sistema Operativo Inteligente de "Algoritmia OS".
+        Eres el Sistema Operativo Inteligente de "Algoritmia OS". Tu objetivo es gestionar la agencia.
         
-        ${dateContext}
+        CONTEXTO TEMPORAL:
+        - HOY: ${localDate} (${localTime})
+        
+        DATOS ACTUALES (Úsalos para buscar IDs si piden editar/borrar):
+        TAREAS ACTIVAS:
+        ${tasksSummary}
+        
+        PROYECTOS:
+        ${projectsSummary}
+
+        REGLAS DE COMPORTAMIENTO:
+        1. Si el usuario pide crear algo, hazlo directo (ACTION).
+        2. Si el usuario pide BORRAR o EDITAR algo existente:
+           - Busca el ID correcto en la lista de arriba.
+           - Si no estás 100% seguro de a qué tarea se refiere (ej: hay dos con nombre similar), devuelve "QUESTION" preguntando.
+           - Si la acción es BORRAR o un cambio drástico, devuelve "CONFIRM" para que el usuario apruebe.
+           - Si es una edición simple (ej: cambiar fecha), usa "ACTION".
+        3. Si no entiendes, PREGUNTA (QUESTION).
 
         ACCIONES DISPONIBLES (Responde SOLO JSON):
         
-        1. CREATE_TASK:
-           - 'title': string (Resumen corto).
-           - 'priority': 'LOW' | 'MEDIUM' | 'HIGH' (Si menciona urgencia es HIGH).
-           - 'dueDate': string (ISO 8601). OBLIGATORIO si menciona tiempo. Si no, null.
+        types:
+        - 'ACTION': Ejecutar inmediatamente.
+        - 'CONFIRM': Requiere botón de confirmación del usuario (Ideal para DELETE).
+        - 'QUESTION': Necesitas más información del usuario.
+        - 'NAVIGATE': Cambiar de página.
+        - 'CHAT': Charla normal.
 
-        2. CREATE_PROJECT: 
-           - 'name': string
-           - 'monthlyRevenue': number
+        actions (para type ACTION/CONFIRM):
+        - 'CREATE_TASK': { title, priority, dueDate? }
+        - 'UPDATE_TASK': { id, title?, status?, priority?, dueDate? } (Envía solo los campos a cambiar)
+        - 'DELETE_TASK': { id }
+        - 'CREATE_PROJECT': { name, monthlyRevenue }
 
-        3. NAVIGATE:
-           - payload: '/tasks', '/projects', '/settings', etc.
-
-        FORMATO JSON:
+        FORMATO JSON RESPUESTA:
         {
-            "type": "NAVIGATE" | "ACTION" | "QUESTION" | "CHAT",
-            "action": "CREATE_TASK" | "CREATE_PROJECT" | null,
+            "type": "ACTION" | "CONFIRM" | "QUESTION" | "CHAT" | "NAVIGATE",
+            "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | null,
             "payload": { ... },
-            "message": "Texto corto confirmando la acción (ej: 'Agendado para mañana 19hs')."
+            "message": "Texto corto explicando qué vas a hacer o tu pregunta."
         }
         `;
 
@@ -133,9 +143,8 @@ export const ai = {
         
         if (!responseText) throw new Error("No response from AI");
         
-        // CLEANUP: OpenAI sometimes wraps JSON in markdown blocks even in JSON mode
+        // CLEANUP
         const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        
         return JSON.parse(cleanJson);
 
       } catch (error) {
