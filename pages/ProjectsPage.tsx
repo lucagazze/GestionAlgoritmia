@@ -1,18 +1,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
+import { ai } from '../services/ai';
 import { Project, ProjectStatus, Contractor, ClientNote, Task } from '../types';
-import { Card, Badge, Button, Modal, Input, Label, Textarea } from '../components/UIComponents';
-import { MoreHorizontal, DollarSign, Calendar, TrendingUp, Plus, Trash2, Edit2, MessageCircle, FileText, User, ArrowRight, Link as LinkIcon, ExternalLink, History, StickyNote, CheckCircle2, Mic } from 'lucide-react';
+import { Badge, Button, Modal, Input, Label, Textarea } from '../components/UIComponents';
+import { MoreHorizontal, Plus, Edit2, MessageCircle, FileText, User, ArrowRight, History, StickyNote, CheckCircle2, Mic, Search, Filter, Phone, Wallet, Sparkles, Copy, Loader2, Handshake } from 'lucide-react';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'HISTORY'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'PARTNER' | 'HISTORY'>('PROFILE');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Data for History Tab
@@ -20,6 +22,10 @@ export default function ProjectsPage() {
   const [clientTasks, setClientTasks] = useState<Task[]>([]);
   const [newNote, setNewNote] = useState('');
   const [noteType, setNoteType] = useState<'MEETING' | 'NOTE' | 'CALL'>('NOTE');
+
+  // Partner Agreement AI State
+  const [isGeneratingAgreement, setIsGeneratingAgreement] = useState(false);
+  const [partnerAgreementText, setPartnerAgreementText] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -43,7 +49,7 @@ export default function ProjectsPage() {
         db.contractors.getAll()
     ]);
     
-    // Map partners to projects manually to ensure display names even if join fails
+    // Map partners to projects manually to ensure display names
     const mappedProjects = projData.map(p => {
         const partner = contData.find(c => c.id === p.assignedPartnerId);
         return { ...p, partnerName: partner ? partner.name : undefined };
@@ -55,9 +61,7 @@ export default function ProjectsPage() {
   };
 
   const loadClientHistory = async (clientId: string) => {
-      // Fetch Notes
       const notes = await db.clientNotes.getByClient(clientId);
-      // Fetch Tasks for this client
       const allTasks = await db.tasks.getAll();
       const relevantTasks = allTasks.filter(t => t.projectId === clientId);
       
@@ -68,11 +72,13 @@ export default function ProjectsPage() {
   const openCreateModal = () => {
       setEditingId(null);
       setFormData({ name: '', monthlyRevenue: '', billingDay: '1', phone: '', assignedPartnerId: '', outsourcingCost: '', proposalUrl: '' });
+      setPartnerAgreementText('');
       setActiveTab('PROFILE');
       setIsModalOpen(true);
   };
 
-  const openEditModal = async (p: Project) => {
+  const openEditModal = async (p: Project, e?: React.MouseEvent) => {
+      if(e) e.stopPropagation();
       setEditingId(p.id);
       setFormData({
           name: p.name,
@@ -83,6 +89,7 @@ export default function ProjectsPage() {
           outsourcingCost: p.outsourcingCost ? p.outsourcingCost.toString() : '',
           proposalUrl: p.proposalUrl || ''
       });
+      setPartnerAgreementText(''); // Reset or load from DB if field existed
       setActiveTab('PROFILE');
       await loadClientHistory(p.id);
       setIsModalOpen(true);
@@ -104,12 +111,12 @@ export default function ProjectsPage() {
 
       if (editingId) {
           await db.projects.update(editingId, payload);
-          alert('Datos actualizados');
       } else {
           await db.projects.create({ ...payload, status: ProjectStatus.ACTIVE });
-          setIsModalOpen(false); // Close on create
+          setIsModalOpen(false); 
       }
       loadData();
+      if(editingId && activeTab === 'PROFILE') alert('Datos actualizados correctamente');
   }
 
   const handleAddNote = async () => {
@@ -120,73 +127,202 @@ export default function ProjectsPage() {
           type: noteType
       });
       setNewNote('');
-      loadClientHistory(editingId); // Refresh history
+      loadClientHistory(editingId); 
   }
 
   const handleDelete = async (id: string) => {
       if(confirm('¿Eliminar proyecto y cliente?')) {
           await db.projects.delete(id);
+          setIsModalOpen(false);
           loadData();
       }
   }
 
-  const toggleStatus = async (project: Project) => {
-    const newStatus = project.status === ProjectStatus.ACTIVE ? ProjectStatus.PAUSED : ProjectStatus.ACTIVE;
-    await db.projects.update(project.id, { status: newStatus });
-    loadData();
+  // --- AI PARTNER AGREEMENT LOGIC ---
+  const generatePartnerAgreement = async () => {
+      if (!formData.assignedPartnerId) {
+          alert("Primero asigna un socio en la pestaña Perfil.");
+          return;
+      }
+      
+      const partner = contractors.find(c => c.id === formData.assignedPartnerId);
+      const clientRevenue = parseFloat(formData.monthlyRevenue) || 0;
+      const partnerCost = parseFloat(formData.outsourcingCost) || 0;
+      
+      setIsGeneratingAgreement(true);
+      try {
+          const prompt = `
+          Actúa como Project Manager. Redacta una "Orden de Trabajo" (Acuerdo simple) para mi socio/freelancer.
+          
+          Datos:
+          - Mi Agencia: Algoritmia
+          - Socio: ${partner?.name || 'Freelancer'}
+          - Cliente Final: ${formData.name}
+          - Pago al Socio: $${partnerCost} (El cliente paga $${clientRevenue}, pero esto NO se le dice al socio, solo su pago).
+          
+          Instrucciones:
+          1. Redacta un mensaje formal pero directo para enviarle por Email o WhatsApp.
+          2. Detalla que el pago es de $${partnerCost} por el servicio mensual.
+          3. Deja placeholders claros como [DETALLE DE TAREAS] o [FECHA DE ENTREGA] si faltan datos.
+          4. El tono debe ser de "Confirmación de asignación de proyecto".
+          `;
+          
+          const response = await ai.chat([{ role: 'user', content: prompt }]);
+          setPartnerAgreementText(response || "Error generando acuerdo.");
+      } catch (error) {
+          console.error(error);
+          alert("Error conectando con la IA");
+      } finally {
+          setIsGeneratingAgreement(false);
+      }
   };
 
-  // WhatsApp Logic
   const getWhatsAppLink = (p: Project) => {
       if (!p.phone) return null;
-      // Clean phone number
       const cleanPhone = p.phone.replace(/\D/g, '');
       const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
       const currentMonth = monthNames[new Date().getMonth()];
-      
       const message = `Hola ${p.name.split(' ')[0]}! 👋 Te paso el total del mes de *${currentMonth}* por valor de *$${p.monthlyRevenue.toLocaleString()}*.\n\nAvísame cuando realices el pago así lo registro. Gracias!`;
-      
       return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
   };
 
-  // Billing Logic Helper
-  const getBillingStatus = (billingDay: number) => {
-      const today = new Date().getDate();
-      if (billingDay === today) return { label: 'Cobrar Hoy', color: 'text-green-600 font-bold' };
-      if (billingDay < today) return { label: 'Vencido', color: 'text-red-500 font-bold' };
-      return { label: `Día ${billingDay}`, color: 'text-gray-500' };
-  }
-
-  // Combined History Timeline
   const getCombinedTimeline = () => {
       const notes = clientNotes.map(n => ({ type: 'NOTE', data: n, date: new Date(n.createdAt) }));
-      const tasks = clientTasks.filter(t => t.status === 'DONE').map(t => ({ type: 'TASK', data: t, date: new Date(t.created_at || new Date()) })); // Fallback date if missing
-      
+      const tasks = clientTasks.filter(t => t.status === 'DONE').map(t => ({ type: 'TASK', data: t, date: new Date(t.created_at || new Date()) }));
       return [...notes, ...tasks].sort((a, b) => b.date.getTime() - a.date.getTime());
   };
 
+  // Filter projects
+  const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20 h-[calc(100vh-100px)] flex flex-col">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Mis Clientes & Proyectos</h1>
-          <p className="text-gray-500 mt-2">Gestiona cobros, márgenes, historial y notas de seguimiento.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Cartera de Clientes</h1>
+          <p className="text-sm text-gray-500">Vista consolidada de facturación y estado.</p>
         </div>
-        <Button onClick={openCreateModal} className="shadow-lg">
-            <Plus className="w-4 h-4 mr-2" /> Nuevo Proyecto
-        </Button>
+        <div className="flex gap-2 w-full md:w-auto">
+             <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <Input 
+                    placeholder="Buscar cliente..." 
+                    className="pl-9 h-10 bg-white" 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                />
+             </div>
+            <Button onClick={openCreateModal} className="shadow-lg shadow-black/10">
+                <Plus className="w-4 h-4 mr-2" /> Nuevo
+            </Button>
+        </div>
       </div>
 
+      {/* DATA TABLE */}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col">
+          <div className="overflow-x-auto flex-1">
+              <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs tracking-wider sticky top-0 z-10">
+                      <tr>
+                          <th className="px-6 py-3">Cliente / Proyecto</th>
+                          <th className="px-6 py-3">Estado</th>
+                          <th className="px-6 py-3 text-right">Fee Cliente</th>
+                          <th className="px-6 py-3 text-right">Pago Socio</th>
+                          <th className="px-6 py-3 text-right">Tu Margen</th>
+                          <th className="px-6 py-3">Día Cobro</th>
+                          <th className="px-6 py-3 text-center">Acciones</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                      {isLoading ? (
+                          <tr><td colSpan={7} className="text-center py-10 text-gray-400">Cargando datos...</td></tr>
+                      ) : filteredProjects.length === 0 ? (
+                           <tr><td colSpan={7} className="text-center py-10 text-gray-400">No se encontraron clientes.</td></tr>
+                      ) : (
+                          filteredProjects.map((p) => {
+                              const margin = (p.monthlyRevenue || 0) - (p.outsourcingCost || 0);
+                              const waLink = getWhatsAppLink(p);
+                              return (
+                                  <tr 
+                                    key={p.id} 
+                                    onClick={() => openEditModal(p)}
+                                    className="hover:bg-blue-50/30 transition-colors cursor-pointer group"
+                                  >
+                                      <td className="px-6 py-3">
+                                          <div className="flex flex-col">
+                                              <span className="font-bold text-gray-900">{p.name}</span>
+                                              {p.partnerName ? (
+                                                  <span className="text-[10px] text-gray-400 flex items-center gap-1"><User className="w-3 h-3"/> {p.partnerName}</span>
+                                              ) : (
+                                                  <span className="text-[10px] text-gray-400 italic">In-house</span>
+                                              )}
+                                          </div>
+                                      </td>
+                                      <td className="px-6 py-3">
+                                          <Badge variant={p.status === ProjectStatus.ACTIVE ? 'green' : 'outline'}>
+                                              {p.status === ProjectStatus.ACTIVE ? 'ACTIVO' : 'PAUSADO'}
+                                          </Badge>
+                                      </td>
+                                      <td className="px-6 py-3 text-right font-mono font-medium">
+                                          ${p.monthlyRevenue.toLocaleString()}
+                                      </td>
+                                      <td className="px-6 py-3 text-right font-mono text-gray-500">
+                                          {p.outsourcingCost ? `$${p.outsourcingCost.toLocaleString()}` : '-'}
+                                      </td>
+                                      <td className="px-6 py-3 text-right font-mono font-bold text-green-600">
+                                          +${margin.toLocaleString()}
+                                      </td>
+                                      <td className="px-6 py-3">
+                                          <div className="flex items-center gap-2">
+                                              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs font-bold">{p.billingDay}</span>
+                                              {p.billingDay === new Date().getDate() && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>}
+                                          </div>
+                                      </td>
+                                      <td className="px-6 py-3 text-center">
+                                          <div className="flex items-center justify-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                              {waLink && (
+                                                  <a href={waLink} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 rounded-md hover:bg-green-50 text-green-600">
+                                                      <MessageCircle className="w-4 h-4" />
+                                                  </a>
+                                              )}
+                                              {p.proposalUrl && (
+                                                  <a href={p.proposalUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="p-1.5 rounded-md hover:bg-blue-50 text-blue-600">
+                                                      <FileText className="w-4 h-4" />
+                                                  </a>
+                                              )}
+                                              <button onClick={(e) => openEditModal(p, e)} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500">
+                                                  <Edit2 className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      </td>
+                                  </tr>
+                              );
+                          })
+                      )}
+                  </tbody>
+              </table>
+          </div>
+          {/* Footer Summary */}
+          <div className="bg-gray-50 border-t border-gray-200 p-4 flex gap-6 text-xs text-gray-500">
+              <div>Total Clientes: <span className="font-bold text-gray-900">{filteredProjects.length}</span></div>
+              <div>MRR Total: <span className="font-bold text-gray-900">${filteredProjects.reduce((acc, p) => acc + (p.monthlyRevenue || 0), 0).toLocaleString()}</span></div>
+          </div>
+      </div>
+
+      {/* EDIT MODAL */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? `Expediente: ${formData.name}` : "Nuevo Proyecto"}>
-          
           {/* TABS */}
           {editingId && (
               <div className="flex border-b border-gray-100 mb-6">
                   <button onClick={() => setActiveTab('PROFILE')} className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'PROFILE' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
                       Perfil & Config
                   </button>
+                  <button onClick={() => setActiveTab('PARTNER')} className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'PARTNER' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
+                      Gestión Socio
+                  </button>
                   <button onClick={() => setActiveTab('HISTORY')} className={`flex-1 pb-3 text-sm font-bold text-center border-b-2 transition-colors ${activeTab === 'HISTORY' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}>
-                      Bitácora & Historial
+                      Bitácora
                   </button>
               </div>
           )}
@@ -197,64 +333,117 @@ export default function ProjectsPage() {
                       <Label>Nombre del Cliente</Label>
                       <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Nike Argentina" autoFocus />
                   </div>
-                  
                   <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Fee Mensual ($)</Label>
                         <Input type="number" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: e.target.value})} placeholder="1500" />
+                        <p className="text-[10px] text-gray-400 mt-1">Lo que el cliente te paga a ti.</p>
                       </div>
                       <div>
                         <Label>Día de Cobro (1-31)</Label>
                         <Input type="number" min="1" max="31" value={formData.billingDay} onChange={e => setFormData({...formData, billingDay: e.target.value})} />
                       </div>
                   </div>
+                  
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
+                      <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-gray-500"/>
+                              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Asignación de Socio</span>
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Socio Responsable</Label>
+                            <select 
+                                    className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-black"
+                                    value={formData.assignedPartnerId}
+                                    onChange={e => setFormData({...formData, assignedPartnerId: e.target.value})}
+                            >
+                                <option value="">(Interno / Yo)</option>
+                                {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <Label>Costo Socio ($)</Label>
+                            <Input type="number" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: e.target.value})} placeholder="0" />
+                            <p className="text-[10px] text-gray-400 mt-1">Lo que tú le pagas a él.</p>
+                        </div>
+                      </div>
+                  </div>
 
                   <div>
                       <Label>WhatsApp (Cobros Automáticos)</Label>
-                      <Input type="tel" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="Ej: 54911..." />
-                      <p className="text-[10px] text-gray-400 mt-1">Ingresa el código de país (ej: 549 para Arg) para que funcione el link.</p>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4">
-                      <div className="flex items-center gap-2 mb-2">
-                          <User className="w-4 h-4 text-gray-500"/>
-                          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Outsourcing & Socios</span>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 w-4 h-4 text-gray-400"/>
+                        <Input type="tel" className="pl-9" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="Ej: 54911..." />
                       </div>
-                      
-                      <div>
-                          <Label>Socio Asignado (Quién lo hace)</Label>
-                          <select 
-                                className="flex h-11 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-black"
-                                value={formData.assignedPartnerId}
-                                onChange={e => setFormData({...formData, assignedPartnerId: e.target.value})}
-                          >
-                              <option value="">(Lo hago yo internamente)</option>
-                              {contractors.map(c => <option key={c.id} value={c.id}>{c.name} ({c.role})</option>)}
-                          </select>
-                      </div>
-
-                      {formData.assignedPartnerId && (
-                          <div>
-                                <Label>Costo del Socio ($)</Label>
-                                <Input type="number" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: e.target.value})} placeholder="Monto que le pagas al socio" />
-                          </div>
-                      )}
                   </div>
-
                   <div>
                       <Label>Link de Propuesta (PDF)</Label>
-                      <Input value={formData.proposalUrl} onChange={e => setFormData({...formData, proposalUrl: e.target.value})} placeholder="https://drive.google.com/..." />
+                      <Input value={formData.proposalUrl} onChange={e => setFormData({...formData, proposalUrl: e.target.value})} placeholder="https://..." />
                   </div>
-
                   <div className="pt-2 flex gap-2">
-                      <Button type="submit" className="w-full">Guardar Cambios</Button>
+                      {editingId && (
+                          <Button type="button" variant="destructive" onClick={() => handleDelete(editingId)} className="w-auto px-3"><Filter className="w-4 h-4"/></Button>
+                      )}
+                      <Button type="submit" className="flex-1">Guardar Cambios</Button>
                   </div>
               </form>
           )}
 
+          {activeTab === 'PARTNER' && (
+              <div className="space-y-6">
+                  {/* Financial Breakdown */}
+                  <div className="grid grid-cols-3 gap-3">
+                      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 text-center">
+                          <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Cliente Paga</p>
+                          <p className="text-lg font-bold text-gray-900">${formData.monthlyRevenue}</p>
+                      </div>
+                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-center">
+                          <p className="text-[10px] text-blue-400 font-bold uppercase mb-1">Pagas al Socio</p>
+                          <p className="text-lg font-bold text-blue-700">${formData.outsourcingCost}</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-xl border border-green-100 text-center">
+                          <p className="text-[10px] text-green-600 font-bold uppercase mb-1">Tu Ganancia</p>
+                          <p className="text-lg font-bold text-green-700">
+                              ${(parseFloat(formData.monthlyRevenue) || 0) - (parseFloat(formData.outsourcingCost) || 0)}
+                          </p>
+                      </div>
+                  </div>
+
+                  {/* Agreement Generator */}
+                  <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                          <Label className="mb-0">Orden de Trabajo (Acuerdo)</Label>
+                          <Button size="sm" variant="ghost" className="h-8 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100" onClick={generatePartnerAgreement} disabled={isGeneratingAgreement}>
+                                {isGeneratingAgreement ? <Loader2 className="w-3 h-3 animate-spin mr-1"/> : <Sparkles className="w-3 h-3 mr-1"/>}
+                                {partnerAgreementText ? 'Regenerar con IA' : 'Redactar con IA'}
+                          </Button>
+                      </div>
+                      
+                      <div className="relative">
+                        <Textarea 
+                            className="min-h-[200px] font-mono text-xs leading-relaxed p-4"
+                            value={partnerAgreementText}
+                            onChange={e => setPartnerAgreementText(e.target.value)}
+                            placeholder="Presiona 'Redactar con IA' para generar el acuerdo formal basado en los montos asignados..."
+                        />
+                        {partnerAgreementText && (
+                            <button onClick={() => navigator.clipboard.writeText(partnerAgreementText)} className="absolute bottom-3 right-3 p-2 bg-white rounded-lg border shadow hover:bg-gray-50">
+                                <Copy className="w-4 h-4 text-gray-500" />
+                            </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400">
+                          Este texto es generado automáticamente usando los valores del perfil. Úsalo para formalizar la tarea con tu socio.
+                      </p>
+                  </div>
+              </div>
+          )}
+
           {activeTab === 'HISTORY' && (
               <div className="space-y-6 h-[400px] flex flex-col">
-                  {/* Add Note */}
                   <div className="flex gap-2 items-start">
                       <div className="flex-1">
                           <Textarea 
@@ -264,20 +453,15 @@ export default function ProjectsPage() {
                              className="min-h-[60px] text-xs"
                           />
                           <div className="flex gap-2 mt-2">
-                              <button onClick={() => setNoteType('NOTE')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'NOTE' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Nota</button>
-                              <button onClick={() => setNoteType('MEETING')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'MEETING' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Reunión</button>
-                              <button onClick={() => setNoteType('CALL')} className={`text-[10px] px-2 py-1 rounded-full border ${noteType === 'CALL' ? 'bg-black text-white border-black' : 'border-gray-200'}`}>Llamada</button>
+                              {['NOTE', 'MEETING', 'CALL'].map(t => (
+                                  <button key={t} onClick={() => setNoteType(t as any)} className={`text-[10px] px-2 py-1 rounded-full border transition-all ${noteType === t ? 'bg-black text-white border-black' : 'border-gray-200 hover:bg-gray-50'}`}>{t === 'NOTE' ? 'Nota' : t === 'MEETING' ? 'Reunión' : 'Llamada'}</button>
+                              ))}
                           </div>
                       </div>
-                      <Button onClick={handleAddNote} size="sm" disabled={!newNote.trim()}>
-                          Agregar
-                      </Button>
+                      <Button onClick={handleAddNote} size="sm" disabled={!newNote.trim()}>Agregar</Button>
                   </div>
-
-                  {/* Timeline */}
                   <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar bg-gray-50/50 p-4 rounded-xl border border-gray-100">
                       {getCombinedTimeline().length === 0 && <p className="text-center text-xs text-gray-400 py-4">No hay historial registrado.</p>}
-                      
                       {getCombinedTimeline().map((item: any, idx) => (
                           <div key={idx} className="flex gap-3">
                               <div className="flex flex-col items-center">
@@ -285,140 +469,19 @@ export default function ProjectsPage() {
                                   <div className="w-px h-full bg-gray-200 my-1"></div>
                               </div>
                               <div className="pb-4">
-                                  <p className="text-[10px] text-gray-400 font-mono mb-0.5">
-                                      {item.date.toLocaleDateString()}
-                                  </p>
-                                  {item.type === 'TASK' ? (
-                                      <div className="bg-white border border-gray-100 p-2 rounded-lg shadow-sm">
-                                          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
-                                              <CheckCircle2 className="w-3 h-3 text-green-500"/> Tarea Completada
-                                          </div>
-                                          <p className="text-xs text-gray-600 mt-1">{item.data.title}</p>
-                                      </div>
-                                  ) : (
-                                      <div className="bg-white border border-gray-100 p-2 rounded-lg shadow-sm">
-                                           <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wide">
-                                              {item.data.type === 'MEETING' && <Mic className="w-3 h-3 text-purple-500"/>}
-                                              {item.data.type === 'NOTE' && <StickyNote className="w-3 h-3 text-yellow-500"/>}
-                                              {item.data.type}
-                                          </div>
-                                          <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{item.data.content}</p>
-                                      </div>
-                                  )}
+                                  <p className="text-[10px] text-gray-400 font-mono mb-0.5">{item.date.toLocaleDateString()}</p>
+                                  <div className="bg-white border border-gray-100 p-2 rounded-lg shadow-sm">
+                                      <p className="text-xs text-gray-600 whitespace-pre-wrap">
+                                          {item.type === 'TASK' ? `✅ Completado: ${item.data.title}` : item.data.content}
+                                      </p>
+                                  </div>
                               </div>
                           </div>
                       ))}
                   </div>
               </div>
           )}
-
       </Modal>
-
-      {isLoading ? (
-        <div className="text-center py-20 text-gray-400">Cargando clientes...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.length === 0 && (
-             <div className="col-span-full text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
-               <p className="text-gray-500">No hay proyectos activos.</p>
-             </div>
-          )}
-          {projects.map((project) => {
-            const billingInfo = getBillingStatus(project.billingDay || 1);
-            const waLink = getWhatsAppLink(project);
-            const margin = (project.monthlyRevenue || 0) - (project.outsourcingCost || 0);
-            
-            return (
-            <Card key={project.id} className="hover:shadow-lg transition-all duration-300 group relative border-t-4 border-t-black">
-              <div className="p-6">
-                
-                {/* Header Card */}
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex flex-col">
-                      <h3 className="text-lg font-bold text-gray-900 truncate">{project.name}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={project.status === ProjectStatus.ACTIVE ? 'green' : 'outline'}>
-                            {project.status === ProjectStatus.ACTIVE ? 'Activo' : 'Pausado'}
-                        </Badge>
-                        {project.proposalUrl && (
-                            <a href={project.proposalUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex items-center">
-                                <FileText className="w-3 h-3 mr-1" /> Propuesta
-                            </a>
-                        )}
-                      </div>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="text-gray-300 hover:text-blue-500 p-1" onClick={() => openEditModal(project)}>
-                        <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button className="text-gray-300 hover:text-black p-1" onClick={() => toggleStatus(project)}>
-                        <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Financial Arbitrage Block */}
-                <div className="bg-gray-50 rounded-xl p-4 my-4 border border-gray-100 space-y-2">
-                    <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-500">Cobro Cliente</span>
-                        <span className="font-bold text-gray-900">${project.monthlyRevenue.toLocaleString()}</span>
-                    </div>
-                    {project.assignedPartnerId && (
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-500 flex items-center gap-1">
-                                <ArrowRight className="w-3 h-3"/> Pago Socio
-                            </span>
-                            <span className="font-medium text-red-500">-${(project.outsourcingCost || 0).toLocaleString()}</span>
-                        </div>
-                    )}
-                    <div className="border-t border-gray-200 pt-2 flex justify-between items-center">
-                        <span className="text-xs font-bold uppercase text-gray-400">Tu Margen</span>
-                        <span className="font-bold text-green-600 text-lg">+${margin.toLocaleString()}</span>
-                    </div>
-                </div>
-                
-                {/* Partner Info */}
-                {project.assignedPartnerId ? (
-                    <div className="mb-4 flex items-center gap-2 text-xs text-gray-500 bg-white border border-gray-100 rounded-lg p-2">
-                        <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
-                            {project.partnerName?.charAt(0) || 'S'}
-                        </div>
-                        <span>Gestionado por <span className="font-medium text-gray-900">{project.partnerName}</span></span>
-                    </div>
-                ) : (
-                    <div className="mb-4 text-xs text-gray-400 italic pl-1">Gestionado in-house</div>
-                )}
-
-                {/* Actions Footer */}
-                <div className="border-t border-gray-50 pt-4 flex items-center justify-between">
-                  <div className="flex flex-col">
-                      <span className="text-[10px] uppercase text-gray-400 font-bold">Próximo Cobro</span>
-                      <span className={`text-sm ${billingInfo.color}`}>{billingInfo.label}</span>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openEditModal(project)}>
-                          <History className="w-4 h-4 mr-2" /> Historial
-                      </Button>
-                      {waLink ? (
-                          <a href={waLink} target="_blank" rel="noreferrer">
-                              <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white border-none shadow-green-200 px-3">
-                                  <MessageCircle className="w-4 h-4" />
-                              </Button>
-                          </a>
-                      ) : (
-                          <Button size="sm" variant="outline" disabled className="opacity-50 px-3">
-                              <MessageCircle className="w-4 h-4" />
-                          </Button>
-                      )}
-                  </div>
-                </div>
-
-              </div>
-            </Card>
-          )})}
-        </div>
-      )}
     </div>
   );
 }

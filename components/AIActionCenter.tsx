@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
-import { Sparkles, Loader2, CornerDownLeft, Mic, MicOff, X, Maximize2, Minimize2, ChevronUp } from 'lucide-react';
+import { Sparkles, Loader2, CornerDownLeft, Mic, MicOff, ChevronUp } from 'lucide-react';
 import { TaskStatus, ProjectStatus } from '../types';
 
 interface Message {
@@ -27,12 +27,12 @@ export const AIActionCenter = () => {
     
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const recognitionRef = useRef<any>(null);
 
     // --- Click Outside Logic ---
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                // Only close if it's open
                 if (isOpen) setIsOpen(false);
             }
         };
@@ -51,24 +51,33 @@ export const AIActionCenter = () => {
     }, [isOpen]);
 
     // --- Voice Logic ---
-    const startListening = () => {
+    const toggleListening = () => {
+        if (isListening) {
+            recognitionRef.current?.stop();
+            setIsListening(false);
+            return;
+        }
+
         const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
         const Recognition = SpeechRecognition || webkitSpeechRecognition;
 
         if (!Recognition) {
-            alert("Tu navegador no soporta voz.");
+            alert("Tu navegador no soporta reconocimiento de voz. Intenta usar Chrome.");
             return;
         }
 
         const recognition = new Recognition();
+        recognitionRef.current = recognition;
+        
         recognition.lang = 'es-ES';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+        recognition.interimResults = true; // Show text while speaking
+        recognition.continuous = false; // Stop after one sentence/command
 
         recognition.onstart = () => {
             setIsListening(true);
-            setPlaceholder("Escuchando...");
-            setIsOpen(true); // Open chat when listening starts
+            setPlaceholder("Te escucho...");
+            setIsOpen(true);
+            setInput(''); // Clear input when starting fresh
         };
 
         recognition.onend = () => {
@@ -77,11 +86,38 @@ export const AIActionCenter = () => {
         };
 
         recognition.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setInput(transcript);
+            let finalTranscript = '';
+            let interimTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            if (finalTranscript) {
+                setInput(finalTranscript);
+            } else if (interimTranscript) {
+                setInput(interimTranscript);
+            }
         };
 
-        recognition.start();
+        recognition.onerror = (event: any) => {
+            console.error("Speech Error:", event.error);
+            setIsListening(false);
+            if (event.error === 'not-allowed') {
+                alert("Permiso de micrófono denegado. Por favor permítelo en tu navegador.");
+            }
+        };
+
+        try {
+            recognition.start();
+        } catch (error) {
+            console.error("Error starting speech recognition:", error);
+            setIsListening(false);
+        }
     };
     
     const executeAction = async (actionType: string, payload: any) => {
@@ -117,6 +153,12 @@ export const AIActionCenter = () => {
     const handleSend = async (textOverride?: string) => {
         const userText = textOverride || input;
         if (!userText.trim()) return;
+
+        // Stop listening if sending manually while listening
+        if (isListening) {
+            recognitionRef.current?.stop();
+            setIsListening(false);
+        }
 
         setInput('');
         setIsOpen(true);
@@ -244,8 +286,9 @@ export const AIActionCenter = () => {
                 {/* Actions Right */}
                 <div className="flex items-center gap-2 pr-2">
                      <button 
-                        onClick={(e) => { e.stopPropagation(); startListening(); }}
+                        onClick={(e) => { e.stopPropagation(); toggleListening(); }}
                         className={`p-2 rounded-full transition-all ${isListening ? 'text-red-500 bg-red-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                        title="Activar/Desactivar Micrófono"
                     >
                         {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                     </button>

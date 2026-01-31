@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Contractor } from '../types';
-import { Button, Card, Input, Label, Badge, Modal } from '../components/UIComponents';
-import { Users, Plus, Trash2, Mail, DollarSign, Briefcase } from 'lucide-react';
+import { Button, Input, Label, Badge, Modal } from '../components/UIComponents';
+import { Users, Plus, Trash2, Mail, DollarSign, Search } from 'lucide-react';
 
 export default function PartnersPage() {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -53,61 +54,73 @@ export default function PartnersPage() {
     }
   };
 
+  const filtered = contractors.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Socios & Outsourcing</h1>
-          <p className="text-gray-500 mt-2">Gestiona tu equipo externo y costos de subcontratación.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Equipo & Socios</h1>
+          <p className="text-gray-500 mt-2">Gestiona tu red de outsourcing y costos.</p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} className="shadow-lg">
-          <Plus className="w-4 h-4 mr-2" /> Nuevo Socio
-        </Button>
+        <div className="flex gap-2">
+            <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                <Input placeholder="Buscar..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+            <Button onClick={() => setIsModalOpen(true)} className="shadow-lg">
+                <Plus className="w-4 h-4 mr-2" /> Agregar
+            </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {contractors.map((contractor) => (
-          <Card key={contractor.id} className="hover:border-black/20 transition-all group">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-600">
-                  {contractor.name.charAt(0)}
-                </div>
-                <button onClick={() => handleDelete(contractor.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-              
-              <h3 className="text-lg font-bold text-gray-900">{contractor.name}</h3>
-              <div className="flex items-center gap-2 mt-1 mb-4">
-                <Badge variant="outline" className="text-[10px] uppercase tracking-wider">{contractor.role || 'Partner'}</Badge>
-                <span className={`w-2 h-2 rounded-full ${contractor.status === 'ACTIVE' ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-gray-50">
-                <div className="flex items-center text-sm text-gray-600">
-                  <DollarSign className="w-4 h-4 mr-2 text-gray-400" />
-                  <span className="font-mono font-medium">${contractor.hourlyRate}/hr</span>
-                  <span className="text-xs text-gray-400 ml-1">(Ref)</span>
-                </div>
-                {contractor.email && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Mail className="w-4 h-4 mr-2 text-gray-400" />
-                    <span className="truncate">{contractor.email}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
-        
-        {contractors.length === 0 && !loading && (
-          <div className="col-span-full py-16 text-center bg-white border border-dashed border-gray-200 rounded-xl text-gray-400">
-            <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No tienes socios registrados.</p>
-            <p className="text-xs">Agrega freelancers para calcular márgenes de outsourcing.</p>
-          </div>
-        )}
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs tracking-wider">
+                  <tr>
+                      <th className="px-6 py-4">Nombre / Rol</th>
+                      <th className="px-6 py-4">Estado</th>
+                      <th className="px-6 py-4">Email</th>
+                      <th className="px-6 py-4 text-right">Tarifa (Ref)</th>
+                      <th className="px-6 py-4 text-center">Acciones</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                  {filtered.length === 0 ? (
+                      <tr><td colSpan={5} className="text-center py-12 text-gray-400">No hay socios registrados.</td></tr>
+                  ) : (
+                      filtered.map(c => (
+                          <tr key={c.id} className="hover:bg-gray-50 group">
+                              <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs">
+                                          {c.name.charAt(0)}
+                                      </div>
+                                      <div>
+                                          <div className="font-bold text-gray-900">{c.name}</div>
+                                          <div className="text-xs text-gray-500">{c.role}</div>
+                                      </div>
+                                  </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                  <Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge>
+                              </td>
+                              <td className="px-6 py-4 text-gray-600">
+                                  {c.email || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-right font-mono font-medium">
+                                  ${c.hourlyRate}/hr
+                              </td>
+                              <td className="px-6 py-4 text-center">
+                                  <button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                  </button>
+                              </td>
+                          </tr>
+                      ))
+                  )}
+              </tbody>
+          </table>
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Socio / Freelancer">
