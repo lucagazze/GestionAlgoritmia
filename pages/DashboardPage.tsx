@@ -1,8 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Project, Task, TaskStatus, ProjectStatus } from '../types';
 import { Card, Button, Badge } from '../components/UIComponents';
+import { AIActionCenter } from '../components/AIActionCenter';
 import { 
   TrendingUp, 
   Calendar, 
@@ -12,13 +12,49 @@ import {
   HardDrive,
   Globe,
   Palette,
-  Bell,
   ArrowRight,
   Clock,
   Briefcase,
   Plus
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+const QuickLink = ({ 
+  href, 
+  to, 
+  internal, 
+  icon: Icon, 
+  label, 
+  color, 
+  bg 
+}: { 
+  href?: string, 
+  to?: string, 
+  internal?: boolean, 
+  icon: any, 
+  label: string, 
+  color: string, 
+  bg: string 
+}) => {
+  const content = (
+    <div className="flex flex-col items-center gap-2 group cursor-pointer transition-transform hover:-translate-y-1">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border border-black/5 transition-all group-hover:scale-110 group-hover:shadow-md ${bg} ${color}`}>
+        <Icon className="w-6 h-6" />
+      </div>
+      <span className="text-xs font-medium text-gray-500 group-hover:text-black">{label}</span>
+    </div>
+  );
+
+  if (internal && to) {
+    return <Link to={to}>{content}</Link>;
+  }
+  
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="block">
+      {content}
+    </a>
+  );
+};
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -68,30 +104,15 @@ export default function DashboardPage() {
     return { ...p, billingStatus: status, daysDiff };
   }).filter(p => p.billingStatus !== 'ok').sort((a, b) => a.daysDiff - b.daysDiff);
 
-  const urgentCount = overdueTasks.length + billingAlerts.filter(b => b.billingStatus === 'overdue' || b.billingStatus === 'today').length;
-
   if (loading) return <div className="flex h-screen items-center justify-center text-gray-400 bg-[#FAFAFA]"><div className="animate-pulse">Cargando Sistema...</div></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
       
-      {/* 1. Header & Greeting */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
-             Buenos días <span className="text-gray-300 font-light">|</span> <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">Luca</span>
-          </h1>
-          <p className="text-gray-500 mt-2 font-medium">
-             {urgentCount > 0 
-                ? `Tienes ${urgentCount} asuntos requieren tu atención inmediata.` 
-                : 'Todo bajo control. Es un buen día para crecer.'}
-          </p>
-        </div>
-        <Link to="/calculator">
-            <Button className="rounded-full px-6 shadow-xl shadow-black/10 hover:scale-105 transition-transform">
-              <Plus className="w-4 h-4 mr-2" /> Nueva Propuesta
-            </Button>
-        </Link>
+      {/* 1. AI HEADER & GREETING */}
+      <div className="flex flex-col items-center justify-center pt-8 pb-4">
+          <p className="text-gray-400 font-medium mb-4 text-sm tracking-wide uppercase">Algoritmia Intelligence</p>
+          <AIActionCenter />
       </div>
 
       {/* 2. Action Center (Alerts) */}
@@ -222,19 +243,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
-
-// --- Quick Link Component ---
-function QuickLink({ href, to, icon: Icon, label, color, bg, internal }: any) {
-    const content = (
-        <div className="flex flex-col items-center gap-2 group cursor-pointer">
-            <div className={`w-12 h-12 rounded-2xl ${bg} flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:shadow-md transition-all duration-300`}>
-                <Icon className={`w-6 h-6 ${color}`} />
-            </div>
-            <span className="text-[10px] font-medium text-gray-500 group-hover:text-black transition-colors">{label}</span>
-        </div>
-    );
-
-    if (internal) return <Link to={to}>{content}</Link>;
-    return <a href={href} target="_blank" rel="noreferrer">{content}</a>;
 }
