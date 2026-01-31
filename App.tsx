@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet } from 'lucide-react';
+import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book } from 'lucide-react';
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -10,31 +10,38 @@ import DashboardPage from './pages/DashboardPage';
 import PartnersPage from './pages/PartnersPage';
 import SettingsPage from './pages/SettingsPage';
 import SalesCopilotPage from './pages/SalesCopilotPage';
+import LabPage from './pages/LabPage';
+import PlaybooksPage from './pages/PlaybooksPage';
+import ClientPortalPage from './pages/ClientPortalPage'; 
 import { AIActionCenter } from './components/AIActionCenter';
+import { CommandPalette } from './components/CommandPalette';
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolean) => void }) => {
   const location = useLocation();
   
-  // Sections definition for better grouping
+  // Reorganización del menú según pedido del usuario
   const sections = [
       {
-          title: "GESTIÓN",
+          title: "PRINCIPAL",
           items: [
               { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio', color: 'text-gray-900' },
-              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes & Pagos', color: 'text-blue-600' },
-              { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-emerald-600' },
-              { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Equipo & Socios', color: 'text-purple-600' },
+              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes', color: 'text-blue-600' },
+              // "Pagos" apunta al Dashboard por ahora ya que ahí está el resumen financiero, o podría ser Calculator
+              { path: '/calculator', icon: <CreditCard className="w-5 h-5" />, label: 'Pagos / Cotizar', color: 'text-emerald-600' },
+              { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-orange-600' },
+              { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Equipo', color: 'text-purple-600' },
           ]
       },
       {
-          title: "VENTAS",
+          title: "ESTRATEGIA",
           items: [
+              { path: '/lab', icon: <Rocket className="w-5 h-5" />, label: 'The Lab', color: 'text-pink-600' },
+              { path: '/playbooks', icon: <Book className="w-5 h-5" />, label: 'Playbooks', color: 'text-amber-600' },
               { path: '/sales-copilot', icon: <MessageSquareMore className="w-5 h-5" />, label: 'Copiloto IA', color: 'text-indigo-600' },
-              { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizador', color: 'text-orange-600' },
           ]
       },
       {
-          title: "ADMIN",
+          title: "SISTEMA",
           items: [
               { path: '/services', icon: <LayoutGrid className="w-5 h-5" />, label: 'Catálogo', color: 'text-gray-600' },
               { path: '/settings', icon: <Settings className="w-5 h-5" />, label: 'Ajustes', color: 'text-gray-600' },
@@ -132,24 +139,29 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolea
   );
 };
 
-export default function App() {
+const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Hide Sidebar and AI Action Center for Portal routes
+  const isPortal = location.pathname.startsWith('/portal/');
 
   return (
-    <Router>
       <div className="flex min-h-screen bg-[#FAFAFA] text-gray-900 font-sans selection:bg-black selection:text-white">
-        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+        {!isPortal && <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />}
         
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen relative">
-          {/* Mobile Header */}
-          <div className="md:hidden h-16 border-b border-gray-200 flex items-center px-4 bg-white/80 backdrop-blur-md sticky top-0 z-30">
-            <button onClick={() => setSidebarOpen(true)}>
-              <Menu className="w-6 h-6" />
-            </button>
-            <span className="ml-4 font-bold text-lg">Algoritmia OS</span>
-          </div>
+          {/* Mobile Header (Hidden in Portal) */}
+          {!isPortal && (
+              <div className="md:hidden h-16 border-b border-gray-200 flex items-center px-4 bg-white/80 backdrop-blur-md sticky top-0 z-30">
+                <button onClick={() => setSidebarOpen(true)}>
+                  <Menu className="w-6 h-6" />
+                </button>
+                <span className="ml-4 font-bold text-lg">Algoritmia OS</span>
+              </div>
+          )}
 
-          <div className="flex-1 overflow-auto p-4 md:p-8 lg:p-10 max-w-[1600px] mx-auto w-full">
+          <div className={`flex-1 overflow-auto ${isPortal ? '' : 'p-4 md:p-8 lg:p-10'} max-w-[1600px] mx-auto w-full`}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/calculator" element={<CalculatorPage />} />
@@ -159,14 +171,29 @@ export default function App() {
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/sales-copilot" element={<SalesCopilotPage />} />
+              <Route path="/lab" element={<LabPage />} />
+              <Route path="/playbooks" element={<PlaybooksPage />} />
+              <Route path="/portal/:token" element={<ClientPortalPage />} />
             </Routes>
           </div>
 
-          {/* AI Action Center Global Widget */}
-          <AIActionCenter />
+          {/* AI Action Center & Global Search (Hidden in Portal) */}
+          {!isPortal && (
+            <>
+              <AIActionCenter />
+              <CommandPalette />
+            </>
+          )}
           
         </main>
       </div>
+  );
+};
+
+export default function App() {
+  return (
+    <Router>
+      <MainLayout />
     </Router>
   );
 }

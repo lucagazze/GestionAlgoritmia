@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -14,7 +14,6 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
 
 export const db = {
   // --- SETTINGS (For API Keys) ---
-  // Table: AgencySettings (CamelCase)
   settings: {
     getApiKey: async (): Promise<string | null> => {
         const { data, error } = await supabase
@@ -27,8 +26,6 @@ export const db = {
         return data?.value || null;
     },
     setApiKey: async (apiKey: string): Promise<void> => {
-        // Usamos UPSERT que es mucho más robusto para configuraciones
-        // Requiere que la columna 'key' tenga la constraint UNIQUE en la BD (que ya la tiene)
         const { error } = await supabase
             .from('AgencySettings')
             .upsert(
@@ -43,8 +40,27 @@ export const db = {
     }
   },
 
+  // --- KNOWLEDGE BASE (SOPs) ---
+  sops: {
+      getAll: async (): Promise<SOP[]> => {
+          return handleResponse<SOP>(supabase.from('SOP').select('*').order('title', { ascending: true }));
+      },
+      create: async (data: Omit<SOP, 'id' | 'updatedAt'>): Promise<SOP> => {
+          const { data: created, error } = await supabase.from('SOP').insert({ ...data, updatedAt: new Date().toISOString() }).select().single();
+          if (error) throw error;
+          return created;
+      },
+      update: async (id: string, data: Partial<SOP>): Promise<void> => {
+          const { error } = await supabase.from('SOP').update({ ...data, updatedAt: new Date().toISOString() }).eq('id', id);
+          if (error) throw error;
+      },
+      delete: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('SOP').delete().eq('id', id);
+          if (error) throw error;
+      }
+  },
+
   // --- CHAT HISTORY & SESSIONS ---
-  // Tables: aichatsession, aichatlog (Lowercase per schema)
   chat: {
       getSessions: async (): Promise<AIChatSession[]> => {
           return handleResponse<AIChatSession>(
@@ -132,13 +148,68 @@ export const db = {
         phone: c.phone || '',
         outsourcingCost: c.outsourcingCost || 0,
         assignedPartnerId: c.assignedPartnerId || null,
-        proposalUrl: c.proposalUrl || ''
+        proposalUrl: c.proposalUrl || '',
+        // CRM fields
+        healthScore: c.healthScore || 'GOOD',
+        lastPaymentDate: c.lastPaymentDate || null,
+        lastContactDate: c.lastContactDate || null, // Ghosting Monitor
+        resources: c.resources || [],
+        contacts: c.contacts || [],
+        // Brand Kit
+        brandColors: c.brandColors || [],
+        brandFonts: c.brandFonts || [],
+        // Profitability & Portal
+        internalHours: c.internalHours || 0,
+        internalHourlyRate: c.internalHourlyRate || 25, // Default internal cost
+        publicToken: c.publicToken || '',
+        progress: c.progress || 0
       }));
+    },
+    // New method for Public Portal
+    getByToken: async (token: string): Promise<Project | null> => {
+         const { data, error } = await supabase.from('Client').select('*').eq('publicToken', token).maybeSingle();
+         if (error || !data) return null;
+         return {
+            ...data,
+            status: data.status || ProjectStatus.ACTIVE,
+            monthlyRevenue: data.monthlyRevenue || 0,
+            billingDay: data.billingDay || 1,
+            notes: data.notes || '',
+            phone: data.phone || '',
+            outsourcingCost: data.outsourcingCost || 0,
+            healthScore: data.healthScore || 'GOOD',
+            resources: data.resources || [],
+            internalHours: data.internalHours || 0,
+            internalHourlyRate: data.internalHourlyRate || 25,
+            publicToken: data.publicToken || '',
+            progress: data.progress || 0
+         };
     },
     create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
        const payload = { ...data, createdAt: new Date().toISOString() };
        const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
        if (error) throw error;
+       
+       // --- AUTOMATION: Onboarding Tasks ---
+       if (data.status === ProjectStatus.ONBOARDING) {
+           const onboardingTasks = [
+               { title: `📝 Enviar contrato a ${data.name}`, priority: 'HIGH' },
+               { title: `📂 Crear carpeta de Drive/Assets para ${data.name}`, priority: 'MEDIUM' },
+               { title: `🔑 Pedir accesos (Web, Redes, Ads) a ${data.name}`, priority: 'HIGH' },
+               { title: `🚀 Agendar Call de Kick-off con ${data.name}`, priority: 'MEDIUM' }
+           ];
+           
+           for (const t of onboardingTasks) {
+               await supabase.from('Task').insert({
+                   title: t.title,
+                   priority: t.priority,
+                   status: TaskStatus.TODO,
+                   projectId: created.id,
+                   description: "Generado automáticamente por Onboarding Automation."
+               });
+           }
+       }
+
        return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
@@ -153,8 +224,6 @@ export const db = {
 
   clientNotes: {
       getByClient: async (clientId: string): Promise<ClientNote[]> => {
-          // Assuming 'ClientNote' table follows CamelCase convention if it exists
-          // If this errors, the table might be missing or lowercase.
           return handleResponse<ClientNote>(
               supabase.from('ClientNote').select('*').eq('clientId', clientId).order('createdAt', { ascending: false })
           );
@@ -165,12 +234,15 @@ export const db = {
               createdAt: new Date().toISOString()
           });
           if (error) throw error;
+
+          // --- GHOSTING MONITOR AUTO-UPDATE ---
+          // When a note is added, we update the Last Contact Date of the Client
+          await supabase.from('Client').update({ lastContactDate: new Date().toISOString() }).eq('id', data.clientId);
       }
   },
 
   tasks: {
     getAll: async (): Promise<Task[]> => {
-      // Use explicit relationship syntax if needed, but standard should work
       const { data, error } = await supabase
           .from('Task')
           .select('*, assignee:Contractor(*)')
@@ -223,7 +295,6 @@ export const db = {
             status: data.status,
             objective: data.objective,
             durationMonths: data.durationMonths,
-            marginMultiplier: data.marginMultiplier,
             totalOneTimePrice: data.totalOneTimePrice,
             totalRecurringPrice: data.totalRecurringPrice,
             totalContractValue: data.totalContractValue,

@@ -12,16 +12,40 @@ export enum ProposalStatus {
 }
 
 export enum ProjectStatus {
+  // Sales Stages
+  LEAD = 'LEAD',
+  DISCOVERY = 'DISCOVERY',
+  PROPOSAL = 'PROPOSAL',
+  NEGOTIATION = 'NEGOTIATION',
+  LOST = 'LOST',
+
+  // Delivery Stages
+  ONBOARDING = 'ONBOARDING', // Won
   ACTIVE = 'ACTIVE', // Pagando mensualmente
-  ONBOARDING = 'ONBOARDING', // En setup
   COMPLETED = 'COMPLETED', // Terminado (One-time)
   PAUSED = 'PAUSED', // Pausado
 }
 
 export enum TaskStatus {
   TODO = 'TODO',
-  IN_PROGRESS = 'IN_PROGRESS',
   DONE = 'DONE',
+}
+
+export type ClientHealth = 'GOOD' | 'RISK' | 'CRITICAL';
+
+export interface ProjectResource {
+  id: string;
+  name: string;
+  url: string;
+  type: 'DRIVE' | 'FIGMA' | 'ACCESS' | 'CONTRACT' | 'OTHER';
+}
+
+export interface ProjectContact {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface Service {
@@ -38,24 +62,39 @@ export interface Client {
   name: string;
   industry?: string;
   email?: string;
-  phone?: string; // New: For WhatsApp automation
+  phone?: string; 
   createdAt: Date;
 }
 
 export interface Project extends Client {
   status: ProjectStatus;
   monthlyRevenue: number;
-  billingDay: number; // Día del mes que se cobra (ej: 1, 5, 15)
+  billingDay: number; 
   nextBillingDate?: string; 
   notes?: string;
   
-  // Outsourcing / Partner logic
-  assignedPartnerId?: string; // Who is doing the work?
-  outsourcingCost?: number;   // How much do I pay them?
-  proposalUrl?: string;       // Link to the PDF sent
+  assignedPartnerId?: string; 
+  outsourcingCost?: number;   
+  proposalUrl?: string;       
   
-  // Calculated frontend
-  partnerName?: string;       // For display
+  partnerName?: string;       
+  
+  // CRM Features
+  healthScore?: ClientHealth;
+  lastPaymentDate?: string;
+  lastContactDate?: string;   // Ghosting Monitor
+  resources?: ProjectResource[];
+  contacts?: ProjectContact[];
+
+  // Brand Kit Features
+  brandColors?: string[];     // Hex codes
+  brandFonts?: string[];      // Font names
+
+  // Profitability & Portal Features
+  internalHours?: number;       // Horas dedicadas internamente este mes
+  internalHourlyRate?: number;  // Costo base de tu hora interna (ej: $20)
+  publicToken?: string;         // Token único para el link público
+  progress?: number;            // 0 a 100 para la barra de estado del cliente
 }
 
 export interface Contractor {
@@ -64,6 +103,7 @@ export interface Contractor {
   role: string;
   hourlyRate: number;
   email?: string;
+  phone?: string; 
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -76,8 +116,8 @@ export interface Task {
   dueDate?: string;
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   assigneeId?: string;
-  assignee?: Contractor; // Joined data
-  created_at?: string; // Supabase default
+  assignee?: Contractor; 
+  created_at?: string; 
 }
 
 export interface ClientNote {
@@ -102,7 +142,6 @@ export interface Proposal {
   status: ProposalStatus;
   objective: string;
   durationMonths: number;
-  marginMultiplier: number;
   totalOneTimePrice: number;
   totalRecurringPrice: number;
   totalContractValue: number;
@@ -113,8 +152,8 @@ export interface Proposal {
 
 export interface AgencySettings {
   id: string;
-  key: string;   // e.g., 'gemini_api_key'
-  value: string; // The actual key
+  key: string;   
+  value: string; 
 }
 
 export interface AIChatSession {
@@ -131,10 +170,17 @@ export interface AIChatLog {
   content: string;
   created_at: string;
   
-  // Persistence Undo Capabilities
-  action_type?: string;     // 'CREATE_TASK', etc.
-  action_payload?: any;     // JSON data needed to undo
-  is_undone?: boolean;      // If true, show as "Action Reverted"
+  action_type?: string;     
+  action_payload?: any;     
+  is_undone?: boolean;      
+}
+
+export interface SOP {
+    id: string;
+    title: string;
+    category: 'SALES' | 'ONBOARDING' | 'FULFILLMENT' | 'ADMIN' | 'OTHER';
+    content: string;
+    updatedAt: string;
 }
 
 export type ServiceCategory = 'Web & Tech' | 'Branding' | 'Contenido' | 'Ads / Tráfico' | 'Automatización' | 'Consultoría';

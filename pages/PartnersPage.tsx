@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
-import { Contractor } from '../types';
-import { Button, Input, Label, Badge, Modal } from '../components/UIComponents';
+import { Contractor, Project, ProjectStatus } from '../types';
+import { Button, Input, Label, Badge, Modal, Card } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
-import { Users, Plus, Trash2, Mail, DollarSign, Search, Edit2 } from 'lucide-react';
+import { Users, Plus, Trash2, Mail, DollarSign, Search, Edit2, Phone, Briefcase, ChevronRight, Wallet } from 'lucide-react';
 
 export default function PartnersPage() {
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,30 +16,41 @@ export default function PartnersPage() {
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; contractor: Contractor | null }>({ x: 0, y: 0, contractor: null });
 
-  const [formData, setFormData] = useState({ name: '', role: '', hourlyRate: '', email: '' });
+  const [formData, setFormData] = useState({ name: '', role: '', hourlyRate: '', email: '', phone: '' });
 
-  useEffect(() => { loadContractors(); }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const loadContractors = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const data = await db.contractors.getAll();
-    setContractors(data);
+    const [cData, pData] = await Promise.all([
+        db.contractors.getAll(),
+        db.projects.getAll()
+    ]);
+    setContractors(cData);
+    setProjects(pData);
     setLoading(false);
   };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
-    await db.contractors.create({ name: formData.name, role: formData.role, hourlyRate: parseFloat(formData.hourlyRate) || 0, email: formData.email, status: 'ACTIVE' });
+    await db.contractors.create({ 
+        name: formData.name, 
+        role: formData.role, 
+        hourlyRate: parseFloat(formData.hourlyRate) || 0, 
+        email: formData.email, 
+        phone: formData.phone,
+        status: 'ACTIVE' 
+    });
     setIsModalOpen(false);
-    setFormData({ name: '', role: '', hourlyRate: '', email: '' });
-    loadContractors();
+    setFormData({ name: '', role: '', hourlyRate: '', email: '', phone: '' });
+    loadData();
   };
 
   const handleDelete = async (id: string) => {
     if (confirm('¿Eliminar socio?')) {
       await db.contractors.delete(id);
-      loadContractors();
+      loadData();
     }
   };
 
@@ -49,29 +61,90 @@ export default function PartnersPage() {
 
   const filtered = contractors.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
+  // Calculate Finances
+  const totalPayroll = filtered.reduce((acc, c) => {
+      const activeProjects = projects.filter(p => p.assignedPartnerId === c.id && p.status === ProjectStatus.ACTIVE);
+      const monthlyPayout = activeProjects.reduce((sum, p) => sum + (p.outsourcingCost || 0), 0);
+      return acc + monthlyPayout;
+  }, 0);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
+      {/* Header & Financial Stats */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div><h1 className="text-3xl font-bold tracking-tight text-gray-900">Equipo & Socios</h1></div>
-        <div className="flex gap-2"><div className="relative w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div><Button onClick={() => setIsModalOpen(true)} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Agregar</Button></div>
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Equipo & Finanzas</h1>
+            <p className="text-gray-500 mt-1">Gestión de socios, freelancers y costos mensuales.</p>
+        </div>
+        <div className="flex gap-2">
+            <div className="relative w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar socio..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+            <Button onClick={() => setIsModalOpen(true)} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Agregar</Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 text-white border-0 shadow-xl">
+              <div className="p-6">
+                  <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
+                      <Wallet className="w-4 h-4" /> Nómina Mensual Total
+                  </div>
+                  <div className="text-4xl font-bold tracking-tight">${totalPayroll.toLocaleString()}</div>
+                  <div className="mt-4 text-sm text-gray-400">Total a pagar en costos de outsourcing fijos.</div>
+              </div>
+          </Card>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs tracking-wider">
-                  <tr><th className="px-6 py-4">Nombre / Rol</th><th className="px-6 py-4">Estado</th><th className="px-6 py-4">Email</th><th className="px-6 py-4 text-right">Tarifa (Ref)</th><th className="px-6 py-4 text-center">Acciones</th></tr>
+                  <tr>
+                      <th className="px-6 py-4">Socio / Freelancer</th>
+                      <th className="px-6 py-4">Proyectos Activos</th>
+                      <th className="px-6 py-4 text-right">Pago Mensual (Estimado)</th>
+                      <th className="px-6 py-4 text-center">Estado</th>
+                      <th className="px-6 py-4 text-center">Acciones</th>
+                  </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                   {filtered.length === 0 ? (<tr><td colSpan={5} className="text-center py-12 text-gray-400">No hay socios registrados.</td></tr>) : 
-                      filtered.map(c => (
-                          <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} className="hover:bg-gray-50 group cursor-pointer">
-                              <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-xs">{c.name.charAt(0)}</div><div><div className="font-bold text-gray-900">{c.name}</div><div className="text-xs text-gray-500">{c.role}</div></div></div></td>
-                              <td className="px-6 py-4"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
-                              <td className="px-6 py-4 text-gray-600">{c.email || '-'}</td>
-                              <td className="px-6 py-4 text-right font-mono font-medium">${c.hourlyRate}/hr</td>
-                              <td className="px-6 py-4 text-center"><button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
-                          </tr>
-                      ))
+                      filtered.map(c => {
+                          const partnerProjects = projects.filter(p => p.assignedPartnerId === c.id && p.status === ProjectStatus.ACTIVE);
+                          const monthlyPayout = partnerProjects.reduce((sum, p) => sum + (p.outsourcingCost || 0), 0);
+
+                          return (
+                              <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} className="hover:bg-gray-50 group cursor-pointer">
+                                  <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-sm">{c.name.charAt(0)}</div>
+                                          <div>
+                                              <div className="font-bold text-gray-900">{c.name}</div>
+                                              <div className="text-xs text-gray-500 flex items-center gap-1">{c.role} <span className="text-gray-300">|</span> {c.email || '-'}</div>
+                                          </div>
+                                      </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      {partnerProjects.length > 0 ? (
+                                          <div className="flex flex-col gap-1">
+                                              {partnerProjects.map(p => (
+                                                  <div key={p.id} className="flex items-center gap-2 text-xs text-gray-600">
+                                                      <Briefcase className="w-3 h-3 text-gray-400"/> {p.name}
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      ) : <span className="text-xs text-gray-400 italic">Sin asignaciones</span>}
+                                  </td>
+                                  <td className="px-6 py-4 text-right">
+                                      <span className={`font-mono font-bold ${monthlyPayout > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
+                                          ${monthlyPayout.toLocaleString()}
+                                      </span>
+                                      <div className="text-[10px] text-gray-400 mt-0.5">Base: ${c.hourlyRate}/hr</div>
+                                  </td>
+                                  <td className="px-6 py-4 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
+                                  <td className="px-6 py-4 text-center"><button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                              </tr>
+                          )
+                      })
                   }
               </tbody>
           </table>
@@ -88,8 +161,13 @@ export default function PartnersPage() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Socio / Freelancer">
         <form onSubmit={handleCreate} className="space-y-4">
           <div><Label>Nombre Completo</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Juan Pérez" autoFocus /></div>
-          <div className="grid grid-cols-2 gap-4"><div><Label>Rol</Label><Input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} /></div><div><Label>Tarifa ($/hr)</Label><Input type="number" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} /></div></div>
-          <div><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+          <div className="grid grid-cols-2 gap-4"><div><Label>Rol</Label><Input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} /></div><div><Label>Tarifa Base ($/hr)</Label><Input type="number" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} /></div></div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+            <div><Label>WhatsApp / Tel</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+54 9..." /></div>
+          </div>
+          
           <div className="flex gap-2 pt-4"><Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1">Cancelar</Button><Button type="submit" className="flex-1">Guardar</Button></div>
         </form>
       </Modal>

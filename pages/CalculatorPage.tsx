@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { Service, ServiceType, ProposalStatus, Contractor } from '../types';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Slider, Badge, Textarea } from '../components/UIComponents';
-import { Check, Copy, Save, Wand2, TrendingUp, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, User, Sparkles, RefreshCw } from 'lucide-react';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge, Textarea } from '../components/UIComponents';
+import { Check, Copy, Save, Wand2, User, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -32,20 +31,21 @@ export default function CalculatorPage() {
       name: '',
       industry: '',
       targetAudience: '',
-      currentSituation: '', // "Punto A"
-      objective: '',        // "Punto B"
+      currentSituation: '', 
+      objective: '',        
   });
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
 
   // --- STEP 3 (Variables moved here) ---
   const [contractVars, setContractVars] = useState({
       budget: '',
-      duration: 6,
-      margin: 2.5
+      duration: 6
+      // Margin removed
   });
 
   // --- STEP 2: STRATEGY ---
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  // Renamed logic: customPrices now means "Final Selling Price" set by user
   const [customPrices, setCustomPrices] = useState<Record<string, number>>({});
   const [outsourcingCosts, setOutsourcingCosts] = useState<Record<string, number>>({});
   const [assignedContractors, setAssignedContractors] = useState<Record<string, string>>({});
@@ -86,7 +86,8 @@ export default function CalculatorPage() {
     setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
   };
 
-  const getEffectivePrice = (service: Service) => customPrices[service.id] !== undefined ? customPrices[service.id] : service.baseCost;
+  // Defaults to baseCost if not overridden
+  const getSellingPrice = (service: Service) => customPrices[service.id] !== undefined ? customPrices[service.id] : service.baseCost;
 
   const servicesByCategory = useMemo<Record<string, Service[]>>(() => {
     const grouped: Record<string, Service[]> = {};
@@ -109,23 +110,21 @@ export default function CalculatorPage() {
         else totalOutsourcingRecurring += outCost;
     });
 
-    const oneTimeBasis = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + getEffectivePrice(s), 0);
-    const recurringBasis = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + getEffectivePrice(s), 0);
+    const oneTimeTotal = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + getSellingPrice(s), 0);
+    const recurringTotal = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + getSellingPrice(s), 0);
 
-    const roundPrice = (price: number) => Math.ceil(price / 50) * 50;
-
-    const setupFee = roundPrice(oneTimeBasis * contractVars.margin);
-    const monthlyFee = roundPrice(recurringBasis * contractVars.margin);
+    const setupFee = oneTimeTotal;
+    const monthlyFee = recurringTotal;
     const contractValue = setupFee + (monthlyFee * contractVars.duration);
     
     const totalOutsourcingCost = totalOutsourcingOneTime + (totalOutsourcingRecurring * contractVars.duration);
     
+    // Internal base cost (just for profit calculation context)
     const internalBaseOneTime = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + s.baseCost, 0);
     const internalBaseRecurring = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + s.baseCost, 0);
-    const totalInternalCost = internalBaseOneTime + (internalBaseRecurring * contractVars.duration);
+    // Not really "cost" anymore if user edits it, but we use baseCost as the "internal" metric
     
-    const totalCost = totalInternalCost + totalOutsourcingCost;
-    const profit = contractValue - totalCost;
+    const profit = contractValue - totalOutsourcingCost; // Simplified profit: Revenue - Outsourcing
     
     return { selected, setupFee, monthlyFee, contractValue, profit, totalOutsourcingCost };
   }, [services, selectedServiceIds, contractVars, customPrices, outsourcingCosts]);
@@ -149,7 +148,6 @@ export default function CalculatorPage() {
           
           const response = await ai.chat([{ role: 'user', content: prompt }]);
           
-          // Cleanup markdown if present
           const cleanJson = response.replace(/```json/g, '').replace(/```/g, '').trim();
           const data = JSON.parse(cleanJson);
           
@@ -182,7 +180,7 @@ export default function CalculatorPage() {
         status: ProposalStatus.DRAFT,
         objective: clientInfo.objective,
         durationMonths: contractVars.duration,
-        marginMultiplier: contractVars.margin,
+        // marginMultiplier removed
         totalOneTimePrice: setupFee,
         totalRecurringPrice: monthlyFee,
         totalContractValue: contractValue,
@@ -191,7 +189,7 @@ export default function CalculatorPage() {
           id: '', 
           serviceId: s.id,
           serviceSnapshotName: s.name,
-          serviceSnapshotCost: getEffectivePrice(s)
+          serviceSnapshotCost: getSellingPrice(s)
         }))
       }, clientInfo.name, clientInfo.industry);
       
@@ -373,9 +371,9 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                           {isSelected && (
                                               <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 animate-in fade-in" onClick={e => e.stopPropagation()}>
                                                   <div className="flex justify-between items-center">
-                                                      <label className="text-[10px] text-gray-500 font-medium">Costo Base</label>
-                                                      <input type="number" className="w-16 text-right text-xs bg-gray-50 rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-black" 
-                                                             value={getEffectivePrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
+                                                      <label className="text-[10px] text-gray-500 font-bold uppercase">Precio de Venta</label>
+                                                      <input type="number" className="w-20 text-right text-xs bg-gray-50 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black" 
+                                                             value={getSellingPrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
                                                   </div>
                                                   <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded-lg">
                                                       <select className="text-[10px] bg-transparent outline-none w-24 font-medium" 
@@ -408,7 +406,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
               </div>
           )}
 
-          {/* STEP 3: REVIEW & FINANCIALS (Moved Variables Here) */}
+          {/* STEP 3: REVIEW & FINANCIALS */}
           {currentStep === 3 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-right-4 duration-300">
                   
@@ -421,19 +419,6 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                               <CardTitle className="flex items-center gap-2 text-base"><RefreshCw className="w-4 h-4"/> Variables del Contrato</CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-6 pt-6">
-                                <div>
-                                    <div className="flex justify-between mb-2">
-                                        <Label>Margen de Ganancia (x)</Label>
-                                        <span className="text-sm font-bold">{contractVars.margin}x</span>
-                                    </div>
-                                    <Slider 
-                                        min={1} max={5} step={0.1} 
-                                        value={contractVars.margin} 
-                                        onChange={(e) => setContractVars({...contractVars, margin: parseFloat(e.target.value)})} 
-                                    />
-                                    <p className="text-[10px] text-gray-400 mt-1">Multiplicador sobre el costo base de servicios.</p>
-                                </div>
-
                                 <div>
                                     <Label>Duración del Contrato</Label>
                                     <div className="flex gap-2 mt-2">
@@ -520,7 +505,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                   {/* Internal Profit Stats */}
                                   <div className="grid grid-cols-2 gap-4">
                                       <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center">
-                                          <p className="text-xs text-green-800 font-bold uppercase mb-1">Ganancia Neta</p>
+                                          <p className="text-xs text-green-800 font-bold uppercase mb-1">Ganancia Estimada</p>
                                           <p className="text-xl font-bold text-green-700">${calculations.profit.toLocaleString()}</p>
                                       </div>
                                       <div className="p-4 bg-red-50 rounded-xl border border-red-100 text-center">
