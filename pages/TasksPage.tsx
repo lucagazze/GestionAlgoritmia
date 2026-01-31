@@ -43,11 +43,23 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadData();
+    
+    // Listen for AI events
+    const handleTaskCreated = () => {
+        console.log("Refrescando tareas por evento externo...");
+        loadData();
+    };
+    window.addEventListener('task-created', handleTaskCreated);
+
+    return () => {
+        window.removeEventListener('task-created', handleTaskCreated);
+    };
   }, []);
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      // Don't set full loading to avoid flickering on auto-refresh
+      // setLoading(true); 
       setError(null);
       const [tasksData, contractorsData] = await Promise.all([
         db.tasks.getAll(),

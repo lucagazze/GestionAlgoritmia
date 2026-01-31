@@ -133,7 +133,10 @@ export const ai = {
         
         if (!responseText) throw new Error("No response from AI");
         
-        return JSON.parse(responseText);
+        // CLEANUP: OpenAI sometimes wraps JSON in markdown blocks even in JSON mode
+        const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        return JSON.parse(cleanJson);
 
       } catch (error) {
           console.error("Agent Error", error);

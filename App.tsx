@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import PartnersPage from './pages/PartnersPage';
 import SettingsPage from './pages/SettingsPage';
 import SalesCopilotPage from './pages/SalesCopilotPage';
+import { AIActionCenter } from './components/AIActionCenter';
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolean) => void }) => {
   const location = useLocation();
@@ -139,7 +140,7 @@ export default function App() {
       <div className="flex min-h-screen bg-[#FAFAFA] text-gray-900 font-sans selection:bg-black selection:text-white">
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
         
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden h-screen relative">
           {/* Mobile Header */}
           <div className="md:hidden h-16 border-b border-gray-200 flex items-center px-4 bg-white/80 backdrop-blur-md sticky top-0 z-30">
             <button onClick={() => setSidebarOpen(true)}>
@@ -160,6 +161,10 @@ export default function App() {
               <Route path="/sales-copilot" element={<SalesCopilotPage />} />
             </Routes>
           </div>
+
+          {/* AI Action Center Global Widget */}
+          <AIActionCenter />
+          
         </main>
       </div>
     </Router>

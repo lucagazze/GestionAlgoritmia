@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Project, Task, TaskStatus, ProjectStatus } from '../types';
 import { Card, Button, Badge } from '../components/UIComponents';
-import { AIActionCenter } from '../components/AIActionCenter';
 import { 
   TrendingUp, 
   Calendar, 
@@ -82,12 +81,12 @@ export default function DashboardPage() {
   if (loading) return <div className="flex h-screen items-center justify-center text-gray-400 bg-[#FAFAFA]"><div className="animate-pulse">Cargando Sistema...</div></div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
       
-      {/* 1. AI HEADER & GREETING */}
-      <div className="flex flex-col items-center justify-center pt-8 pb-4">
-          <p className="text-gray-400 font-medium mb-4 text-sm tracking-wide uppercase">Algoritmia Intelligence</p>
-          <AIActionCenter />
+      {/* 1. Header (AI Moved to Global) */}
+      <div className="flex flex-col items-start justify-center pt-8 pb-4">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Bienvenido, Luca.</h1>
+          <p className="text-gray-500 mt-2">Aquí tienes el resumen de tu agencia para hoy.</p>
       </div>
 
       {/* 2. Action Center (Alerts) */}
