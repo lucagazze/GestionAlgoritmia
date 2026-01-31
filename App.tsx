@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book } from 'lucide-react';
+import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays } from 'lucide-react';
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -14,6 +14,7 @@ import SalesCopilotPage from './pages/SalesCopilotPage';
 import LabPage from './pages/LabPage';
 import PlaybooksPage from './pages/PlaybooksPage';
 import ClientPortalPage from './pages/ClientPortalPage'; 
+import PaymentsPage from './pages/PaymentsPage';
 import { AIActionCenter } from './components/AIActionCenter';
 import { CommandPalette } from './components/CommandPalette';
 
@@ -26,9 +27,9 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolea
           title: "PRINCIPAL",
           items: [
               { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio', color: 'text-gray-900' },
-              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes', color: 'text-blue-600' },
-              // "Pagos" apunta al Dashboard por ahora ya que ahí está el resumen financiero, o podría ser Calculator
-              { path: '/calculator', icon: <CreditCard className="w-5 h-5" />, label: 'Pagos / Cotizar', color: 'text-emerald-600' },
+              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes (Ops)', color: 'text-blue-600' },
+              { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600' },
+              { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600' },
               { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-orange-600' },
               { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Equipo', color: 'text-purple-600' },
           ]
@@ -166,6 +167,7 @@ const MainLayout = () => {
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/calculator" element={<CalculatorPage />} />
+              <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/partners" element={<PartnersPage />} />

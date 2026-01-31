@@ -91,17 +91,19 @@ export interface Project extends Client {
   brandFonts?: string[];      // Font names
 
   // Profitability & Portal Features
-  internalHours?: number;       // Horas dedicadas internamente este mes
-  internalHourlyRate?: number;  // Costo base de tu hora interna (ej: $20)
+  internalCost?: number;        // Costo fijo interno mensual (Suscripciones, equipo base)
   publicToken?: string;         // Token único para el link público
   progress?: number;            // 0 a 100 para la barra de estado del cliente
+  
+  // Growth
+  growthStrategy?: string;      // Texto de estrategia
 }
 
 export interface Contractor {
   id: string;
   name: string;
   role: string;
-  hourlyRate: number;
+  monthlyRate: number; // Changed from hourlyRate
   email?: string;
   phone?: string; 
   status: 'ACTIVE' | 'INACTIVE';

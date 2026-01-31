@@ -159,16 +159,17 @@ export const db = {
         brandColors: c.brandColors || [],
         brandFonts: c.brandFonts || [],
         // Profitability & Portal
-        internalHours: c.internalHours || 0,
-        internalHourlyRate: c.internalHourlyRate || 25, // Default internal cost
+        internalCost: c.internalCost || 0,
         publicToken: c.publicToken || '',
-        progress: c.progress || 0
+        progress: c.progress || 0,
+        growthStrategy: c.growthStrategy || ''
       }));
     },
     // New method for Public Portal
     getByToken: async (token: string): Promise<Project | null> => {
          const { data, error } = await supabase.from('Client').select('*').eq('publicToken', token).maybeSingle();
          if (error || !data) return null;
+         
          return {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
@@ -179,10 +180,10 @@ export const db = {
             outsourcingCost: data.outsourcingCost || 0,
             healthScore: data.healthScore || 'GOOD',
             resources: data.resources || [],
-            internalHours: data.internalHours || 0,
-            internalHourlyRate: data.internalHourlyRate || 25,
+            internalCost: data.internalCost || 0,
             publicToken: data.publicToken || '',
-            progress: data.progress || 0
+            progress: data.progress || 0,
+            growthStrategy: data.growthStrategy || ''
          };
     },
     create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
@@ -342,12 +343,18 @@ export const db = {
 
   contractors: {
     getAll: async (): Promise<Contractor[]> => {
-      return handleResponse<Contractor>(supabase.from('Contractor').select('*'));
+      // Mapping hourlyRate from DB to monthlyRate in type if needed, or assuming DB field is now treating as monthly
+      return handleResponse<Contractor>(supabase.from('Contractor').select('*').then(res => ({
+          ...res,
+          data: res.data?.map((c: any) => ({ ...c, monthlyRate: c.hourlyRate || 0 })) // Fallback mapping
+      })));
     },
     create: async (data: Omit<Contractor, 'id' | 'created_at'>): Promise<Contractor> => {
-      const { data: created, error } = await supabase.from('Contractor').insert(data).select().single();
+      // Mapping monthlyRate to hourlyRate column in DB to reuse schema
+      const payload = { ...data, hourlyRate: data.monthlyRate };
+      const { data: created, error } = await supabase.from('Contractor').insert(payload).select().single();
       if (error) throw error;
-      return created;
+      return { ...created, monthlyRate: created.hourlyRate };
     },
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from('Contractor').delete().eq('id', id);

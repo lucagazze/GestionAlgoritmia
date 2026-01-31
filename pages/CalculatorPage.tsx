@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
@@ -119,12 +120,7 @@ export default function CalculatorPage() {
     
     const totalOutsourcingCost = totalOutsourcingOneTime + (totalOutsourcingRecurring * contractVars.duration);
     
-    // Internal base cost (just for profit calculation context)
-    const internalBaseOneTime = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + s.baseCost, 0);
-    const internalBaseRecurring = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + s.baseCost, 0);
-    // Not really "cost" anymore if user edits it, but we use baseCost as the "internal" metric
-    
-    const profit = contractValue - totalOutsourcingCost; // Simplified profit: Revenue - Outsourcing
+    const profit = contractValue - totalOutsourcingCost; 
     
     return { selected, setupFee, monthlyFee, contractValue, profit, totalOutsourcingCost };
   }, [services, selectedServiceIds, contractVars, customPrices, outsourcingCosts]);
@@ -180,7 +176,6 @@ export default function CalculatorPage() {
         status: ProposalStatus.DRAFT,
         objective: clientInfo.objective,
         durationMonths: contractVars.duration,
-        // marginMultiplier removed
         totalOneTimePrice: setupFee,
         totalRecurringPrice: monthlyFee,
         totalContractValue: contractValue,
@@ -269,6 +264,14 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
   return (
     <div className="pb-20 animate-in fade-in duration-500 max-w-5xl mx-auto">
       
+      {/* HEADER */}
+      <div className="mb-8 mt-4 flex items-center justify-between">
+          <div>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900">Cotizador</h1>
+              <p className="text-gray-500">Generador de presupuestos High-Ticket.</p>
+          </div>
+      </div>
+
       {/* STEPS HEADER */}
       <div className="flex justify-between items-center mb-8 px-6 py-4 bg-white/80 backdrop-blur-md rounded-full border border-gray-100 shadow-lg sticky top-4 z-20 mx-4">
          {STEPS.map((step, idx) => {
@@ -296,7 +299,6 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       </div>
 
       <div className="grid grid-cols-1 gap-6 px-4">
-          
           {/* STEP 1: DISCOVERY FORM */}
           {currentStep === 1 && (
              <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -376,8 +378,19 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                              value={getSellingPrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
                                                   </div>
                                                   <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded-lg">
-                                                      <select className="text-[10px] bg-transparent outline-none w-24 font-medium" 
-                                                              value={assignedId || ''} onChange={e => setAssignedContractors({...assignedContractors, [s.id]: e.target.value})}>
+                                                      <select 
+                                                        className="text-[10px] bg-transparent outline-none w-24 font-medium" 
+                                                        value={assignedId || ''} 
+                                                        onChange={e => {
+                                                            const pid = e.target.value;
+                                                            const partner = contractors.find(c => c.id === pid);
+                                                            setAssignedContractors({...assignedContractors, [s.id]: pid});
+                                                            // Auto-fill outsourcing cost based on partner's monthly rate
+                                                            if (partner && partner.monthlyRate > 0) {
+                                                                setOutsourcingCosts(prev => ({...prev, [s.id]: partner.monthlyRate}));
+                                                            }
+                                                        }}
+                                                      >
                                                           <option value="">(Interno)</option>
                                                           {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                       </select>
@@ -409,10 +422,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
           {/* STEP 3: REVIEW & FINANCIALS */}
           {currentStep === 3 && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in slide-in-from-right-4 duration-300">
-                  
                   {/* LEFT COLUMN: Variables & Actions */}
                   <div className="lg:col-span-5 space-y-6">
-                      
                       {/* Financial Variables Control Panel */}
                       <Card className="border-2 border-black/5 shadow-xl bg-white/80 backdrop-blur-sm">
                           <CardHeader className="bg-gray-50/50 border-b border-gray-100">
