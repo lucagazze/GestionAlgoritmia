@@ -62,17 +62,27 @@ export const db = {
   
   projects: {
     getAll: async (): Promise<Project[]> => {
+      // Fetch Clients and try to join with Contractor (assignedPartner) if relation exists
+      // If relation 'assignedPartnerId' -> 'Contractor.id' doesn't exist in DB, this join might fail.
+      // We will fetch simple first.
       const { data, error } = await supabase.from('Client').select('*');
+      
       if (error) {
         console.error('Supabase Error (Client):', error);
         return [];
       }
+
+      // Map fields to Project interface
       return (data || []).map((c: any) => ({
         ...c,
         status: c.status || ProjectStatus.ACTIVE,
         monthlyRevenue: c.monthlyRevenue || 0,
         billingDay: c.billingDay || 1,
-        notes: c.notes || ''
+        notes: c.notes || '',
+        phone: c.phone || '',
+        outsourcingCost: c.outsourcingCost || 0,
+        assignedPartnerId: c.assignedPartnerId || null,
+        proposalUrl: c.proposalUrl || ''
       }));
     },
     create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {

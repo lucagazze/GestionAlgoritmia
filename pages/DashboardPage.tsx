@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Project, Task, TaskStatus, ProjectStatus } from '../types';
@@ -15,7 +16,8 @@ import {
   ArrowRight,
   Clock,
   Briefcase,
-  Plus
+  Plus,
+  MessageCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -103,6 +105,16 @@ export default function DashboardPage() {
 
     return { ...p, billingStatus: status, daysDiff };
   }).filter(p => p.billingStatus !== 'ok').sort((a, b) => a.daysDiff - b.daysDiff);
+  
+  // WhatsApp Logic Helper
+  const getWhatsAppLink = (p: Project) => {
+      if (!p.phone) return null;
+      const cleanPhone = p.phone.replace(/\D/g, '');
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      const currentMonth = monthNames[new Date().getMonth()];
+      const message = `Hola ${p.name.split(' ')[0]}! 👋 Te paso el total del mes de *${currentMonth}* por valor de *$${p.monthlyRevenue.toLocaleString()}*.\n\nAvísame cuando realices el pago así lo registro. Gracias!`;
+      return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  };
 
   if (loading) return <div className="flex h-screen items-center justify-center text-gray-400 bg-[#FAFAFA]"><div className="animate-pulse">Cargando Sistema...</div></div>;
 
@@ -129,7 +141,14 @@ export default function DashboardPage() {
                               <p className="text-xs opacity-80">{p.billingStatus === 'today' ? 'Cobrar hoy' : p.billingStatus === 'overdue' ? 'Pago vencido' : 'Vence pronto'}</p>
                           </div>
                       </div>
-                      <span className="font-mono font-bold">${p.monthlyRevenue.toLocaleString()}</span>
+                      <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold">${p.monthlyRevenue.toLocaleString()}</span>
+                          {p.phone && (
+                              <a href={getWhatsAppLink(p)!} target="_blank" rel="noreferrer" className="p-2 bg-white rounded-full shadow-sm hover:scale-110 transition-transform text-green-600">
+                                  <MessageCircle className="w-4 h-4" />
+                              </a>
+                          )}
+                      </div>
                   </div>
               ))}
               {overdueTasks.map(t => (
@@ -229,7 +248,14 @@ export default function DashboardPage() {
                                   </div>
                                   <span className="text-sm font-medium text-gray-800">{p.name}</span>
                               </div>
-                              <span className="text-xs font-mono text-gray-500">${p.monthlyRevenue.toLocaleString()}</span>
+                              <div className="flex items-center gap-2">
+                                  <span className="text-xs font-mono text-gray-500">${p.monthlyRevenue.toLocaleString()}</span>
+                                  {p.phone && (
+                                      <a href={getWhatsAppLink(p)!} target="_blank" rel="noreferrer" className="text-green-500 hover:text-green-600">
+                                          <MessageCircle className="w-3 h-3" />
+                                      </a>
+                                  )}
+                              </div>
                           </div>
                       ))}
                   </div>

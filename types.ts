@@ -38,6 +38,7 @@ export interface Client {
   name: string;
   industry?: string;
   email?: string;
+  phone?: string; // New: For WhatsApp automation
   createdAt: Date;
 }
 
@@ -45,8 +46,16 @@ export interface Project extends Client {
   status: ProjectStatus;
   monthlyRevenue: number;
   billingDay: number; // Día del mes que se cobra (ej: 1, 5, 15)
-  nextBillingDate?: string; // Calculado o guardado
+  nextBillingDate?: string; 
   notes?: string;
+  
+  // Outsourcing / Partner logic
+  assignedPartnerId?: string; // Who is doing the work?
+  outsourcingCost?: number;   // How much do I pay them?
+  proposalUrl?: string;       // Link to the PDF sent
+  
+  // Calculated frontend
+  partnerName?: string;       // For display
 }
 
 export interface Contractor {
