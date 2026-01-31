@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings } from 'lucide-react';
+import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore } from 'lucide-react';
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -9,6 +9,7 @@ import TasksPage from './pages/TasksPage';
 import DashboardPage from './pages/DashboardPage';
 import PartnersPage from './pages/PartnersPage';
 import SettingsPage from './pages/SettingsPage';
+import SalesCopilotPage from './pages/SalesCopilotPage';
 
 const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolean) => void }) => {
   const location = useLocation();
@@ -16,6 +17,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolea
   const links = [
     { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio' },
     { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes & Pagos' },
+    { path: '/sales-copilot', icon: <MessageSquareMore className="w-5 h-5" />, label: 'Copiloto de Ventas' },
     { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Socios & Outsourcing' },
     { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas' },
     { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Calculadora' },
@@ -136,6 +138,7 @@ export default function App() {
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/sales-copilot" element={<SalesCopilotPage />} />
             </Routes>
           </div>
         </main>

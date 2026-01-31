@@ -34,6 +34,63 @@ export const ai = {
     }
   },
 
+  // --- AGENTE DE VENTAS (SALES COPILOT) ---
+  salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
+      try {
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) throw new Error("API Key missing");
+        const aiClient = new GoogleGenAI({ apiKey });
+
+        let systemPrompt = `
+        Eres el Director Comercial Senior de "Algoritmia". Eres experto en metodologías de venta consultiva (SPIN Selling, Challenger Sale, Sandler).
+        Tu tono es: Seguro, Profesional, Persuasivo pero ético, y Psicológicamente astuto.
+        Nunca des respuestas genéricas. Ve al grano.
+        `;
+
+        let userPrompt = "";
+
+        if (mode === 'SCRIPT') {
+            systemPrompt += " Tu objetivo es redactar el guion perfecto para la situación descrita.";
+            userPrompt = `
+            Contexto: ${inputData.context}
+            Cliente: ${inputData.clientName} (${inputData.industry})
+            Situación/Objetivo: ${inputData.goal}
+            
+            Genera:
+            1. Un asunto (si es email) o gancho de apertura (si es chat/llamada) irresistible.
+            2. El cuerpo del mensaje (conciso, enfocado en el beneficio del cliente).
+            3. Una explicación breve de por qué funcionará este enfoque (psicología).
+            `;
+        } 
+        else if (mode === 'ANALYSIS') {
+            systemPrompt += " Tu objetivo es analizar la conversación, detectar objeciones ocultas, medir la temperatura del lead y decirme qué responder.";
+            userPrompt = `
+            Cliente: ${inputData.clientName}
+            Último mensaje del cliente/Situación: "${inputData.lastMessage}"
+            Historial reciente: ${inputData.history || 'N/A'}
+
+            Analiza:
+            1. ¿Qué está pensando realmente el cliente? (Subtexto).
+            2. Temperatura del Lead (0-100%).
+            3. Estrategia recomendada.
+            4. Respuesta sugerida (lista para copiar y pegar).
+            `;
+        }
+
+        const response = await aiClient.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            config: { systemInstruction: systemPrompt }
+        });
+
+        return response.text;
+
+      } catch (error) {
+          console.error("Sales Coach Error", error);
+          return "Error consultando al experto en ventas.";
+      }
+  },
+
   // --- AGENTE DEL SISTEMA (Router & Ejecutor) ---
   agent: async (userInput: string, contextHistory: any[] = []) => {
       try {
@@ -52,6 +109,7 @@ export const ai = {
         - Servicios: '/services'
         - Socios: '/partners'
         - Ajustes: '/settings'
+        - Copiloto de Ventas: '/sales-copilot'
 
         ACCIONES DISPONIBLES (Tu puedes ejecutarlas generando el JSON correcto):
         - CREATE_TASK: Requiere 'title'. Opcional: 'priority' (LOW, MEDIUM, HIGH).
@@ -69,11 +127,6 @@ export const ai = {
             "payload": { ...datos de la acción o ruta... },
             "message": "Texto corto y amigable para el usuario"
         }
-
-        Ejemplos:
-        User: "Quiero hacer un presupuesto" -> {"type": "NAVIGATE", "payload": "/calculator", "message": "Abriendo calculadora..."}
-        User: "Agendar tarea llamar a Juan" -> {"type": "ACTION", "action": "CREATE_TASK", "payload": {"title": "Llamar a Juan", "priority": "MEDIUM"}, "message": "Tarea creada."}
-        User: "Nuevo cliente" -> {"type": "QUESTION", "message": "¿Cómo se llama el nuevo cliente?"}
         `;
 
         const history = contextHistory.map(m => ({
@@ -81,7 +134,6 @@ export const ai = {
             parts: [{ text: m.content }]
         }));
 
-        // Add current user input
         history.push({ role: 'user', parts: [{ text: userInput }] });
 
         const response = await aiClient.models.generateContent({
@@ -96,7 +148,6 @@ export const ai = {
         const text = response.text;
         if (!text) throw new Error("No response");
         
-        // Clean markdown code blocks if present (Gemini sometimes adds ```json)
         const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(cleanJson);
 
