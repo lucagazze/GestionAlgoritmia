@@ -20,13 +20,13 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
 export const db = {
   // --- SETTINGS (For API Keys & Automation) ---
   settings: {
-    getApiKey: async (): Promise<string | null> => {
-        const { data, error } = await supabase.from('AgencySettings').select('value').eq('key', 'openai_api_key').maybeSingle();
+    getApiKey: async (keyName: string = 'google_api_key'): Promise<string | null> => {
+        const { data, error } = await supabase.from('AgencySettings').select('value').eq('key', keyName).maybeSingle();
         if (error && error.code !== 'PGRST205') console.error("Error getting API Key:", error);
         return data?.value || null;
     },
-    setApiKey: async (apiKey: string): Promise<void> => {
-        const { error } = await supabase.from('AgencySettings').upsert({ key: 'openai_api_key', value: apiKey }, { onConflict: 'key' });
+    setApiKey: async (apiKey: string, keyName: string = 'google_api_key'): Promise<void> => {
+        const { error } = await supabase.from('AgencySettings').upsert({ key: keyName, value: apiKey }, { onConflict: 'key' });
         if (error) throw error;
     },
     // AUTOMATION: Check and run recurring tasks

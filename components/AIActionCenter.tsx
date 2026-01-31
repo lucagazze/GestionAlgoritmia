@@ -1,20 +1,14 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
 import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
-import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb } from 'lucide-react';
+import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform } from 'lucide-react';
 
 interface UndoPayload {
     undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT';
     data: any;
     description: string;
-}
-
-interface IWindow extends Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
 }
 
 export const AIActionCenter = () => {
@@ -23,7 +17,12 @@ export const AIActionCenter = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
-    const [isListening, setIsListening] = useState(false);
+    
+    // Audio Recording State
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
+
     const [placeholder, setPlaceholder] = useState("¿Qué hacemos hoy?");
     
     // Proactive Context State
@@ -45,9 +44,7 @@ export const AIActionCenter = () => {
 
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const recognitionRef = useRef<any>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
 
     // --- Context Awareness & Proactivity ---
     useEffect(() => {
@@ -98,12 +95,12 @@ export const AIActionCenter = () => {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                if (isOpen) setIsOpen(false);
+                if (isOpen && !isRecording) setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen]);
+    }, [isOpen, isRecording]);
 
     // --- Logic ---
     const loadSessions = async () => { const sess = await db.chat.getSessions(); setSessions(sess); };
@@ -134,19 +131,16 @@ export const AIActionCenter = () => {
                     status: TaskStatus.TODO,
                     priority: payload.priority || 'MEDIUM',
                     dueDate: payload.dueDate || payload.due || null, 
-                    description: payload.description || 'AI Generated',
-                    projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId // Auto-assign if in context
+                    description: payload.description || 'Generado por Voz',
+                    projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
                 });
                 window.dispatchEvent(new Event('task-created'));
                 return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea' } };
             }
             if (actionType === 'UPDATE_PROJECT') {
-                // If context is active, update THAT project
                 const targetId = payload.id || (activeContextData?.type === 'PROJECT' ? activeContextData.data.id : null);
                 if (!targetId) return { success: false };
-                
                 await db.projects.update(targetId, payload);
-                // Force reload of page if we are on it
                 if (activeContextData?.type === 'PROJECT') window.location.reload(); 
                 return { success: true };
             }
@@ -194,14 +188,68 @@ export const AIActionCenter = () => {
         } catch (e) { alert("Error al deshacer."); } finally { setIsThinking(false); }
     };
 
-    const handleSend = async (textOverride?: string) => {
-        const userText = textOverride || input;
-        if (!userText.trim()) return;
-        
-        if (abortControllerRef.current) abortControllerRef.current.abort();
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
+    // --- AUDIO HANDLING ---
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            // Feature detect supported mime types
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                mimeType = 'audio/mp4'; // Safari
+            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                mimeType = 'audio/ogg'; // Firefox sometimes prefers this
+            }
+            // else default to webm (Chrome/Edge)
 
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunksRef.current.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                handleSend(undefined, audioBlob, mimeType);
+                stream.getTracks().forEach(track => track.stop()); // Stop mic
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setIsOpen(true);
+        } catch (err) {
+            console.error("Error accessing microphone:", err);
+            alert("No se pudo acceder al micrófono.");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const blobToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                // Remove data url prefix (e.g. "data:audio/mp3;base64,")
+                const base64Data = base64String.split(',')[1];
+                resolve(base64Data);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    const handleSend = async (textOverride?: string, audioFile?: Blob, audioMimeType?: string) => {
+        const userText = textOverride || input;
+        if (!userText.trim() && !audioFile) return;
+        
         setInput('');
         setIsOpen(true);
         setIsThinking(true);
@@ -212,14 +260,16 @@ export const AIActionCenter = () => {
         let sessionId = currentSessionId;
         if (!sessionId) {
             try {
-                const newSession = await db.chat.createSession(userText);
+                const title = audioFile ? "Nota de Voz" : userText;
+                const newSession = await db.chat.createSession(title);
                 sessionId = newSession.id;
                 setCurrentSessionId(sessionId);
                 setSessions([newSession, ...sessions]); 
             } catch (e) { setIsThinking(false); return; }
         }
 
-        await db.chat.addMessage(sessionId, 'user', userText);
+        const displayMessage = audioFile ? "🎤 [Audio Enviado]" : userText;
+        await db.chat.addMessage(sessionId, 'user', displayMessage);
         await loadMessages(sessionId);
 
         try {
@@ -227,23 +277,25 @@ export const AIActionCenter = () => {
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
             
-            // INJECT CONTEXT INTO PROMPT
-            let contextPrompt = "";
-            if (activeContextData?.type === 'PROJECT') {
-                const p = activeContextData.data;
-                contextPrompt = `ESTÁS VIENDO EL PROYECTO: ID=${p.id}, Nombre="${p.name}", Rubro="${p.industry}", Fee=$${p.monthlyRevenue}. 
-                Si el usuario dice "actualiza el rubro a X", usa UPDATE_PROJECT con id=${p.id}. 
-                Si dice "agrega tarea", asocia projectId=${p.id}.`;
+            // PREPARE INPUT: TEXT OR AUDIO
+            let agentInput: string | { mimeType: string, data: string } = userText;
+            
+            if (audioFile) {
+                const base64Audio = await blobToBase64(audioFile);
+                agentInput = { mimeType: audioMimeType || 'audio/webm', data: base64Audio };
             }
 
             const response = await ai.agent(
-                contextPrompt + "\n" + userText, 
+                agentInput, 
                 await db.chat.getMessages(sessionId), 
-                { tasks, projects, services, contractors }, 
-                controller.signal
+                { tasks, projects, services, contractors }
             );
             
-            if (!response) { setIsThinking(false); return; }
+            if (!response) { 
+                await db.chat.addMessage(sessionId, 'assistant', "No pude procesar eso. Intenta de nuevo.");
+                setIsThinking(false); 
+                return; 
+            }
             
             let finalMessage = response.message || "Entendido.";
             
@@ -266,24 +318,11 @@ export const AIActionCenter = () => {
             }
             await loadMessages(sessionId);
         } catch (error) {
-            if (!controller.signal.aborted) {
-                await db.chat.addMessage(sessionId, 'assistant', "Error de conexión.");
-                await loadMessages(sessionId);
-            }
+            console.error(error);
+            await db.chat.addMessage(sessionId, 'assistant', "Error de conexión o procesamiento.");
+            await loadMessages(sessionId);
         } finally {
-            if (abortControllerRef.current === controller) {
-                 setIsThinking(false);
-                 abortControllerRef.current = null;
-            }
-        }
-    };
-    
-    const handleStop = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
             setIsThinking(false);
-            if (inputRef.current) inputRef.current.focus();
         }
     };
 
@@ -315,25 +354,6 @@ export const AIActionCenter = () => {
         await loadMessages(currentSessionId);
         setPendingAction(null);
         setConfirmationMessage(null);
-    };
-
-    const toggleListening = () => {
-        const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
-        const Recognition = SpeechRecognition || webkitSpeechRecognition;
-        if (!Recognition) { alert("Navegador no soportado"); return; }
-        if (isListening) { recognitionRef.current?.stop(); setIsListening(false); setPlaceholder("Procesando..."); if (input.trim().length > 0) setTimeout(() => handleSend(), 500); return; }
-        const recognition = new Recognition();
-        recognitionRef.current = recognition;
-        recognition.lang = 'es-ES';
-        recognition.interimResults = true; 
-        recognition.onstart = () => { setIsListening(true); setPlaceholder("Escuchando..."); setIsOpen(true); };
-        recognition.onend = () => { if (isListening) setIsListening(false); };
-        recognition.onresult = (event: any) => {
-            let fullStr = '';
-            for (let i = 0; i < event.results.length; ++i) fullStr += event.results[i][0].transcript;
-            setInput(fullStr);
-        };
-        try { recognition.start(); } catch (error) { setIsListening(false); }
     };
 
     return (
@@ -394,7 +414,8 @@ export const AIActionCenter = () => {
                                 ))}
                             </div>
                         )}
-                        {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Pensando...</span></div>}
+                        {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Procesando...</span></div>}
+                        {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Grabando audio...</span></div>}
                         <div className="h-1"></div>
                      </div>
                  )}
@@ -406,7 +427,7 @@ export const AIActionCenter = () => {
             </div>
 
             {/* Quick Prompts (Chips) */}
-            {isOpen && !isThinking && !input && viewMode === 'CHAT' && messages.length === 0 && (
+            {isOpen && !isThinking && !isRecording && !input && viewMode === 'CHAT' && messages.length === 0 && (
                 <div className="absolute bottom-full mb-4 left-0 w-full flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar animate-in slide-in-from-bottom-2">
                     {quickChips.map((chip, idx) => (
                         <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
@@ -417,13 +438,18 @@ export const AIActionCenter = () => {
             )}
 
             <div onClick={() => setIsOpen(true)} className={`relative group bg-white/80 backdrop-blur-xl border border-white/60 shadow-2xl shadow-indigo-500/20 rounded-full transition-all duration-300 cursor-text flex items-center px-2 py-2 md:px-3 ${isOpen ? 'ring-2 ring-black/5 scale-100' : 'hover:scale-105 hover:bg-white'}`}>
-                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 ${isThinking ? 'bg-indigo-600 rotate-180' : isListening ? 'bg-red-500 animate-pulse' : 'bg-black'}`}>
-                    {isThinking ? <Loader2 className="w-5 h-5 animate-spin" /> : isListening ? <Mic className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+                {/* Main Dynamic Button */}
+                <div 
+                    onClick={(e) => { e.stopPropagation(); if (isRecording) stopRecording(); else startRecording(); }}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
+                >
+                    {isThinking ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
                 </div>
-                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && handleSend()} placeholder={isListening ? "Te escucho..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions} />
+                
+                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && handleSend()} placeholder={isRecording ? "Escuchando..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording} />
+                
                 <div className="flex items-center gap-2 pr-2">
-                     {!isThinking && <button onClick={(e) => { e.stopPropagation(); toggleListening(); }} className={`p-2 rounded-full transition-all ${isListening ? 'text-white bg-red-500 hover:bg-red-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}>{isListening ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</button>}
-                    {isThinking ? <button onClick={(e) => { e.stopPropagation(); handleStop(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors border border-red-200"><Square className="w-4 h-4 fill-red-500" /></button> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
+                     {isThinking ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>
         </div>

@@ -7,9 +7,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Prevents "process is not defined" error in browser
-      // and maps VITE_GOOGLE_API_KEY to process.env.API_KEY for the SDK
-      'process.env.API_KEY': JSON.stringify(env.VITE_GOOGLE_API_KEY || env.API_KEY || ''),
+      // Maps the VITE_ var to process.env.API_KEY as required by the new SDK guidelines
+      'process.env.API_KEY': JSON.stringify(env.VITE_GOOGLE_API_KEY || ''),
     },
   }
 })

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { Card, CardContent, CardHeader, CardTitle, Input, Button, Label } from '../components/UIComponents';
-import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy } from 'lucide-react';
+import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles } from 'lucide-react';
 
 export default function SettingsPage() {
     const [apiKey, setApiKey] = useState('');
@@ -17,7 +17,7 @@ export default function SettingsPage() {
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const key = await db.settings.getApiKey();
+            const key = await db.settings.getApiKey('google_api_key');
             if (key) setApiKey(key);
         } catch (e) {
             console.error("Error loading settings", e);
@@ -30,7 +30,7 @@ export default function SettingsPage() {
         if (!apiKey.trim()) return;
         setSaving(true);
         try {
-            await db.settings.setApiKey(apiKey.trim());
+            await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (e) {
@@ -102,20 +102,20 @@ alter table "AgencySettings" add column if not exists key text unique;
                         <div>
                             <p className="font-bold">Conexión Segura</p>
                             <p className="opacity-90 mt-1">
-                                Estamos utilizando <strong>OpenAI (GPT-4o-mini)</strong>. Tu clave de API se guarda encriptada en tu base de datos.
+                                Tu clave de API se guarda en la base de datos (Supabase). Usamos <strong>Gemini 2.5 Flash</strong> para máximo rendimiento y audio.
                             </p>
                         </div>
                     </div>
 
                     <div className="space-y-3">
-                        <Label>OpenAI API Key</Label>
+                        <Label>Google Gemini API Key</Label>
                         <div className="flex gap-2">
                             <div className="relative flex-1">
                                 <Input 
                                     type="password" 
                                     value={apiKey} 
                                     onChange={(e) => setApiKey(e.target.value)} 
-                                    placeholder="sk-..." 
+                                    placeholder="AIzaSy..." 
                                     className="pr-10 font-mono text-sm"
                                 />
                                 {loading && (
@@ -129,6 +129,7 @@ alter table "AgencySettings" add column if not exists key text unique;
                                 {success ? "Guardado" : "Guardar"}
                             </Button>
                         </div>
+                        <p className="text-xs text-gray-400 mt-1">Si ya configuraste el archivo .env, esa clave se usará como respaldo.</p>
                     </div>
                 </CardContent>
             </Card>

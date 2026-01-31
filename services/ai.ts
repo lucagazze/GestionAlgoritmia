@@ -1,215 +1,193 @@
 
+import { GoogleGenAI } from "@google/genai";
 import { db } from './db';
 
-const MODEL = 'gpt-4o-mini';
+// We use Gemini 2.5 Flash Preview for its speed, low cost, and native audio capabilities.
+const MODEL_NAME = 'gemini-2.5-flash-preview';
 
-let cachedApiKey: string | null = null;
-
-const getApiKey = async () => {
-    if (cachedApiKey) return cachedApiKey;
-    const key = await db.settings.getApiKey();
-    if (key) {
-        cachedApiKey = key;
-        return key;
+// Helper to get an initialized client dynamically
+const getClient = async () => {
+    // 1. Try to get from Supabase
+    const dbKey = await db.settings.getApiKey('google_api_key');
+    // 2. Fallback to env var
+    const apiKey = dbKey || process.env.API_KEY; 
+    
+    if (!apiKey) {
+        throw new Error("No Google API Key found. Please add it in Settings.");
     }
-    return null;
-};
-
-const fetchOpenAI = async (messages: any[], jsonMode = false, signal?: AbortSignal) => {
-    try {
-        const apiKey = await getApiKey();
-        if (!apiKey) {
-            console.error("API Key no encontrada.");
-            return null;
-        }
-
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                messages,
-                response_format: jsonMode ? { type: "json_object" } : undefined,
-                temperature: 0.7
-            }),
-            signal 
-        });
-
-        if (!response.ok) throw new Error(await response.text());
-        const data = await response.json();
-        return data.choices[0].message.content;
-    } catch (error: any) {
-        if (error.name === 'AbortError') return null;
-        console.error("AI Service Error:", error);
-        return null;
-    }
+    return new GoogleGenAI({ apiKey });
 };
 
 export const ai = {
+  /**
+   * General Chat function
+   */
   chat: async (messages: any[]) => {
-      const response = await fetchOpenAI(messages);
-      return response || "Error de conexión.";
-  },
-
-  salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
-      return await fetchOpenAI([
-          { role: 'system', content: "Eres director comercial." },
-          { role: 'user', content: JSON.stringify(inputData) }
-      ]);
-  },
-
-  analyzeAgencyHealth: async (projects: any[], tasks: any[]) => {
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Filter only relevant data to save tokens
-      const riskProjects = projects.filter(p => {
-          if (p.status !== 'ACTIVE' && p.status !== 'ONBOARDING') return false;
-          // Check ghosting (>7 days)
-          const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : new Date(p.createdAt);
-          const diffDays = Math.ceil(Math.abs(new Date().getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
-          return diffDays > 7;
-      }).map(p => ({
-          id: p.id,
-          name: p.name,
-          industry: p.industry,
-          phone: p.phone,
-          lastContactDays: Math.ceil(Math.abs(new Date().getTime() - (p.lastContactDate ? new Date(p.lastContactDate).getTime() : new Date(p.createdAt).getTime())) / (1000 * 60 * 60 * 24))
-      }));
-
-      const overdueTasksCount = tasks.filter(t => t.status !== 'DONE' && t.dueDate && t.dueDate < new Date().toISOString()).length;
-      
-      const prompt = `
-      Eres un "Auditor de Agencia" experto y proactivo. Analiza la situación hoy (${today}).
-      
-      DATA:
-      - Clientes en Riesgo (Ghosting > 7 días): ${JSON.stringify(riskProjects)}
-      - Tareas Vencidas: ${overdueTasksCount}
-      
-      TAREA:
-      Genera un reporte JSON accionable.
-      
-      Para cada cliente en riesgo ("riskClients"), REDACTA UN MENSAJE DE REACTIVACIÓN ("recoveryMessage") para enviar por WhatsApp. 
-      El mensaje debe ser casual, empático y profesional (ej: "Hola [Nombre], hace mucho no hablamos, quería contarte que...").
-      
-      FORMATO JSON:
-      {
-        "overallScore": 0-100, (100 es perfecto)
-        "summary": "Resumen corto de 1 linea",
-        "actionItems": [
-            {
-                "type": "CLIENT_GHOSTING",
-                "clientId": "...",
-                "title": "Cliente Descuidado: [Nombre]",
-                "description": "Hace X días no hay contacto.",
-                "actionLabel": "Enviar Mensaje",
-                "generatedMessage": "Hola [Nombre]..." 
-            },
-            {
-                "type": "OVERDUE_TASKS",
-                "title": "Limpieza de Tareas",
-                "description": "Tienes X tareas vencidas.",
-                "actionLabel": "Reprogramar para Hoy",
-                "count": ${overdueTasksCount}
-            }
-        ]
-      }
-      `;
-
-      const response = await fetchOpenAI([{ role: 'system', content: "Eres un auditor operativo." }, { role: 'user', content: prompt }], true);
       try {
-          return JSON.parse(response || "{}");
-      } catch (e) {
-          console.error("Error parsing health scan", e);
+          const client = await getClient();
+          
+          // Adapt simple message format to Gemini format
+          let systemInstruction = undefined;
+          let contents = messages.map(m => {
+              if (m.role === 'system') {
+                  systemInstruction = m.content;
+                  return null;
+              }
+              return {
+                  role: m.role === 'assistant' ? 'model' : 'user',
+                  parts: [{ text: m.content }]
+              };
+          }).filter(Boolean) as any[];
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: contents,
+              config: {
+                  systemInstruction: systemInstruction
+              }
+          });
+
+          return response.text || "No pude generar una respuesta.";
+      } catch (error) {
+          console.error("AI Chat Error:", error);
+          return "Error: Verifica tu API Key en Ajustes.";
+      }
+  },
+
+  /**
+   * Sales Coach specific function
+   */
+  salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
+      const prompt = `Actúa como un Director Comercial de Agencia High-Ticket. 
+      Modo: ${mode}. 
+      Datos: ${JSON.stringify(inputData)}. 
+      Sé directo, persuasivo y utiliza marcos de venta como SPIN o Sandler.`;
+
+      try {
+          const client = await getClient();
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+          return response.text;
+      } catch (error) {
+          console.error("Sales Coach Error:", error);
           return null;
       }
   },
 
-  agent: async (userInput: string, contextHistory: any[] = [], currentData: any, signal?: AbortSignal) => {
+  /**
+   * The Agency OS Agent - Handles Text AND Audio inputs
+   */
+  agent: async (
+      userInput: string | { mimeType: string, data: string }, // Can be text or Audio Base64
+      contextHistory: any[] = [], 
+      currentData: any
+  ) => {
       const now = new Date();
       const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
       const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       
+      // Prepare context data for the prompt
       const activeTasks = currentData.tasks
           .filter((t: any) => t.status !== 'DONE')
           .slice(0, 40)
-          .map((t: any) => `ID:${t.id} | "${t.title}" | Due:${t.dueDate?.slice(0,16) || 'N/A'}`)
+          .map((t: any) => `ID:${t.id} | "${t.title}" | Due:${t.dueDate?.slice(0,10) || 'N/A'}`)
           .join('\n');
 
       const activeProjects = currentData.projects
-          .map((p: any) => `ID:${p.id} | "${p.name}"`)
+          .map((p: any) => `ID:${p.id} | "${p.name}" | Status:${p.status}`)
           .join('\n');
           
-      const systemPrompt = `
-      Eres el "Sistema Operativo" de la agencia.
-      FECHA: ${localDate} | HORA: ${localTime}.
+      const systemInstruction = `
+      Eres "Algoritmia OS", el cerebro operativo de la agencia.
+      FECHA ACTUAL: ${localDate} | HORA: ${localTime}.
 
-      REGLAS CRÍTICAS:
-      1. ESTADOS DE TAREA: Solo existen "TODO" (Por hacer) y "DONE" (Terminado). No uses in_progress.
-      2. PRECIO: No calculamos márgenes. El precio es directo.
-      3. NUEVO CLIENTE: Si el usuario dice "Nuevo Cliente" o similar, NO inventes datos. Pregunta paso a paso o analiza el texto si ya te dio la info.
-         - Si falta info, pregunta: "¿Cómo se llama el cliente?", "¿Cuál es el fee mensual?", "¿De qué rubro es?".
-         - Si tienes toda la info (Nombre, Rubro, Fee), genera la acción CREATE_PROJECT.
+      OBJETIVO:
+      Interpreta la intención del usuario (que puede venir en AUDIO o TEXTO) y genera acciones estructuradas.
+      
+      REGLAS DE ORO:
+      1. **AUDIO NATIVO:** Estás escuchando al usuario. Si duda, se corrige o habla coloquialmente, interpreta su intención final. No transcribas, ACTÚA.
+      2. **FECHAS:** Si dice "mañana", calcula la fecha basándote en que hoy es ${localDate}. Si dice "el viernes", es el próximo viernes.
+      3. **CONTEXTO:** Usa la lista de Tareas y Proyectos para entender referencias (ej: "Llama a Juan" -> buscar si hay un proyecto con contacto Juan).
 
-      TUS PODERES:
-      1. CREAR TAREAS: Batch support (arrays). Detecta fechas relativas (ej: "próximo lunes").
-      2. CREAR CLIENTES: Usa acción CREATE_PROJECT. Payload: { name, monthlyRevenue, industry, notes }.
-      3. BORRAR: Si hay ambigüedad, devuelve type "DECISION".
-      4. HÁBITOS: Sé proactivo si ves patrones rotos.
-
-      BASE DE DATOS:
-      [TAREAS PENDIENTES]
-      ${activeTasks}
-      [CLIENTES]
+      BASE DE DATOS ACTUAL:
+      [PROYECTOS ACTIVOS]
       ${activeProjects}
 
-      FORMATOS JSON:
+      [TAREAS PENDIENTES]
+      ${activeTasks}
 
-      A) ACCIÓN ÚNICA:
+      FORMATO DE RESPUESTA (JSON ÚNICAMENTE):
+      
+      Si es una ACCIÓN (Crear/Editar):
       {
           "type": "ACTION", 
-          "action": "CREATE_TASK" | "CREATE_PROJECT",
+          "action": "CREATE_TASK" | "UPDATE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "DELETE_TASK",
           "payload": { ... }, 
-          "message": "He creado..."
+          "message": "Breve confirmación hablada (ej: 'Listo, agendado para el viernes')."
       }
+      * Nota: Para CREATE_TASK, "dueDate" debe ser ISO string (YYYY-MM-DDTHH:mm:ss).
 
-      B) BATCH (Múltiples):
+      Si son MÚLTIPLES acciones:
       {
           "type": "BATCH",
-          "actions": [ ... ],
-          "message": "Listo..."
+          "actions": [ { "action": "...", "payload": "..." } ],
+          "message": "Resumen de lo hecho."
       }
 
-      C) DECISIÓN (Ambigüedad):
+      Si necesitas DECIDIR (Ambigüedad):
       {
           "type": "DECISION",
-          "message": "¿Cual borro?",
-          "options": [ { "label": "...", "action": "...", "payload": ... } ]
+          "message": "¿Te refieres al proyecto X o Y?",
+          "options": [ { "label": "Opción A", "action": "...", "payload": ... } ]
       }
-
-      D) PREGUNTAS (Si necesitas info):
-      { "type": "QUESTION", "message": "¿Cuál es el nombre del cliente?" }
       
-      E) CHAT:
-      { "type": "CHAT", "message": "..." }
+      Si es solo CHARLA:
+      { "type": "CHAT", "message": "Respuesta útil y conversacional..." }
       `;
 
-      const apiMessages = [
-          { role: 'system', content: systemPrompt },
-          ...contextHistory.slice(-10).map(m => ({ role: m.role, content: m.content })),
-          { role: 'user', content: userInput }
-      ];
-
-      const responseText = await fetchOpenAI(apiMessages, true, signal);
-      
-      if (!responseText) return null;
-
       try {
+          const client = await getClient();
+          
+          // Construct the user message part
+          let userPart;
+          if (typeof userInput === 'string') {
+              userPart = { text: userInput };
+          } else {
+              // Audio Input - Gemini Flash supports audio directly via inlineData
+              userPart = { inlineData: { mimeType: userInput.mimeType, data: userInput.data } };
+          }
+
+          // Build history for context (last 6 messages to save context window)
+          const historyParts = contextHistory.slice(-6).map(m => {
+              return {
+                  role: m.role === 'assistant' ? 'model' : 'user',
+                  parts: [{ text: typeof m.content === 'string' ? m.content : '[Interacción Compleja]' }]
+              };
+          });
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [
+                  ...historyParts,
+                  { role: 'user', parts: [userPart] }
+              ],
+              config: {
+                  systemInstruction: systemInstruction,
+                  responseMimeType: "application/json", // Force JSON output for reliability
+                  temperature: 0.3 // Lower temperature for more deterministic actions
+              }
+          });
+
+          const responseText = response.text;
+          if (!responseText) return { type: "CHAT", message: "No entendí, ¿puedes repetir?" };
+
           return JSON.parse(responseText);
-      } catch (e) {
-          return { type: "CHAT", message: responseText };
+
+      } catch (error) {
+          console.error("Agent Error:", error);
+          return { type: "CHAT", message: "Tuve un problema procesando eso. Intenta de nuevo." };
       }
   }
 };
