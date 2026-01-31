@@ -117,4 +117,24 @@ export interface AgencySettings {
   value: string; // The actual key
 }
 
+export interface AIChatSession {
+    id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface AIChatLog {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+  
+  // Persistence Undo Capabilities
+  action_type?: string;     // 'CREATE_TASK', etc.
+  action_payload?: any;     // JSON data needed to undo
+  is_undone?: boolean;      // If true, show as "Action Reverted"
+}
+
 export type ServiceCategory = 'Web & Tech' | 'Branding' | 'Contenido' | 'Ads / Tráfico' | 'Automatización' | 'Consultoría';

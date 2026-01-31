@@ -1,13 +1,12 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
   const { data, error } = await query;
   if (error) {
     console.error('Supabase Error:', error);
-    // Return empty array on error to prevent UI crash, but log it
     return [];
   }
   return data || [];
@@ -15,30 +14,86 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
 
 export const db = {
   // --- SETTINGS (For API Keys) ---
+  // Table: AgencySettings (CamelCase)
   settings: {
     getApiKey: async (): Promise<string | null> => {
-        // Try fetching from a table named 'AgencySettings'
-        // Schema: id (uuid), key (text, unique), value (text)
         const { data, error } = await supabase
-            .from('AgencySettings')
+            .from('AgencySettings') 
             .select('value')
             .eq('key', 'openai_api_key')
             .maybeSingle();
         
-        if (error || !data) return null;
-        return data.value;
+        if (error) console.error("Error getting API Key:", error);
+        return data?.value || null;
     },
     setApiKey: async (apiKey: string): Promise<void> => {
-        // Check if exists first to decide update or insert (or use upsert if constraint exists)
-        const { data: existing } = await supabase.from('AgencySettings').select('id').eq('key', 'openai_api_key').maybeSingle();
-        
-        if (existing) {
-            await supabase.from('AgencySettings').update({ value: apiKey }).eq('id', existing.id);
-        } else {
-            await supabase.from('AgencySettings').insert({ key: 'openai_api_key', value: apiKey });
+        // Usamos UPSERT que es mucho más robusto para configuraciones
+        // Requiere que la columna 'key' tenga la constraint UNIQUE en la BD (que ya la tiene)
+        const { error } = await supabase
+            .from('AgencySettings')
+            .upsert(
+                { key: 'openai_api_key', value: apiKey }, 
+                { onConflict: 'key' }
+            );
+
+        if (error) {
+            console.error("Error saving API Key:", error);
+            throw error;
         }
     }
   },
+
+  // --- CHAT HISTORY & SESSIONS ---
+  // Tables: aichatsession, aichatlog (Lowercase per schema)
+  chat: {
+      getSessions: async (): Promise<AIChatSession[]> => {
+          return handleResponse<AIChatSession>(
+              supabase.from('aichatsession').select('*').order('updated_at', { ascending: false })
+          );
+      },
+      createSession: async (firstMessage: string): Promise<AIChatSession> => {
+          const title = firstMessage.slice(0, 40) + (firstMessage.length > 40 ? '...' : '');
+          const { data, error } = await supabase
+              .from('aichatsession')
+              .insert({ title, created_at: new Date().toISOString() })
+              .select()
+              .single();
+          
+          if (error) throw error;
+          return data;
+      },
+      deleteSession: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('aichatsession').delete().eq('id', id);
+          if (error) throw error;
+      },
+      getMessages: async (sessionId: string): Promise<AIChatLog[]> => {
+          return handleResponse<AIChatLog>(
+              supabase.from('aichatlog')
+                      .select('*')
+                      .eq('session_id', sessionId)
+                      .order('created_at', { ascending: true })
+          );
+      },
+      addMessage: async (sessionId: string, role: 'user' | 'assistant', content: string, actionData?: { type: string, payload: any }): Promise<void> => {
+          const { error } = await supabase.from('aichatlog').insert({
+              session_id: sessionId,
+              role,
+              content,
+              created_at: new Date().toISOString(),
+              action_type: actionData?.type || null,
+              action_payload: actionData?.payload || null,
+              is_undone: false
+          });
+          if (error) console.error("Error adding message:", error);
+
+          await supabase.from('aichatsession').update({ updated_at: new Date().toISOString() }).eq('id', sessionId);
+      },
+      markUndone: async (messageId: string): Promise<void> => {
+          await supabase.from('aichatlog').update({ is_undone: true }).eq('id', messageId);
+      }
+  },
+
+  // --- BUSINESS ENTITIES (CamelCase per schema) ---
 
   services: {
     getAll: async (): Promise<Service[]> => {
@@ -62,17 +117,12 @@ export const db = {
   
   projects: {
     getAll: async (): Promise<Project[]> => {
-      // Fetch Clients and try to join with Contractor (assignedPartner) if relation exists
-      // If relation 'assignedPartnerId' -> 'Contractor.id' doesn't exist in DB, this join might fail.
-      // We will fetch simple first.
+      // NOTE: Using 'Client' table for Projects as per typical agency structure mapping
       const { data, error } = await supabase.from('Client').select('*');
-      
       if (error) {
         console.error('Supabase Error (Client):', error);
         return [];
       }
-
-      // Map fields to Project interface
       return (data || []).map((c: any) => ({
         ...c,
         status: c.status || ProjectStatus.ACTIVE,
@@ -103,6 +153,8 @@ export const db = {
 
   clientNotes: {
       getByClient: async (clientId: string): Promise<ClientNote[]> => {
+          // Assuming 'ClientNote' table follows CamelCase convention if it exists
+          // If this errors, the table might be missing or lowercase.
           return handleResponse<ClientNote>(
               supabase.from('ClientNote').select('*').eq('clientId', clientId).order('createdAt', { ascending: false })
           );
@@ -118,26 +170,16 @@ export const db = {
 
   tasks: {
     getAll: async (): Promise<Task[]> => {
-      // 1. Try fetching tasks WITH Contractor details
+      // Use explicit relationship syntax if needed, but standard should work
       const { data, error } = await supabase
           .from('Task')
           .select('*, assignee:Contractor(*)')
           .order('created_at', { ascending: false });
 
-      // 2. If it fails due to missing relationship (PGRST200), fallback to simple fetch
-      if (error && error.code === 'PGRST200') {
-          console.warn("⚠️ Relation Task -> Contractor missing in DB. Running fallback query (Tasks will load without assignees). Please run the SQL migration.");
-          return handleResponse<Task>(
-             supabase.from('Task').select('*').order('created_at', { ascending: false })
-          );
-      }
-
-      // 3. Handle other errors
       if (error) {
-          console.error('Supabase Error:', error);
+          console.error('Supabase Error (Task):', error);
           return [];
       }
-
       return data as Task[];
     },
     create: async (data: Partial<Task>): Promise<Task> => {
@@ -157,14 +199,11 @@ export const db = {
 
   proposals: {
     create: async (data: Omit<Proposal, 'id' | 'createdAt' | 'clientId'>, clientName: string, industry?: string): Promise<Proposal> => {
-        
-        // 1. Create or Get Client
         let clientId = '';
         const { data: existingClient } = await supabase.from('Client').select('id, monthlyRevenue').ilike('name', clientName).maybeSingle();
         
         if (existingClient) {
             clientId = existingClient.id;
-            // Update MRR if changed
             await supabase.from('Client').update({ monthlyRevenue: data.totalRecurringPrice }).eq('id', clientId);
         } else {
             const { data: newClient, error: clientError } = await supabase.from('Client').insert({
@@ -175,12 +214,10 @@ export const db = {
                 monthlyRevenue: data.totalRecurringPrice,
                 billingDay: 1
             }).select().single();
-            
             if (clientError) throw clientError;
             clientId = newClient.id;
         }
 
-        // 2. Create Proposal
         const proposalPayload = {
             clientId,
             status: data.status,
@@ -197,7 +234,6 @@ export const db = {
         const { data: newProposal, error: proposalError } = await supabase.from('Proposal').insert(proposalPayload).select().single();
         if (proposalError) throw proposalError;
 
-        // 3. Create Proposal Items & Generate Tasks
         if (data.items && data.items.length > 0) {
             const itemsPayload = data.items.map(item => ({
                 proposalId: newProposal.id,
@@ -205,28 +241,22 @@ export const db = {
                 serviceSnapshotName: item.serviceSnapshotName,
                 serviceSnapshotCost: item.serviceSnapshotCost
             }));
-            
             const { error: itemsError } = await supabase.from('ProposalItem').insert(itemsPayload);
             if (itemsError) console.error("Error creating items", itemsError);
 
-            // AUTOMATIC TASK GENERATION
-            // We create a task for each service sold
             const tasksPayload = data.items.map(item => ({
                 title: `Implementar: ${item.serviceSnapshotName}`,
                 description: `Servicio vendido en propuesta. Cliente: ${clientName}. Objetivo: ${data.objective}`,
                 status: TaskStatus.TODO,
-                priority: 'HIGH', // New sales are high priority
+                priority: 'HIGH', 
                 projectId: clientId 
             }));
 
-            // Insert tasks one by one or bulk if supported by simple logic
-            // Using a loop for safety to ensure all get inserted even if one fails
             for (const task of tasksPayload) {
                  const { error: taskError } = await supabase.from('Task').insert(task);
                  if (taskError) console.error("Error auto-creating task", taskError);
             }
         }
-
         return newProposal;
     },
     getAll: async (): Promise<Proposal[]> => {

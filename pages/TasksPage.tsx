@@ -1,53 +1,56 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
+import { ai } from '../services/ai';
 import { Task, TaskStatus, Contractor } from '../types';
 import { Button, Input, Label, Modal, Textarea, Badge } from '../components/UIComponents';
+import { ContextMenu, ContextMenuItem } from '../components/ContextMenu';
 import { 
   CheckCircle2, 
-  Circle, 
   Clock, 
   Plus, 
   Trash2, 
   User, 
   Loader2,
-  LayoutList,
-  KanbanSquare,
   Calendar as CalendarIcon,
   Search,
-  ArrowUpDown,
-  ListFilter,
-  Check,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  AlertCircle
+  AlertCircle,
+  Flag,
+  Columns,
+  Edit2,
+  Sparkles,
+  LayoutGrid,
+  Sun
 } from 'lucide-react';
 
-type ViewMode = 'BOARD' | 'LIST' | 'CALENDAR';
+// View Modes
+type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR';
 type SortKey = 'dueDate' | 'priority' | 'status' | 'title';
-type TimeFilter = 'ALL' | 'TODAY' | 'WEEK';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   
-  // Views & Filters
-  const [viewMode, setViewMode] = useState<ViewMode>('LIST');
+  const [viewMode, setViewMode] = useState<ViewMode>('WEEK');
   const [searchTerm, setSearchTerm] = useState('');
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   
-  // Sorting State
-  const [sortKey, setSortKey] = useState<SortKey>('dueDate');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  // Date Navigation State
+  const [referenceDate, setReferenceDate] = useState(new Date()); 
   
-  // Calendar State
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+  // Drag Visual State
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; task: Task | null }>({ x: 0, y: 0, task: null });
+
+  // AI State
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
   // Create/Edit Form State
   const [formData, setFormData] = useState<{
     id?: string;
@@ -73,13 +76,6 @@ export default function TasksPage() {
     return () => { window.removeEventListener('task-created', handleTaskCreated); };
   }, []);
 
-  // Close dropdown on click outside
-  useEffect(() => {
-      const closeDropdown = () => setIsSortDropdownOpen(false);
-      if(isSortDropdownOpen) document.addEventListener('click', closeDropdown);
-      return () => document.removeEventListener('click', closeDropdown);
-  }, [isSortDropdownOpen]);
-
   const loadData = async () => {
     try {
       const [tasksData, contractorsData] = await Promise.all([
@@ -95,31 +91,105 @@ export default function TasksPage() {
     }
   };
 
-  // --- Actions ---
+  // --- AI Handler ---
+  const handleAiAssist = async () => {
+      if (!formData.title) {
+          alert("Escribe un título primero para que la IA sepa en qué ayudarte.");
+          return;
+      }
+      setIsAiGenerating(true);
+      try {
+          const prompt = `
+          Actúa como un Project Manager eficiente.
+          Tengo una tarea titulada: "${formData.title}".
+          
+          Genera una descripción breve y profesional, seguida de una lista de 3 a 5 pasos accionables (checklist) para completarla.
+          Formato: Texto plano, directo al grano.
+          `;
+          
+          const response = await ai.chat([{ role: 'user', content: prompt }]);
+          
+          setFormData(prev => ({
+              ...prev,
+              description: prev.description ? prev.description + "\n\n--- Sugerencia IA ---\n" + response : response
+          }));
+      } catch (error) {
+          console.error(error);
+          alert("La IA no pudo responder en este momento.");
+      } finally {
+          setIsAiGenerating(false);
+      }
+  };
 
-  const handleToggleStatus = async (e: React.MouseEvent, task: Task) => {
-      e.stopPropagation(); // Prevent opening modal
-      const newStatus = task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE;
+  // --- Handlers ---
+
+  const handleContextMenu = (e: React.MouseEvent, task: Task) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.pageX, y: e.pageY, task });
+  };
+
+  const handleCloseContextMenu = () => {
+      setContextMenu({ ...contextMenu, task: null });
+  };
+
+  const handleDoubleClickDate = (date: Date, hour?: number) => {
+      const newDate = new Date(date);
+      if (hour !== undefined) {
+          newDate.setHours(hour, 0, 0, 0);
+      } else {
+          newDate.setHours(12, 0, 0, 0); // Default noon
+      }
       
-      // Optimistic Update
+      const tzOffset = newDate.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(newDate.getTime() - tzOffset)).toISOString().slice(0, 16);
+
+      setFormData({ 
+          title: '', 
+          description: '', 
+          assigneeId: '', 
+          dueDate: localISOTime, 
+          priority: 'MEDIUM', 
+          status: TaskStatus.TODO 
+      });
+      setIsModalOpen(true);
+  };
+
+  const handleToggleStatus = async (task: Task) => {
+      // Rotate: TODO -> IN_PROGRESS -> DONE -> TODO
+      let newStatus = TaskStatus.TODO;
+      if (task.status === TaskStatus.TODO) newStatus = TaskStatus.IN_PROGRESS;
+      else if (task.status === TaskStatus.IN_PROGRESS) newStatus = TaskStatus.DONE;
+      
       const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t);
       setTasks(updatedTasks);
-
       await db.tasks.updateStatus(task.id, newStatus);
   };
 
   const openCreateModal = () => {
-      setFormData({ title: '', description: '', assigneeId: '', dueDate: '', priority: 'MEDIUM', status: TaskStatus.TODO });
+      const defaultDate = new Date(referenceDate);
+      defaultDate.setHours(12, 0, 0, 0);
+      const tzOffset = defaultDate.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(defaultDate.getTime() - tzOffset)).toISOString().slice(0, 16);
+
+      setFormData({ title: '', description: '', assigneeId: '', dueDate: localISOTime, priority: 'MEDIUM', status: TaskStatus.TODO });
       setIsModalOpen(true);
   };
 
   const openEditModal = (task: Task) => {
+      let dueIso = '';
+      if (task.dueDate) {
+         const d = new Date(task.dueDate);
+         const tzOffset = d.getTimezoneOffset() * 60000;
+         dueIso = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+      }
+
       setFormData({
           id: task.id,
           title: task.title,
           description: task.description || '',
           assigneeId: task.assigneeId || '',
-          dueDate: task.dueDate || '',
+          dueDate: dueIso,
           priority: task.priority || 'MEDIUM',
           status: task.status
       });
@@ -136,12 +206,12 @@ export default function TasksPage() {
             description: formData.description,
             status: formData.status,
             assigneeId: formData.assigneeId || null,
-            dueDate: formData.dueDate || null,
+            dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : null,
             priority: formData.priority
         };
 
         if (formData.id) {
-             await db.tasks.delete(formData.id); // Hack for mock update
+             await db.tasks.delete(formData.id);
              await db.tasks.create(payload);
         } else {
             await db.tasks.create(payload);
@@ -155,374 +225,369 @@ export default function TasksPage() {
   };
 
   const deleteTask = async (id: string) => {
-    if(confirm('¿Eliminar esta tarea?')) {
+    // Force close menu to ensure clean state
+    setContextMenu({ x: 0, y: 0, task: null });
+    
+    if(confirm('¿Estás seguro de eliminar esta tarea?')) {
+        // Optimistic update
         setTasks(prev => prev.filter(t => t.id !== id)); 
         await db.tasks.delete(id);
         setIsModalOpen(false);
     }
   };
 
-  // --- Sorting & Filtering Logic ---
+  // --- Helpers ---
+  const getStartOfWeek = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay(); 
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  const handleDragStart = (e: React.DragEvent, id: string) => { 
+      e.dataTransfer.setData('text/plain', id); 
+      e.dataTransfer.effectAllowed = 'move'; 
+  };
   
-  const toggleSort = (key: SortKey) => {
-      if (sortKey === key) {
-          setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-      } else {
-          setSortKey(key);
-          setSortDirection('asc');
+  const handleDragOver = (e: React.DragEvent, slotId: string) => { 
+      e.preventDefault(); 
+      e.dataTransfer.dropEffect = 'move';
+      if (dragOverSlot !== slotId) {
+          setDragOverSlot(slotId);
       }
   };
 
-  const getProcessedTasks = () => {
-      // 1. Filter by Search
-      let result = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  const handleDragLeave = () => {
+      // Optional: Logic to clear, but often tricky with child elements
+      // We rely on Drop or DragEnd to clear mainly
+  };
 
-      // 2. Filter by Time (Only applies to List/Board usually, but we apply global logic here)
-      if (timeFilter !== 'ALL') {
-          const now = new Date();
-          now.setHours(0,0,0,0);
-          
-          result = result.filter(t => {
-              if (!t.dueDate) return false;
-              const d = new Date(t.dueDate);
-              d.setHours(0,0,0,0);
-              
-              if (timeFilter === 'TODAY') {
-                  return d.getTime() === now.getTime();
-              }
-              if (timeFilter === 'WEEK') {
-                  const nextWeek = new Date(now);
-                  nextWeek.setDate(now.getDate() + 7);
-                  return d >= now && d <= nextWeek;
-              }
-              return true;
-          });
+  const handleDrop = async (e: React.DragEvent, date: Date, hour?: number) => {
+      e.preventDefault();
+      setDragOverSlot(null); // Clear highlight
+
+      const id = e.dataTransfer.getData('text/plain');
+      if (!id) return;
+
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      const newDate = new Date(date);
+      if (hour !== undefined) {
+          newDate.setHours(hour, 0, 0, 0);
+      } else if (task.dueDate) {
+          const old = new Date(task.dueDate);
+          newDate.setHours(old.getHours(), old.getMinutes());
+      } else {
+          newDate.setHours(12, 0, 0, 0);
       }
 
-      // 3. Sort
-      result.sort((a, b) => {
-          let valA: any = a[sortKey];
-          let valB: any = b[sortKey];
+      const updatedTasks = tasks.map(t => t.id === id ? { ...t, dueDate: newDate.toISOString() } : t);
+      setTasks(updatedTasks);
+      
+      await db.tasks.delete(id);
+      await db.tasks.create({ ...task, dueDate: newDate.toISOString(), status: task.status }); 
+      loadData();
+  };
 
-          // Special Handling for Priorities to make them numeric
-          if (sortKey === 'priority') {
-              const map = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-              valA = map[a.priority || 'MEDIUM'];
-              valB = map[b.priority || 'MEDIUM'];
-          }
-          // Special Handling for Status
-          if (sortKey === 'status') {
-              const map = { TODO: 1, IN_PROGRESS: 2, DONE: 3 };
-              valA = map[a.status];
-              valB = map[b.status];
-          }
-          // Special Handling for Date (Nulls last)
-          if (sortKey === 'dueDate') {
-              if (!valA) return 1;
-              if (!valB) return -1;
-              valA = new Date(valA).getTime();
-              valB = new Date(valB).getTime();
-          }
-          // Strings
-          if (typeof valA === 'string') valA = valA.toLowerCase();
-          if (typeof valB === 'string') valB = valB.toLowerCase();
+  const handleDragEnd = () => {
+      setDragOverSlot(null);
+  };
 
-          if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-          if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-          return 0;
+  // --- Styling Helper ---
+  const getTaskStyles = (status: TaskStatus) => {
+      switch(status) {
+          case TaskStatus.DONE: 
+              return 'bg-emerald-50 border-l-4 border-l-emerald-500 text-emerald-900 opacity-60 line-through decoration-emerald-500/50';
+          case TaskStatus.IN_PROGRESS: 
+              return 'bg-amber-50 border-l-4 border-l-amber-500 text-amber-900 shadow-sm';
+          default: 
+              return 'bg-white border-l-4 border-l-blue-500 text-gray-900 shadow-sm';
+      }
+  };
+
+  // --- Views ---
+
+  const TodayView = () => {
+      const today = new Date();
+      const todayTasks = tasks.filter(t => {
+          if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+          if (!t.dueDate) return false;
+          const d = new Date(t.dueDate);
+          return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      }).sort((a,b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+
+      const pendingTasks = tasks.filter(t => {
+          if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+          return t.status !== TaskStatus.DONE && (!t.dueDate || new Date(t.dueDate) < new Date(today.setHours(0,0,0,0)));
       });
 
-      return result;
-  };
-
-  const processedTasks = getProcessedTasks();
-
-  // --- Board Logic ---
-  const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; };
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
-  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain');
-    if (!id) return;
-    const taskIndex = tasks.findIndex(t => t.id === id);
-    if (taskIndex === -1 || tasks[taskIndex].status === targetStatus) return;
-    const updatedTasks = [...tasks];
-    updatedTasks[taskIndex] = { ...updatedTasks[taskIndex], status: targetStatus };
-    setTasks(updatedTasks);
-    await db.tasks.updateStatus(id, targetStatus);
-  };
-
-  // --- Helpers ---
-  const getPriorityColor = (priority?: string) => {
-    switch(priority) {
-        case 'HIGH': return 'bg-red-50 text-red-700 border-red-200';
-        case 'LOW': return 'bg-blue-50 text-blue-700 border-blue-200';
-        default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
-  };
-
-  const formatDateDisplay = (isoString: string) => {
-      if(!isoString) return '-';
-      const date = new Date(isoString);
-      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  };
-  
-  const formatDateShort = (isoString: string) => {
-      if(!isoString) return '';
-      const date = new Date(isoString);
-      return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-  };
-
-  // --- RENDERERS ---
-
-  const CalendarView = () => {
-      const year = currentCalendarDate.getFullYear();
-      const month = currentCalendarDate.getMonth();
-      
-      const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sunday
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      
-      const daysArray = [];
-      // Fill empty slots for previous month
-      for (let i = 0; i < firstDayOfMonth; i++) {
-          daysArray.push(null);
-      }
-      // Fill days
-      for (let i = 1; i <= daysInMonth; i++) {
-          daysArray.push(new Date(year, month, i));
-      }
-
-      const changeMonth = (delta: number) => {
-          const newDate = new Date(currentCalendarDate);
-          newDate.setMonth(newDate.getMonth() + delta);
-          setCurrentCalendarDate(newDate);
-      };
-
       return (
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
-              <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                  <h2 className="font-bold text-lg capitalize">
-                      {currentCalendarDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                  </h2>
-                  <div className="flex gap-2">
-                      <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
-                      <button onClick={() => setCurrentCalendarDate(new Date())} className="text-sm px-3 hover:bg-gray-100 rounded-lg font-medium">Hoy</button>
-                      <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full min-h-0">
+              {/* Today's Agenda */}
+              <div className="md:col-span-2 flex flex-col gap-4 bg-white border border-gray-200 rounded-xl p-6 shadow-sm overflow-hidden">
+                  <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2">
+                          <Sun className="w-6 h-6 text-orange-500" />
+                          <h2 className="text-xl font-bold text-gray-900">Agenda de Hoy</h2>
+                      </div>
+                      <span className="text-sm text-gray-500 font-medium capitalize">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                   </div>
-              </div>
-              <div className="grid grid-cols-7 text-center border-b border-gray-100 bg-gray-50">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                      <div key={d} className="py-2 text-xs font-bold text-gray-400 uppercase">{d}</div>
-                  ))}
-              </div>
-              <div className="grid grid-cols-7 flex-1 auto-rows-fr">
-                  {daysArray.map((date, idx) => {
-                      if (!date) return <div key={idx} className="bg-gray-50/30 border-b border-r border-gray-100"></div>;
-                      
-                      const dayTasks = tasks.filter(t => {
-                          if (!t.dueDate) return false;
-                          const tDate = new Date(t.dueDate);
-                          return tDate.getDate() === date.getDate() && tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
-                      });
-                      
-                      const isToday = new Date().toDateString() === date.toDateString();
-
-                      return (
-                          <div key={idx} className={`border-b border-r border-gray-100 p-2 min-h-[100px] hover:bg-blue-50/10 transition-colors flex flex-col gap-1 ${isToday ? 'bg-blue-50/30' : ''}`}>
-                              <div className={`text-xs font-medium mb-1 ${isToday ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>
-                                  {date.getDate()}
-                              </div>
-                              {dayTasks.map(t => (
+                  
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                      {todayTasks.length === 0 ? (
+                          <div className="h-full flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
+                              <CalendarIcon className="w-10 h-10 mb-2 opacity-20" />
+                              <p>No hay tareas programadas para hoy.</p>
+                              <Button variant="ghost" size="sm" onClick={openCreateModal} className="mt-2 text-blue-600">Crear una tarea</Button>
+                          </div>
+                      ) : (
+                          todayTasks.map(t => {
+                              const hour = new Date(t.dueDate!).toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+                              return (
                                   <div 
                                     key={t.id} 
+                                    onContextMenu={(e) => handleContextMenu(e, t)}
                                     onClick={() => openEditModal(t)}
-                                    className={`text-[10px] px-1.5 py-1 rounded border truncate cursor-pointer shadow-sm transition-transform hover:scale-105 ${t.status === TaskStatus.DONE ? 'bg-gray-100 text-gray-400 line-through border-gray-200' : 'bg-white text-gray-700 border-gray-200'}`}
+                                    className={`group flex items-start gap-4 p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer ${getTaskStyles(t.status)}`}
                                   >
-                                      {t.title}
+                                      <div className="w-16 pt-1 text-center border-r border-black/5 pr-4 flex-shrink-0">
+                                          <span className="text-lg font-bold text-gray-700 block leading-none">{hour}</span>
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                          <div className="flex justify-between items-start">
+                                               <h3 className={`font-bold text-sm truncate ${t.status === TaskStatus.DONE ? 'line-through text-gray-500' : 'text-gray-900'}`}>{t.title}</h3>
+                                               {t.priority === 'HIGH' && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0 mt-1"></div>}
+                                          </div>
+                                          {t.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.description}</p>}
+                                          <div className="mt-2 flex items-center gap-2">
+                                              {t.assignee && <Badge variant="outline" className="text-[10px] bg-white/50">{t.assignee.name}</Badge>}
+                                              <Badge className={`text-[10px] ${t.status === TaskStatus.DONE ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>{t.status === 'IN_PROGRESS' ? 'EN PROCESO' : t.status}</Badge>
+                                          </div>
+                                      </div>
                                   </div>
-                              ))}
-                          </div>
-                      );
-                  })}
+                              );
+                          })
+                      )}
+                  </div>
+              </div>
+
+              {/* Backlog / Overdue */}
+              <div className="flex flex-col gap-4 bg-gray-50 border border-gray-200 rounded-xl p-6 shadow-inner overflow-hidden">
+                   <h3 className="font-bold text-gray-600 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Pendientes / Atrasados</h3>
+                   <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                       {pendingTasks.map(t => (
+                           <div key={t.id} onClick={() => openEditModal(t)} onContextMenu={(e) => handleContextMenu(e, t)} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-black/20 cursor-pointer transition-all">
+                               <div className="flex justify-between items-start">
+                                   <p className="text-xs font-bold text-gray-800 line-clamp-2">{t.title}</p>
+                                   {t.priority === 'HIGH' && <Flag className="w-3 h-3 text-red-500 flex-shrink-0" />}
+                               </div>
+                               {t.dueDate && <p className="text-[10px] text-red-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(t.dueDate).toLocaleDateString()}</p>}
+                           </div>
+                       ))}
+                       {pendingTasks.length === 0 && <p className="text-xs text-gray-400 text-center py-4">¡Todo al día!</p>}
+                   </div>
               </div>
           </div>
       );
   };
 
-  const ListView = () => (
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm flex-1 flex flex-col">
-          <div className="overflow-x-auto flex-1">
-              <table className="w-full text-sm text-left">
-                  <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs tracking-wider sticky top-0 bg-gray-50 z-10">
-                      <tr>
-                          <th className="px-6 py-3 w-12 text-center">
-                              <CheckCircle2 className="w-4 h-4 mx-auto text-gray-400" />
-                          </th>
-                          <th className="px-6 py-3 w-[40%] cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => toggleSort('title')}>
-                              <div className="flex items-center gap-2">Tarea {sortKey === 'title' && <ArrowUpDown className="w-3 h-3" />}</div>
-                          </th>
-                          <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => toggleSort('status')}>
-                               <div className="flex items-center gap-2">Estado {sortKey === 'status' && <ArrowUpDown className="w-3 h-3" />}</div>
-                          </th>
-                          <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => toggleSort('priority')}>
-                               <div className="flex items-center gap-2">Prioridad {sortKey === 'priority' && <ArrowUpDown className="w-3 h-3" />}</div>
-                          </th>
-                          <th className="px-6 py-3">Responsable</th>
-                          <th className="px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => toggleSort('dueDate')}>
-                               <div className="flex items-center gap-2">Fecha Entrega {sortKey === 'dueDate' && <ArrowUpDown className="w-3 h-3" />}</div>
-                          </th>
-                          <th className="px-6 py-3 text-center"></th>
-                      </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                      {processedTasks.length === 0 ? (
-                          <tr><td colSpan={7} className="text-center py-8 text-gray-400">No hay tareas para mostrar.</td></tr>
-                      ) : (
-                          processedTasks.map(t => {
-                              const isOverdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE;
-                              const isDone = t.status === TaskStatus.DONE;
-                              
-                              return (
-                                  <tr key={t.id} onClick={() => openEditModal(t)} className={`cursor-pointer group transition-all duration-200 ${isDone ? 'bg-gray-50/50 hover:bg-gray-50' : 'hover:bg-blue-50/30'}`}>
-                                      <td className="px-6 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                          <div 
-                                            onClick={(e) => handleToggleStatus(e, t)}
-                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ${
-                                                isDone 
-                                                ? 'bg-green-500 border-green-500' 
-                                                : 'border-gray-300 hover:border-black'
-                                            }`}
-                                          >
-                                              {isDone && <Check className="w-3 h-3 text-white" />}
-                                          </div>
-                                      </td>
-                                      <td className="px-6 py-3">
-                                          <div className={`font-semibold text-gray-900 transition-all ${isDone ? 'line-through text-gray-400' : ''}`}>
-                                              {t.title}
-                                          </div>
-                                          {t.description && <div className={`text-xs truncate max-w-xs ${isDone ? 'text-gray-300' : 'text-gray-400'}`}>{t.description}</div>}
-                                      </td>
-                                      <td className="px-6 py-3">
-                                          <Badge variant={t.status === TaskStatus.DONE ? 'green' : t.status === TaskStatus.IN_PROGRESS ? 'blue' : 'outline'}>
-                                              {t.status === TaskStatus.TODO ? 'PENDIENTE' : t.status === TaskStatus.IN_PROGRESS ? 'EN PROCESO' : 'LISTO'}
-                                          </Badge>
-                                      </td>
-                                      <td className="px-6 py-3">
-                                          <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(t.priority)}`}>
-                                              {t.priority || 'NORMAL'}
-                                          </span>
-                                      </td>
-                                      <td className="px-6 py-3">
-                                          {t.assignee ? (
-                                              <div className="flex items-center gap-2">
-                                                  <div className="w-5 h-5 rounded-full bg-black text-white text-[9px] flex items-center justify-center font-bold">
-                                                      {t.assignee.name.charAt(0)}
-                                                  </div>
-                                                  <span className="text-xs text-gray-600">{t.assignee.name}</span>
-                                              </div>
-                                          ) : <span className="text-xs text-gray-300 italic">Sin asignar</span>}
-                                      </td>
-                                      <td className="px-6 py-3">
-                                          <span className={`text-xs ${isOverdue ? 'text-red-500 font-bold' : isDone ? 'text-gray-400' : 'text-gray-500'}`}>
-                                              {formatDateDisplay(t.dueDate!)}
-                                          </span>
-                                      </td>
-                                      <td className="px-6 py-3 text-center">
-                                          <button 
-                                            onClick={(e) => { e.stopPropagation(); deleteTask(t.id); }}
-                                            className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          >
-                                              <Trash2 className="w-4 h-4"/>
-                                          </button>
-                                      </td>
-                                  </tr>
-                              )
-                          })
-                      )}
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  );
+  const WeeklyView = () => {
+    const startOfWeek = getStartOfWeek(referenceDate);
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+        const day = new Date(startOfWeek);
+        day.setDate(startOfWeek.getDate() + i);
+        weekDays.push(day);
+    }
+    
+    // Time Slots (08:00 to 20:00) - 13 Slots
+    const hours = Array.from({length: 13}, (_, i) => i + 8); 
 
-  const BoardView = () => (
-      <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 h-full snap-x">
-        <Column title="Por Hacer" status={TaskStatus.TODO} icon={Circle} color="text-gray-400" />
-        <Column title="En Progreso" status={TaskStatus.IN_PROGRESS} icon={Clock} color="text-blue-500" />
-        <Column title="Completado" status={TaskStatus.DONE} icon={CheckCircle2} color="text-green-500" />
-      </div>
-  );
+    const nextWeek = () => {
+        const d = new Date(referenceDate);
+        d.setDate(d.getDate() + 7);
+        setReferenceDate(d);
+    };
+    const prevWeek = () => {
+        const d = new Date(referenceDate);
+        d.setDate(d.getDate() - 7);
+        setReferenceDate(d);
+    };
 
-  const Column = ({ title, status, icon: Icon, color }: any) => {
-    // Also use filtered/sorted tasks for the board for consistency
-    const columnTasks = processedTasks.filter(t => t.status === status);
     return (
-      <div 
-        className="flex-1 min-w-[320px] flex flex-col h-full rounded-2xl bg-gray-50/50 border border-gray-200/50"
-        onDragOver={handleDragOver}
-        onDrop={(e) => handleDrop(e, status)}
-      >
-        <div className="p-4 flex items-center gap-2 border-b border-gray-100/50">
-          <div className={`p-2 rounded-lg bg-white shadow-sm border border-gray-100 ${color}`}><Icon className="w-4 h-4" /></div>
-          <h3 className="font-bold text-gray-700 text-sm uppercase tracking-wide">{title}</h3>
-          <span className="ml-auto text-xs font-semibold text-gray-500 bg-white px-2 py-1 rounded-md border border-gray-200">{columnTasks.length}</span>
+        <div className="flex flex-col h-full animate-in fade-in overflow-hidden border border-gray-300 rounded-xl bg-white shadow-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-300 bg-gray-50/50 flex-shrink-0">
+                <button onClick={prevWeek} className="p-1.5 hover:bg-gray-200 rounded-full"><ChevronLeft className="w-5 h-5 text-gray-500"/></button>
+                <div className="font-bold text-gray-900 capitalize text-base">{startOfWeek.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
+                <button onClick={nextWeek} className="p-1.5 hover:bg-gray-200 rounded-full"><ChevronRight className="w-5 h-5 text-gray-500"/></button>
+            </div>
+
+            {/* Grid Container - FLEX COLUMN to force fit height */}
+            <div className="flex-1 flex flex-col min-h-0"> 
+                {/* Columns Wrapper */}
+                <div className="flex flex-1 min-h-0">
+                    
+                    {/* Time Column */}
+                    <div className="w-14 flex-shrink-0 border-r border-gray-300 bg-gray-50/30 flex flex-col z-20">
+                        <div className="h-10 border-b border-gray-300 flex-shrink-0 bg-gray-50/50"></div> {/* Spacer for header */}
+                        {hours.map(h => (
+                            <div key={h} className="flex-1 border-b border-gray-200 text-[10px] text-gray-500 font-semibold font-mono flex justify-center items-center">
+                                {h}:00
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Day Columns */}
+                    {weekDays.map((date, idx) => {
+                        const isToday = new Date().toDateString() === date.toDateString();
+                        
+                        return (
+                            <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 last:border-r-0 min-w-[100px]">
+                                {/* Day Header */}
+                                <div className={`h-10 flex-shrink-0 flex flex-col items-center justify-center border-b border-gray-300 ${isToday ? 'bg-blue-50 text-blue-700' : 'bg-gray-50/30'}`}>
+                                    <div className="flex items-center gap-1">
+                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${isToday ? 'text-blue-700' : 'text-gray-400'}`}>{date.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
+                                        <span className={`text-xs font-bold ${isToday ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md shadow-blue-200' : 'text-gray-700'}`}>
+                                            {date.getDate()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Hourly Slots - FLEX GROW to fill remaining space equally */}
+                                <div className="flex-1 flex flex-col min-h-0 bg-white">
+                                    {hours.map(h => {
+                                        const slotId = `${date.toISOString()}-${h}`;
+                                        const isDragTarget = dragOverSlot === slotId;
+
+                                        const slotTasks = tasks.filter(t => {
+                                            if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                                            if (!t.dueDate) return false;
+                                            const d = new Date(t.dueDate);
+                                            return d.getDate() === date.getDate() && 
+                                                   d.getMonth() === date.getMonth() && 
+                                                   d.getHours() === h;
+                                        });
+
+                                        return (
+                                            <div 
+                                                key={h} 
+                                                className={`flex-1 border-b border-gray-200 transition-all duration-200 relative group min-h-[40px] flex flex-col justify-center 
+                                                    ${isDragTarget ? 'bg-indigo-100 ring-2 ring-indigo-500 ring-inset z-10' : 'hover:bg-gray-50'}`}
+                                                onDragOver={(e) => handleDragOver(e, slotId)}
+                                                onDrop={(e) => handleDrop(e, date, h)}
+                                                onDoubleClick={() => handleDoubleClickDate(date, h)}
+                                            >
+                                                {/* Hover Action Indicator */}
+                                                {!isDragTarget && (
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none z-0 transition-opacity duration-200">
+                                                        <div className="bg-white/90 rounded-full p-1.5 shadow-sm border border-gray-200">
+                                                            <Plus className="w-4 h-4 text-blue-500" />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Tasks in this slot */}
+                                                <div className="flex flex-col gap-1 px-1 py-0.5 w-full relative z-10 h-full justify-center">
+                                                    {slotTasks.map(t => (
+                                                        <div 
+                                                            key={t.id} 
+                                                            draggable
+                                                            onDragStart={(e) => handleDragStart(e, t.id)}
+                                                            onDragEnd={handleDragEnd}
+                                                            onClick={() => openEditModal(t)}
+                                                            onContextMenu={(e) => handleContextMenu(e, t)}
+                                                            className={`px-2 py-1.5 rounded-md text-[11px] cursor-grab active:cursor-grabbing hover:scale-[1.02] hover:shadow-md transition-all flex items-center gap-1.5 leading-tight shadow-sm ${getTaskStyles(t.status)}`}
+                                                        >
+                                                            {t.priority === 'HIGH' && t.status !== TaskStatus.DONE && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />}
+                                                            <div className="truncate font-semibold flex-1">{t.title}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
         </div>
-        <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
-          {columnTasks.map(task => {
-             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== TaskStatus.DONE;
-             
-             return (
-               <div key={task.id} draggable onDragStart={(e) => handleDragStart(e, task.id)} onClick={() => openEditModal(task)}
-                  className="group bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing flex flex-col gap-3">
-                   
-                   {/* HEADER */}
-                   <div className="flex justify-between items-start">
-                       <p className={`font-semibold text-sm leading-snug ${task.status === TaskStatus.DONE ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                           {task.title}
-                       </p>
-                   </div>
-                   
-                   {/* DESCRIPTION */}
-                   {task.description && (
-                       <p className={`text-xs line-clamp-2 leading-relaxed ${task.status === TaskStatus.DONE ? 'text-gray-300' : 'text-gray-500'}`}>
-                           {task.description}
-                       </p>
-                   )}
+    );
+  };
 
-                   {/* DIVIDER */}
-                   <div className="h-px bg-gray-50 w-full" />
+  const CalendarView = () => {
+    const year = referenceDate.getFullYear();
+    const month = referenceDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days = [];
+    for (let i = 0; i < firstDay; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(new Date(year, month, i));
 
-                   {/* FOOTER */}
-                   <div className="flex items-center justify-between">
-                       {/* Date */}
-                       <div className={`flex items-center gap-1.5 text-xs ${isOverdue ? 'text-red-600 font-bold' : 'text-gray-400'}`}>
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          <span>{formatDateShort(task.dueDate!) || 'S/F'}</span>
-                       </div>
+    return (
+        <div className="bg-white border border-gray-300 rounded-xl overflow-hidden flex flex-col h-full shadow-sm">
+            <div className="flex justify-between items-center p-4 border-b border-gray-300">
+                <h2 className="font-bold text-lg capitalize flex items-center gap-2">
+                    <CalendarIcon className="w-5 h-5 text-gray-400" />
+                    {referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                </h2>
+                <div className="flex gap-2">
+                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d); }} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={() => setReferenceDate(new Date())} className="text-sm px-3 hover:bg-gray-100 rounded-lg font-medium">Hoy</button>
+                    <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d); }} className="p-2 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5"/></button>
+                </div>
+            </div>
+            <div className="grid grid-cols-7 text-center border-b border-gray-300 bg-gray-50">
+                {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => <div key={d} className="py-2 text-xs font-bold text-gray-400 uppercase">{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 flex-1 auto-rows-fr bg-gray-200 gap-px border-b border-gray-200">
+                {days.map((date, idx) => {
+                    if (!date) return <div key={idx} className="bg-gray-50/50 min-h-[100px]"></div>;
+                    
+                    const slotId = date.toISOString();
+                    const isDragTarget = dragOverSlot === slotId;
 
-                       {/* Meta */}
-                       <div className="flex items-center gap-2">
-                           <div className="flex -space-x-1">
-                               {task.assignee ? (
-                                   <div className="w-6 h-6 rounded-full bg-black text-white text-[9px] flex items-center justify-center border border-white font-bold" title={task.assignee.name}>
-                                       {task.assignee.name.charAt(0)}
-                                   </div>
-                               ) : (
-                                   <div className="w-6 h-6 rounded-full bg-gray-100 text-gray-300 flex items-center justify-center border border-white">
-                                       <User className="w-3 h-3"/>
-                                   </div>
-                               )}
-                           </div>
-                           <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(task.priority)}`}>
-                               {task.priority || 'MED'}
-                           </span>
-                       </div>
-                   </div>
-               </div>
-             )
-          })}
+                    const dayTasks = tasks.filter(t => {
+                         if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+                         return t.dueDate && new Date(t.dueDate).toDateString() === date.toDateString();
+                    });
+                    const isToday = new Date().toDateString() === date.toDateString();
+
+                    return (
+                        <div 
+                          key={idx} 
+                          onDragOver={(e) => handleDragOver(e, slotId)}
+                          onDrop={(e) => handleDrop(e, date)}
+                          onDoubleClick={() => handleDoubleClickDate(date)}
+                          className={`bg-white p-2 min-h-[100px] transition-all flex flex-col gap-1 group 
+                            ${isToday ? 'bg-blue-50/30' : ''} 
+                            ${isDragTarget ? '!bg-indigo-100 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-gray-50'}
+                          `}
+                        >
+                            <div className={`text-xs font-medium mb-1 ${isToday ? 'text-blue-600 font-bold' : 'text-gray-400'}`}>{date.getDate()}</div>
+                            {dayTasks.map(t => (
+                                <div 
+                                  key={t.id} 
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, t.id)}
+                                  onDragEnd={handleDragEnd}
+                                  onClick={() => openEditModal(t)}
+                                  onContextMenu={(e) => handleContextMenu(e, t)}
+                                  className={`text-[10px] px-1.5 py-1 rounded border-0 truncate cursor-grab active:cursor-grabbing shadow-sm hover:scale-105 transition-all ${getTaskStyles(t.status)}`}
+                                >
+                                    {t.title}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
-      </div>
     );
   };
 
@@ -530,125 +595,86 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
+      {/* 1. Header & Filters Bar */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 px-2">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tareas</h1>
-            
-            {/* View Toggle */}
-            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
-                <button 
-                    onClick={() => setViewMode('LIST')} 
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <LayoutList className="w-4 h-4" />
-                </button>
-                <button 
-                    onClick={() => setViewMode('BOARD')} 
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'BOARD' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <KanbanSquare className="w-4 h-4" />
-                </button>
-                <button 
-                    onClick={() => setViewMode('CALENDAR')} 
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'CALENDAR' ? 'bg-white shadow text-black' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                    <CalendarIcon className="w-4 h-4" />
-                </button>
+            <div>
+                <h1 className="text-2xl font-bold tracking-tight text-gray-900">Tareas</h1>
             </div>
-
-            {/* Time Filters (Only active if not in calendar mode usually, but useful globally) */}
-            {viewMode !== 'CALENDAR' && (
-                <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
-                    <button onClick={() => setTimeFilter('ALL')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'ALL' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Todos</button>
-                    <button onClick={() => setTimeFilter('TODAY')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'TODAY' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Hoy</button>
-                    <button onClick={() => setTimeFilter('WEEK')} className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${timeFilter === 'WEEK' ? 'bg-black text-white' : 'text-gray-500 hover:bg-gray-50'}`}>Semana</button>
-                </div>
-            )}
+            
+            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
+                <button onClick={() => setViewMode('TODAY')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'TODAY' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><Sun className="w-4 h-4" /> Hoy</button>
+                <button onClick={() => setViewMode('WEEK')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'WEEK' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><Columns className="w-4 h-4" /> Semana</button>
+                <button onClick={() => setViewMode('CALENDAR')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'CALENDAR' ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black'}`}><CalendarIcon className="w-4 h-4" /> Mes</button>
+            </div>
         </div>
 
-        <div className="flex gap-2 w-full md:w-auto">
-             
-             {/* SORT DROPDOWN (Click Based Fix) */}
-             {viewMode !== 'CALENDAR' && (
-                <div className="relative">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); setIsSortDropdownOpen(!isSortDropdownOpen); }}
-                        className="h-10 px-3 bg-white border border-gray-200 rounded-xl flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-black hover:border-gray-300 transition-colors"
-                    >
-                        <ListFilter className="w-4 h-4" />
-                        <span className="hidden sm:inline">
-                            {sortKey === 'dueDate' ? 'Fecha' : sortKey === 'priority' ? 'Prioridad' : 'Estado'}
-                        </span>
-                    </button>
-                    
-                    {isSortDropdownOpen && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-xl rounded-xl overflow-hidden z-30 animate-in fade-in zoom-in-95 duration-200">
-                            <div className="p-1 flex flex-col">
-                                <span className="px-3 py-2 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Ordenar por</span>
-                                <button onClick={() => { setSortKey('dueDate'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'dueDate' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Fecha de Entrega</button>
-                                <button onClick={() => { setSortKey('priority'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'priority' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Prioridad</button>
-                                <button onClick={() => { setSortKey('status'); setIsSortDropdownOpen(false); }} className={`text-left px-3 py-2 text-sm rounded-lg ${sortKey === 'status' ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'}`}>Estado</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-             )}
-
-             <div className="relative flex-1 md:w-64">
+        <div className="flex gap-2 w-full xl:w-auto">
+             <div className="relative flex-1 xl:w-64">
                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                <Input placeholder="Buscar tarea..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <Input placeholder="Buscar..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
              </div>
-            <Button onClick={openCreateModal} className="shadow-lg shadow-black/10">
-                <Plus className="w-4 h-4 mr-2" /> Nueva
-            </Button>
+            <Button onClick={openCreateModal} className="shadow-lg shadow-black/10"><Plus className="w-4 h-4 mr-2" /> Nueva</Button>
         </div>
       </div>
 
-      {/* VIEW SWITCHER */}
-      {viewMode === 'LIST' && <ListView />}
-      {viewMode === 'BOARD' && <BoardView />}
+      {viewMode === 'TODAY' && <TodayView />}
+      {viewMode === 'WEEK' && <WeeklyView />}
       {viewMode === 'CALENDAR' && <CalendarView />}
+      
+      {/* --- CONTEXT MENU --- */}
+      <ContextMenu 
+        x={contextMenu.x} 
+        y={contextMenu.y} 
+        isOpen={!!contextMenu.task} 
+        onClose={handleCloseContextMenu}
+        items={[
+            { label: 'Cambiar Estado', icon: CheckCircle2, onClick: () => contextMenu.task && handleToggleStatus(contextMenu.task) },
+            { label: 'Editar Tarea', icon: Edit2, onClick: () => contextMenu.task && openEditModal(contextMenu.task) },
+            { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => contextMenu.task && deleteTask(contextMenu.task.id) }
+        ]}
+      />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? "Editar Tarea" : "Nueva Tarea"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div><Label>Título</Label><Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} autoFocus /></div>
-          <div><Label>Descripción</Label><Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-                <Label>Responsable</Label>
-                <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-black"
-                    value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}>
-                    <option value="">Sin Asignar</option>
-                    {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-            </div>
-            <div>
-                <Label>Prioridad</Label>
-                <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-black"
-                    value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}>
-                    <option value="LOW">Baja</option>
-                    <option value="MEDIUM">Media</option>
-                    <option value="HIGH">Alta</option>
-                </select>
-            </div>
+      {/* --- MODAL --- */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Detalles de la Tarea">
+        <form onSubmit={handleSubmit} className="space-y-0">
+          <div className="bg-gray-50 -mx-6 -mt-2 px-6 py-4 border-b border-gray-100 flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                  <select value={formData.status} onChange={e => setFormData({...formData,status: e.target.value as any})} className="text-xs font-bold px-3 py-1.5 rounded-full border bg-white cursor-pointer outline-none">
+                      <option value={TaskStatus.TODO}>PENDIENTE</option>
+                      <option value={TaskStatus.IN_PROGRESS}>EN PROCESO</option>
+                      <option value={TaskStatus.DONE}>COMPLETADA</option>
+                  </select>
+                  {formData.dueDate && new Date(formData.dueDate) < new Date() && formData.status !== TaskStatus.DONE && <span className="flex items-center text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md border border-red-100"><AlertCircle className="w-3 h-3 mr-1" /> ATRASADA</span>}
+              </div>
+              {formData.id && <button type="button" onClick={() => deleteTask(formData.id!)} className="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-             <div><Label>Fecha Entrega</Label><Input type="datetime-local" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} /></div>
-             <div>
-                <Label>Estado</Label>
-                <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-black"
-                    value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
-                    <option value={TaskStatus.TODO}>Pendiente</option>
-                    <option value={TaskStatus.IN_PROGRESS}>En Progreso</option>
-                    <option value={TaskStatus.DONE}>Completada</option>
-                </select>
-             </div>
+          <div className="space-y-6">
+              <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full text-xl font-bold border-none outline-none bg-transparent p-0" placeholder="Título..." autoFocus />
+              
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="space-y-1.5"><Label><User className="w-3 h-3"/> Responsable</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 px-3 text-sm" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}><option value="">Sin Asignar</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+                 <div className="space-y-1.5"><Label><Flag className="w-3 h-3"/> Prioridad</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 px-3 text-sm" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}><option value="LOW">Baja</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option></select></div>
+                 <div className="space-y-1.5 col-span-2"><Label><CalendarIcon className="w-3 h-3"/> Fecha</Label><Input type="datetime-local" className="bg-white" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} /></div>
+              </div>
+              
+              <div className="space-y-1.5 relative">
+                  <div className="flex justify-between items-center">
+                    <Label>Descripción & Checklist</Label>
+                    <button 
+                        type="button" 
+                        onClick={handleAiAssist} 
+                        disabled={isAiGenerating} 
+                        className="text-xs flex items-center gap-1.5 text-indigo-600 font-bold hover:bg-indigo-50 px-2 py-1 rounded-md transition-colors"
+                    >
+                        {isAiGenerating ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3"/>}
+                        Autocompletar con IA
+                    </button>
+                  </div>
+                  <Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="min-h-[150px]" placeholder="Detalles o pasos a seguir..." />
+              </div>
           </div>
-          <div className="pt-4 flex gap-2">
-            {formData.id && <Button type="button" variant="destructive" onClick={() => deleteTask(formData.id!)}><Trash2 className="w-4 h-4"/></Button>}
-            <Button type="submit" className="flex-1">Guardar Tarea</Button>
-          </div>
+          <div className="pt-6 mt-6 border-t border-gray-100 flex justify-end"><Button type="submit" className="w-full md:w-auto bg-black text-white">Guardar Cambios</Button></div>
         </form>
       </Modal>
     </div>

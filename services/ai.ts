@@ -1,155 +1,188 @@
 
-import { db } from "./db";
+import { db } from './db';
 
-const CALL_OPENAI = async (messages: any[], jsonMode: boolean = false) => {
-    // 1. Get Key from DB
-    const apiKey = await db.settings.getApiKey();
+const MODEL = 'gpt-4o-mini';
 
-    if (!apiKey) throw new Error("API Key missing. Por favor configúrala en la sección Ajustes.");
+// Cache simple en memoria para no consultar la DB en cada mensaje de una misma sesión
+let cachedApiKey: string | null = null;
 
+const getApiKey = async () => {
+    if (cachedApiKey) return cachedApiKey;
+    
+    // Consultamos a Supabase (AgencySettings)
+    const key = await db.settings.getApiKey();
+    if (key) {
+        cachedApiKey = key;
+        return key;
+    }
+    return null;
+};
+
+// Helper genérico para fetch a OpenAI
+const fetchOpenAI = async (messages: any[], jsonMode = false) => {
     try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
+        const apiKey = await getApiKey();
+
+        if (!apiKey) {
+            console.error("API Key no encontrada en Supabase (Tabla: AgencySettings, Key: openai_api_key)");
+            return null;
+        }
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
             headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: "gpt-4o-mini",
-                messages: messages,
+                model: MODEL,
+                messages,
                 response_format: jsonMode ? { type: "json_object" } : undefined,
-                temperature: 0.5 // Lower temperature for more precision on actions
+                temperature: 0.7
             })
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || "OpenAI API Error");
+            const errorText = await response.text();
+            console.error("OpenAI API Error:", errorText);
+            
+            // Si el error es de autenticación, limpiamos la caché para reintentar la próxima vez
+            if (response.status === 401) cachedApiKey = null;
+            
+            throw new Error(`Error ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
         return data.choices[0].message.content;
-
     } catch (error) {
-        console.error("OpenAI Error:", error);
-        throw error;
+        console.error("AI Service Error:", error);
+        return null;
     }
 };
 
 export const ai = {
   // --- CHAT GENERAL ---
   chat: async (messages: {role: 'system' | 'user' | 'assistant', content: string}[]) => {
-    try {
-      return await CALL_OPENAI(messages);
-    } catch (error) {
-      return "Error: No se pudo conectar con la IA. Verifica tu API Key en Ajustes.";
-    }
+      const response = await fetchOpenAI(messages);
+      return response || "Error de conexión con OpenAI o falta configurar la API Key.";
   },
 
   // --- AGENTE DE VENTAS ---
   salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
-      try {
-        let systemPrompt = `
-        Eres el Director Comercial Senior de "Algoritmia".
-        Objetivo: Ayudar a cerrar ventas high-ticket.
-        `;
+      let systemPrompt = `
+      Eres el Director Comercial Senior de "Algoritmia".
+      Objetivo: Ayudar a cerrar ventas high-ticket.
+      Sé conciso, persuasivo y profesional.
+      `;
 
-        let userPrompt = "";
+      let userPrompt = "";
 
-        if (mode === 'SCRIPT') {
-            userPrompt = `Genera un guion de ventas para: ${inputData.context}. Cliente: ${inputData.clientName}. Objetivo: ${inputData.goal}`;
-        } 
-        else if (mode === 'ANALYSIS') {
-            userPrompt = `Analiza esta respuesta del cliente: "${inputData.lastMessage}". Dame una estrategia y respuesta.`;
-        }
-
-        const messages = [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-        ];
-
-        return await CALL_OPENAI(messages);
-
-      } catch (error) {
-          return "Error consultando al experto en ventas.";
+      if (mode === 'SCRIPT') {
+          userPrompt = `Genera un guion de ventas para: ${inputData.context}. Cliente: ${inputData.clientName}. Rubro: ${inputData.industry || 'General'}. Objetivo: ${inputData.goal}`;
+      } 
+      else if (mode === 'ANALYSIS') {
+          userPrompt = `Analiza esta respuesta del cliente: "${inputData.lastMessage}". Dame una estrategia y respuesta sugerida.`;
       }
+
+      const messages = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+      ];
+
+      const response = await fetchOpenAI(messages);
+      return response;
   },
 
   // --- AGENTE DEL SISTEMA (Router & Ejecutor) ---
-  agent: async (userInput: string, contextHistory: any[] = [], currentData: { tasks: any[], projects: any[] }) => {
+  agent: async (userInput: string, contextHistory: any[] = [], currentData: { tasks: any[], projects: any[], services: any[], contractors: any[] }) => {
+      // 1. FECHA Y HORA ACTUAL
+      const now = new Date();
+      const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      
+      // 2. CONTEXT PRUNING
+      const activeTasks = currentData.tasks
+          .filter(t => t.status !== 'DONE')
+          .slice(0, 40)
+          .map(t => `ID:${t.id} | "${t.title}" | ${t.status} | Due:${t.dueDate?.slice(0,10) || 'N/A'}`)
+          .join('\n');
+
+      const activeProjects = currentData.projects
+          .filter(p => p.status === 'ACTIVE' || p.status === 'ONBOARDING')
+          .map(p => `ID:${p.id} | "${p.name}" | Rev:$${p.monthlyRevenue}`)
+          .join('\n');
+          
+      const servicesSummary = currentData.services.map(s => `- ${s.name} ($${s.baseCost})`).join('\n');
+      
+      const systemPrompt = `
+      Eres el "Sistema Operativo" de la agencia.
+      FECHA: ${localDate} | HORA: ${localTime}
+
+      BASE DE DATOS ACTIVA:
+      [TAREAS PENDIENTES]
+      ${activeTasks || "No hay tareas pendientes."}
+      [PROYECTOS]
+      ${activeProjects || "No hay proyectos activos."}
+      [SERVICIOS]
+      ${servicesSummary}
+
+      TU OBJETIVO:
+      1. Identificar la intención del usuario (Crear, Editar, Borrar, Consultar).
+      2. Si faltan datos clave (ej: fecha, cliente), PREGUNTA usando type "QUESTION".
+      3. Si tienes todo, genera la acción.
+
+      FORMATO JSON OBLIGATORIO:
+      
+      A) ACCIONES:
+      {
+          "type": "CONFIRM", 
+          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT",
+          "payload": {
+              "title": "Titulo",
+              "dueDate": "YYYY-MM-DDTHH:mm:00",
+              "id": "UUID (Solo para update/delete)"
+          }, 
+          "message": "Confirmación..."
+      }
+
+      B) PREGUNTAS:
+      {
+          "type": "QUESTION",
+          "message": "¿Pregunta?"
+      }
+
+      C) CHAT / CONSULTA:
+      {
+          "type": "CHAT",
+          "message": "Respuesta..."
+      }
+      
+      D) NAVEGACIÓN:
+      {
+          "type": "NAVIGATE",
+          "payload": "/tasks",
+          "message": "Vamos."
+      }
+      `;
+
+      // Preparamos historial simple
+      const apiMessages = [
+          { role: 'system', content: systemPrompt },
+          ...contextHistory.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          { role: 'user', content: userInput }
+      ];
+
+      const responseText = await fetchOpenAI(apiMessages, true);
+      
+      if (!responseText) {
+          return { type: "CHAT", message: "Error conectando con la IA." };
+      }
+
       try {
-        // INJECT PRECISE DATE CONTEXT
-        const now = new Date();
-        const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        
-        // Simplify Data for Context Window (Optimization)
-        const tasksSummary = currentData.tasks.map(t => `- [ID: ${t.id}] "${t.title}" (Status: ${t.status}, Priority: ${t.priority})`).join('\n');
-        const projectsSummary = currentData.projects.map(p => `- [ID: ${p.id}] "${p.name}"`).join('\n');
-
-        const systemPrompt = `
-        Eres el Sistema Operativo Inteligente de "Algoritmia OS". Tu objetivo es gestionar la agencia.
-        
-        CONTEXTO TEMPORAL:
-        - HOY: ${localDate} (${localTime})
-        
-        DATOS ACTUALES (Úsalos para buscar IDs si piden editar/borrar):
-        TAREAS ACTIVAS:
-        ${tasksSummary}
-        
-        PROYECTOS:
-        ${projectsSummary}
-
-        REGLAS DE COMPORTAMIENTO:
-        1. Si el usuario pide crear algo, hazlo directo (ACTION).
-        2. Si el usuario pide BORRAR o EDITAR algo existente:
-           - Busca el ID correcto en la lista de arriba.
-           - Si no estás 100% seguro de a qué tarea se refiere (ej: hay dos con nombre similar), devuelve "QUESTION" preguntando.
-           - Si la acción es BORRAR o un cambio drástico, devuelve "CONFIRM" para que el usuario apruebe.
-           - Si es una edición simple (ej: cambiar fecha), usa "ACTION".
-        3. Si no entiendes, PREGUNTA (QUESTION).
-
-        ACCIONES DISPONIBLES (Responde SOLO JSON):
-        
-        types:
-        - 'ACTION': Ejecutar inmediatamente.
-        - 'CONFIRM': Requiere botón de confirmación del usuario (Ideal para DELETE).
-        - 'QUESTION': Necesitas más información del usuario.
-        - 'NAVIGATE': Cambiar de página.
-        - 'CHAT': Charla normal.
-
-        actions (para type ACTION/CONFIRM):
-        - 'CREATE_TASK': { title, priority, dueDate? }
-        - 'UPDATE_TASK': { id, title?, status?, priority?, dueDate? } (Envía solo los campos a cambiar)
-        - 'DELETE_TASK': { id }
-        - 'CREATE_PROJECT': { name, monthlyRevenue }
-
-        FORMATO JSON RESPUESTA:
-        {
-            "type": "ACTION" | "CONFIRM" | "QUESTION" | "CHAT" | "NAVIGATE",
-            "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | null,
-            "payload": { ... },
-            "message": "Texto corto explicando qué vas a hacer o tu pregunta."
-        }
-        `;
-
-        const messages = [
-            { role: "system", content: systemPrompt },
-            ...contextHistory.map(m => ({ role: m.role, content: m.content })),
-            { role: "user", content: userInput }
-        ];
-
-        const responseText = await CALL_OPENAI(messages, true); // Enable JSON mode
-        
-        if (!responseText) throw new Error("No response from AI");
-        
-        // CLEANUP
-        const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanJson);
-
-      } catch (error) {
-          console.error("Agent Error", error);
-          return { type: "CHAT", message: "Error procesando solicitud. Verifica tu API Key en Ajustes." };
+          return JSON.parse(responseText);
+      } catch (e) {
+          console.error("Error parsing JSON from AI", e);
+          return { type: "CHAT", message: responseText };
       }
   }
 };

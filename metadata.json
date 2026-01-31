@@ -1,5 +1,7 @@
 {
   "name": "Algoritmia OS",
   "description": "Sistema operativo interno de agencia para generación de propuestas high-ticket y cálculo de márgenes.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }
