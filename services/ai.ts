@@ -1,12 +1,18 @@
 
 import { GoogleGenAI } from "@google/genai";
+import { db } from "./db";
 
 export const ai = {
   // --- CHAT GENERAL (Para la calculadora y asistentes simples) ---
   chat: async (messages: {role: 'system' | 'user' | 'assistant', content: string}[]) => {
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) return "Error: API Key no configurada.";
+      // 1. Try env var, 2. Try Database Settings
+      let apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === '""') {
+          apiKey = await db.settings.getApiKey() || "";
+      }
+
+      if (!apiKey) return "Error: API Key no configurada. Ve a Ajustes > Configuración.";
 
       const aiClient = new GoogleGenAI({ apiKey });
       
@@ -30,15 +36,19 @@ export const ai = {
       return response.text;
     } catch (error) {
       console.error("AI Error:", error);
-      return "Error de conexión con IA.";
+      return "Error de conexión con IA. Verifica tu API Key.";
     }
   },
 
   // --- AGENTE DE VENTAS (SALES COPILOT) ---
   salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS' | 'ROLEPLAY', inputData: any) => {
       try {
-        const apiKey = process.env.API_KEY;
+        let apiKey = process.env.API_KEY;
+        if (!apiKey || apiKey === '""') {
+            apiKey = await db.settings.getApiKey() || "";
+        }
         if (!apiKey) throw new Error("API Key missing");
+        
         const aiClient = new GoogleGenAI({ apiKey });
 
         let systemPrompt = `
@@ -87,14 +97,17 @@ export const ai = {
 
       } catch (error) {
           console.error("Sales Coach Error", error);
-          return "Error consultando al experto en ventas.";
+          return "Error consultando al experto en ventas. Verifica la API Key en Ajustes.";
       }
   },
 
   // --- AGENTE DEL SISTEMA (Router & Ejecutor) ---
   agent: async (userInput: string, contextHistory: any[] = []) => {
       try {
-        const apiKey = process.env.API_KEY;
+        let apiKey = process.env.API_KEY;
+        if (!apiKey || apiKey === '""') {
+            apiKey = await db.settings.getApiKey() || "";
+        }
         if (!apiKey) throw new Error("API Key missing");
 
         const aiClient = new GoogleGenAI({ apiKey });
@@ -153,7 +166,7 @@ export const ai = {
 
       } catch (error) {
           console.error("Agent Error", error);
-          return { type: "CHAT", message: "Lo siento, tuve un error procesando eso." };
+          return { type: "CHAT", message: "Lo siento, verifica que la API Key esté guardada en Ajustes." };
       }
   }
 };

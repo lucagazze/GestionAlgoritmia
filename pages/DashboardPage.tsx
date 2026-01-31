@@ -21,43 +21,6 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const QuickLink = ({ 
-  href, 
-  to, 
-  internal, 
-  icon: Icon, 
-  label, 
-  color, 
-  bg 
-}: { 
-  href?: string, 
-  to?: string, 
-  internal?: boolean, 
-  icon: any, 
-  label: string, 
-  color: string, 
-  bg: string 
-}) => {
-  const content = (
-    <div className="flex flex-col items-center gap-2 group cursor-pointer transition-transform hover:-translate-y-1">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border border-black/5 transition-all group-hover:scale-110 group-hover:shadow-md ${bg} ${color}`}>
-        <Icon className="w-6 h-6" />
-      </div>
-      <span className="text-xs font-medium text-gray-500 group-hover:text-black">{label}</span>
-    </div>
-  );
-
-  if (internal && to) {
-    return <Link to={to}>{content}</Link>;
-  }
-  
-  return (
-    <a href={href} target="_blank" rel="noreferrer" className="block">
-      {content}
-    </a>
-  );
-};
-
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -168,20 +131,7 @@ export default function DashboardPage() {
           </div>
       )}
 
-      {/* 3. Quick Launch Dock (Apple Style) */}
-      <div className="flex items-center justify-center">
-          <div className="glass-panel px-6 py-4 rounded-3xl flex items-center gap-6 shadow-2xl shadow-black/5 border border-white/50 overflow-x-auto max-w-full">
-              <QuickLink href="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=1015285380135120&business_id=1149946139536218&breakdown_regrouping=true&nav_source=no_referrer" icon={Facebook} label="Ads" color="text-blue-600" bg="bg-blue-50" />
-              <QuickLink href="https://drive.google.com/drive/u/0/my-drive" icon={HardDrive} label="Drive" color="text-green-600" bg="bg-green-50" />
-              <QuickLink href="https://algoritmiadesarrollos.com.ar/" icon={Globe} label="Web" color="text-indigo-600" bg="bg-indigo-50" />
-              <QuickLink href="https://www.canva.com/projects" icon={Palette} label="Canva" color="text-cyan-600" bg="bg-cyan-50" />
-              <div className="w-px h-8 bg-gray-200 mx-2"></div>
-              <QuickLink internal to="/tasks" icon={CheckCircle2} label="Tareas" color="text-gray-700" bg="bg-gray-100" />
-              <QuickLink internal to="/projects" icon={Briefcase} label="Clientes" color="text-gray-700" bg="bg-gray-100" />
-          </div>
-      </div>
-
-      {/* 4. Main Widgets Grid */}
+      {/* 3. Main Widgets Grid (Quick Links Removed) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left: Focus of the Day */}
