@@ -1,9 +1,10 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
 import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
-import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo } from 'lucide-react';
+import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb } from 'lucide-react';
 
 interface UndoPayload {
     undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT';
@@ -18,11 +19,16 @@ interface IWindow extends Window {
 
 export const AIActionCenter = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [placeholder, setPlaceholder] = useState("¿Qué hacemos hoy?");
+    
+    // Proactive Context State
+    const [activeContextData, setActiveContextData] = useState<any>(null);
+    const [quickChips, setQuickChips] = useState<{label: string, prompt: string}[]>([]);
     
     // Sessions State
     const [sessions, setSessions] = useState<AIChatSession[]>([]);
@@ -42,6 +48,40 @@ export const AIActionCenter = () => {
     const recognitionRef = useRef<any>(null);
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
+
+    // --- Context Awareness & Proactivity ---
+    useEffect(() => {
+        const checkContext = async () => {
+            const projectMatch = matchPath("/projects/:id", location.pathname);
+            if (projectMatch && projectMatch.params.id) {
+                // We are inside a project. Load it.
+                const projects = await db.projects.getAll();
+                const project = projects.find(p => p.id === projectMatch.params.id);
+                
+                if (project) {
+                    setActiveContextData({ type: 'PROJECT', data: project });
+                    
+                    // Generate Quick Chips based on missing data
+                    const chips = [];
+                    if (!project.industry) chips.push({ label: "Definir Rubro", prompt: `Ayúdame a definir el rubro para ${project.name}` });
+                    if (!project.contacts || project.contacts.length === 0) chips.push({ label: "Agregar Contacto", prompt: `Quiero agregar un contacto a ${project.name}` });
+                    if (project.status === 'ONBOARDING') chips.push({ label: "Iniciar Onboarding", prompt: `Genera una lista de tareas de onboarding para ${project.name}` });
+                    chips.push({ label: "¿Resumen?", prompt: `¿Qué es lo último que pasó con ${project.name}?` });
+                    
+                    setQuickChips(chips);
+                    setPlaceholder(`Pregunta sobre ${project.name}...`);
+                }
+            } else {
+                setActiveContextData(null);
+                setQuickChips([
+                    { label: "Nuevo Cliente", prompt: "Nuevo Cliente" },
+                    { label: "Agendar Tarea", prompt: "Agendar Tarea" }
+                ]);
+                setPlaceholder("¿Qué hacemos hoy?");
+            }
+        };
+        checkContext();
+    }, [location.pathname]);
 
     // --- Initial Load ---
     useEffect(() => { loadSessions(); }, [isOpen]);
@@ -94,10 +134,21 @@ export const AIActionCenter = () => {
                     status: TaskStatus.TODO,
                     priority: payload.priority || 'MEDIUM',
                     dueDate: payload.dueDate || payload.due || null, 
-                    description: payload.description || 'AI Generated'
+                    description: payload.description || 'AI Generated',
+                    projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId // Auto-assign if in context
                 });
                 window.dispatchEvent(new Event('task-created'));
                 return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea' } };
+            }
+            if (actionType === 'UPDATE_PROJECT') {
+                // If context is active, update THAT project
+                const targetId = payload.id || (activeContextData?.type === 'PROJECT' ? activeContextData.data.id : null);
+                if (!targetId) return { success: false };
+                
+                await db.projects.update(targetId, payload);
+                // Force reload of page if we are on it
+                if (activeContextData?.type === 'PROJECT') window.location.reload(); 
+                return { success: true };
             }
             if (actionType === 'UPDATE_TASK') {
                 if (!payload.id) return { success: false };
@@ -120,7 +171,6 @@ export const AIActionCenter = () => {
                     billingDay: 1,
                     status: ProjectStatus.ONBOARDING
                 });
-                window.dispatchEvent(new Event('project-created'));
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
             return { success: false };
@@ -136,7 +186,6 @@ export const AIActionCenter = () => {
             else if (undoData.undoType === 'DELETE_PROJECT') await db.projects.delete(undoData.data.id);
             
             window.dispatchEvent(new Event('task-created'));
-            window.dispatchEvent(new Event('project-created'));
             await db.chat.markUndone(msg.id);
             if (currentSessionId) {
                 await db.chat.addMessage(currentSessionId, 'assistant', `✅ Deshice esa acción.`);
@@ -177,7 +226,22 @@ export const AIActionCenter = () => {
             const [tasks, projects, services, contractors] = await Promise.all([
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
-            const response = await ai.agent(userText, await db.chat.getMessages(sessionId), { tasks, projects, services, contractors }, controller.signal);
+            
+            // INJECT CONTEXT INTO PROMPT
+            let contextPrompt = "";
+            if (activeContextData?.type === 'PROJECT') {
+                const p = activeContextData.data;
+                contextPrompt = `ESTÁS VIENDO EL PROYECTO: ID=${p.id}, Nombre="${p.name}", Rubro="${p.industry}", Fee=$${p.monthlyRevenue}. 
+                Si el usuario dice "actualiza el rubro a X", usa UPDATE_PROJECT con id=${p.id}. 
+                Si dice "agrega tarea", asocia projectId=${p.id}.`;
+            }
+
+            const response = await ai.agent(
+                contextPrompt + "\n" + userText, 
+                await db.chat.getMessages(sessionId), 
+                { tasks, projects, services, contractors }, 
+                controller.signal
+            );
             
             if (!response) { setIsThinking(false); return; }
             
@@ -281,6 +345,11 @@ export const AIActionCenter = () => {
                         {viewMode === 'HISTORY' && <button onClick={() => setViewMode('CHAT')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><CornerDownLeft className="w-4 h-4" /></button>}
                         <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">{viewMode === 'HISTORY' ? 'Historial' : sessions.find(s => s.id === currentSessionId)?.title || 'Nueva Conversación'}</span>
                     </div>
+                    {activeContextData && (
+                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
+                            <Lightbulb className="w-3 h-3" /> Contexto: {activeContextData.data.name}
+                        </div>
+                    )}
                     <button onClick={startNewChat} className="text-[10px] bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-gray-800"><Plus className="w-3 h-3"/> Nuevo</button>
                  </div>
                  
@@ -300,7 +369,7 @@ export const AIActionCenter = () => {
                         {messages.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2 opacity-50">
                                 <Sparkles className="w-10 h-10" />
-                                <p className="text-xs">Soy tu Segundo Cerebro. ¿Qué hacemos hoy?</p>
+                                <p className="text-xs">Soy tu Segundo Cerebro. {activeContextData ? `Hablemos de ${activeContextData.data.name}.` : "¿Qué hacemos hoy?"}</p>
                             </div>
                         )}
                         {messages.map((msg, idx) => (
@@ -339,12 +408,11 @@ export const AIActionCenter = () => {
             {/* Quick Prompts (Chips) */}
             {isOpen && !isThinking && !input && viewMode === 'CHAT' && messages.length === 0 && (
                 <div className="absolute bottom-full mb-4 left-0 w-full flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar animate-in slide-in-from-bottom-2">
-                    <button onClick={() => handleSend("Nuevo Cliente")} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
-                        <UserPlus className="w-3.5 h-3.5" /> Nuevo Cliente
-                    </button>
-                    <button onClick={() => handleSend("Agendar Tarea")} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
-                        <ListTodo className="w-3.5 h-3.5" /> Nueva Tarea
-                    </button>
+                    {quickChips.map((chip, idx) => (
+                        <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
+                            <Sparkles className="w-3 h-3 text-yellow-500" /> {chip.label}
+                        </button>
+                    ))}
                 </div>
             )}
 

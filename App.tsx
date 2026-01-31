@@ -5,6 +5,7 @@ import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, 
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 import TasksPage from './pages/TasksPage';
 import DashboardPage from './pages/DashboardPage';
 import PartnersPage from './pages/PartnersPage';
@@ -50,7 +51,7 @@ const Sidebar = ({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolea
   ];
 
   const NavItem: React.FC<{ path: string, icon: React.ReactNode, label: string, color: string }> = ({ path, icon, label, color }) => {
-    const isActive = location.pathname === path;
+    const isActive = location.pathname === path || (path === '/projects' && location.pathname.includes('/projects/'));
     return (
       <Link 
         to={path} 
@@ -166,6 +167,7 @@ const MainLayout = () => {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/calculator" element={<CalculatorPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/partners" element={<PartnersPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/services" element={<ServicesPage />} />
