@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Card, CardContent, CardHeader, CardTitle, Input, Button, Label } from '../components/UIComponents';
-import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow } from 'lucide-react';
+import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow, CalendarCheck } from 'lucide-react';
 
 export default function SettingsPage() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
+    const [oauthClientId, setOauthClientId] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -21,6 +22,9 @@ export default function SettingsPage() {
             setLoading(true);
             const key = await db.settings.getApiKey('google_api_key');
             if (key) setApiKey(key);
+            
+            const clientId = await db.settings.getApiKey('google_oauth_client_id');
+            if (clientId) setOauthClientId(clientId);
         } catch (e) {
             console.error("Error loading settings", e);
         } finally {
@@ -29,15 +33,16 @@ export default function SettingsPage() {
     };
 
     const handleSave = async () => {
-        if (!apiKey.trim()) return;
         setSaving(true);
         try {
-            await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
+            if (apiKey.trim()) await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
+            if (oauthClientId.trim()) await db.settings.setApiKey(oauthClientId.trim(), 'google_oauth_client_id');
+            
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (e) {
             console.error("Error saving settings", e);
-            alert("Error guardando la clave. Asegúrate de correr el Script de Base de Datos de abajo.");
+            alert("Error guardando claves.");
         } finally {
             setSaving(false);
         }
@@ -167,60 +172,59 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {/* Google API Key */}
+                 {/* Google API Key (GEMINI) */}
                 <Card className="border-indigo-100 dark:border-indigo-900/50 shadow-lg shadow-indigo-500/5 overflow-visible">
                     <CardHeader className="bg-gradient-to-r from-indigo-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-indigo-100 dark:border-slate-800">
                         <CardTitle className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
-                            <Key className="w-5 h-5 text-indigo-600" /> Inteligencia Artificial
+                            <Key className="w-5 h-5 text-indigo-600" /> Inteligencia Artificial (Gemini)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 rounded-xl p-4 flex gap-3 text-sm text-blue-800 dark:text-blue-200">
-                            <ShieldCheck className="w-5 h-5 flex-shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
-                            <div>
-                                <p className="font-bold">Conexión Segura</p>
-                                <p className="opacity-90 mt-1">
-                                    Tu clave de API se guarda en la base de datos (Supabase). Usamos <strong>Gemini 3 Flash</strong> para máximo rendimiento.
-                                </p>
-                            </div>
-                        </div>
-
                         <div className="space-y-3">
                             <Label>Google Gemini API Key</Label>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <Input 
-                                        type="password" 
-                                        value={apiKey} 
-                                        onChange={(e) => setApiKey(e.target.value)} 
-                                        placeholder="AIzaSy..." 
-                                        className="pr-10 font-mono text-sm"
-                                    />
-                                    {loading && (
-                                        <div className="absolute right-3 top-3">
-                                            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                                        </div>
-                                    )}
-                                </div>
-                                <Button onClick={handleSave} disabled={saving || loading} className="min-w-[120px]">
-                                    {saving ? <Loader2 className="animate-spin w-4 h-4" /> : success ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Save className="w-4 h-4 mr-2" />}
-                                    {success ? "Guardado" : "Guardar"}
-                                </Button>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">Si ya configuraste el archivo .env, esa clave se usará como respaldo.</p>
+                            <Input 
+                                type="password" 
+                                value={apiKey} 
+                                onChange={(e) => setApiKey(e.target.value)} 
+                                placeholder="AIzaSy..." 
+                                className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-gray-400">Usado para el Copiloto de Ventas y el Asistente.</p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Automation Shortcuts */}
-                <Card className="border-purple-100 dark:border-purple-900/30 flex flex-col justify-center items-center text-center p-6 bg-gradient-to-b from-purple-50/50 to-white dark:from-slate-800 dark:to-slate-900">
-                    <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
-                        <Workflow className="w-8 h-8" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Motor de Automatizaciones</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-6">Configura recetas "If This Then That" para que tu agencia funcione en piloto automático.</p>
-                    <Button onClick={() => navigate('/automations')} className="bg-purple-600 hover:bg-purple-700 text-white w-full">Configurar Recetas</Button>
+                {/* Google OAuth (CALENDAR) */}
+                <Card className="border-blue-100 dark:border-blue-900/50 shadow-lg shadow-blue-500/5">
+                    <CardHeader className="bg-gradient-to-r from-blue-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-blue-100 dark:border-slate-800">
+                        <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-200">
+                            <CalendarCheck className="w-5 h-5 text-blue-600" /> Google Calendar API
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                        <div className="space-y-3">
+                            <Label>OAuth Client ID (Web)</Label>
+                            <Input 
+                                type="text" 
+                                value={oauthClientId} 
+                                onChange={(e) => setOauthClientId(e.target.value)} 
+                                placeholder="123...apps.googleusercontent.com" 
+                                className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-gray-400">
+                                Requerido para sincronizar tareas con el calendario. <br/>
+                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="underline text-blue-500">Obtener en Google Cloud Console</a>
+                            </p>
+                        </div>
+                    </CardContent>
                 </Card>
+            </div>
+
+            <div className="flex justify-end">
+                <Button onClick={handleSave} disabled={saving || loading} className="min-w-[150px] shadow-xl">
+                    {saving ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : success ? <CheckCircle className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    {success ? "Configuración Guardada" : "Guardar Todo"}
+                </Button>
             </div>
 
             <Card className="border-red-100 dark:border-red-900/30">

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
+import { googleCalendarService } from '../services/googleCalendar';
 import { Task, TaskStatus, Contractor, SOP } from '../types';
 import { Button, Input, Label, Modal, Textarea, Badge } from '../components/UIComponents';
 import { ContextMenu, ContextMenuItem } from '../components/ContextMenu';
@@ -24,7 +25,12 @@ import {
   LayoutGrid,
   Sun,
   MessageCircle,
-  Book
+  Book,
+  Smartphone,
+  Share2,
+  Download,
+  CalendarCheck,
+  RefreshCw
 } from 'lucide-react';
 
 // View Modes
@@ -49,6 +55,7 @@ export default function TasksPage() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; task: Task | null }>({ x: 0, y: 0, task: null });
 
   const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [formData, setFormData] = useState<{
     id?: string;
@@ -73,6 +80,8 @@ export default function TasksPage() {
     loadData();
     const handleTaskCreated = () => { loadData(); };
     window.addEventListener('task-created', handleTaskCreated);
+    // Init Google Scripts
+    googleCalendarService.loadScripts().catch(err => console.error("Could not load Google Scripts", err));
     return () => { window.removeEventListener('task-created', handleTaskCreated); };
   }, []);
 
@@ -144,6 +153,97 @@ export default function TasksPage() {
       const message = `Hola ${partner.name.split(' ')[0]}, te recuerdo esta tarea pendiente: *${task.title}*.\n\n${task.description ? 'Detalles: ' + task.description : ''}\n\nAvísame cuando esté lista!`;
       const url = `https://wa.me/${partner.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
       window.open(url, '_blank');
+  };
+
+  // --- CALENDAR SYNC FUNCTIONS ---
+  
+  const formatDateForCalendar = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  };
+
+  const handleGoogleSync = async () => {
+      // 1. Get Pending Tasks
+      const pendingTasks = tasks.filter(t => t.status !== TaskStatus.DONE && t.dueDate);
+      if (pendingTasks.length === 0) return alert("No hay tareas pendientes con fecha para sincronizar.");
+
+      setIsSyncing(true);
+      try {
+          // 2. Auth with Google
+          await googleCalendarService.authenticate();
+          
+          let count = 0;
+          // 3. Loop and Create
+          for (const t of pendingTasks) {
+              if (!t.dueDate) continue;
+              const start = new Date(t.dueDate);
+              const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour default
+
+              await googleCalendarService.createEvent({
+                  title: `[OS] ${t.title}`,
+                  description: t.description || 'Tarea sincronizada desde Algoritmia OS',
+                  startTime: start.toISOString(),
+                  endTime: end.toISOString()
+              });
+              count++;
+          }
+          alert(`¡Éxito! Se han sincronizado ${count} tareas a tu Google Calendar.`);
+      } catch (e: any) {
+          console.error(e);
+          if (e.message?.includes("client_id")) {
+              alert("Falta configurar el 'OAuth Client ID' en la página de Ajustes.");
+          } else {
+              alert("Error al sincronizar. Revisa la consola o asegúrate de habilitar los popups.");
+          }
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
+  const handleBatchExportICS = () => {
+      // Filter: Only Pending tasks with Due Dates
+      const validTasks = tasks.filter(t => t.status !== TaskStatus.DONE && t.dueDate);
+      
+      if (validTasks.length === 0) {
+          alert("No hay tareas pendientes con fecha asignada para exportar.");
+          return;
+      }
+
+      const now = formatDateForCalendar(new Date().toISOString());
+      let icsBody = "";
+
+      validTasks.forEach(t => {
+          if (!t.dueDate) return;
+          const start = formatDateForCalendar(t.dueDate);
+          const endDate = new Date(new Date(t.dueDate).getTime() + 60 * 60 * 1000);
+          const end = formatDateForCalendar(endDate.toISOString());
+          const cleanDesc = (t.description || "").replace(/\n/g, "\\n").replace(/,/g, "\\,");
+
+          icsBody += `BEGIN:VEVENT
+UID:${t.id}@algoritmia.os
+DTSTAMP:${now}
+DTSTART:${start}
+DTEND:${end}
+SUMMARY:${t.title}
+DESCRIPTION:${cleanDesc}
+END:VEVENT
+`;
+      });
+
+      const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Algoritmia OS//Batch//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+${icsBody}END:VCALENDAR`;
+
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.setAttribute('download', `Agenda_Algoritmia_${new Date().toISOString().slice(0,10)}.ics`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
   };
 
   const handleDoubleClickDate = (date: Date, hour?: number) => {
@@ -572,7 +672,21 @@ export default function TasksPage() {
         </div>
         <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
              <div className="relative flex-1 xl:w-64"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400 dark:text-gray-500" /><Input placeholder="Buscar..." className="pl-9 h-9 text-sm bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-            <Button onClick={openCreateModal} className="h-9 shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-3.5 h-3.5 mr-2" /> Nueva</Button>
+             
+             {/* SYNC ACTIONS */}
+             <div className="flex gap-2">
+                 <Button onClick={handleGoogleSync} disabled={isSyncing} className="h-9 bg-white dark:bg-slate-800 text-black dark:text-white border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 shadow-sm">
+                     {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CalendarCheck className="w-3.5 h-3.5" />}
+                     <span className="hidden lg:inline ml-2 text-xs">Sincronizar Google</span>
+                 </Button>
+                 
+                 <Button onClick={handleBatchExportICS} className="h-9 bg-white dark:bg-slate-800 text-black dark:text-white border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 shadow-sm">
+                     <Download className="w-3.5 h-3.5" />
+                     <span className="hidden lg:inline ml-2 text-xs">Exportar iCal</span>
+                 </Button>
+
+                 <Button onClick={openCreateModal} className="h-9 shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-3.5 h-3.5 mr-2" /> Nueva</Button>
+             </div>
         </div>
       </div>
 
