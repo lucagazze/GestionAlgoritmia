@@ -17,6 +17,12 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
   return data || [];
 };
 
+interface UndoPayload {
+    undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT' | 'RESTORE_TASKS';
+    data: any;
+    description: string;
+}
+
 // --- AUTOMATION ENGINE HELPER ---
 const runAutomations = async (triggerType: 'PROJECT_STATUS_CHANGE' | 'NEW_PROJECT', project: Project, triggerValue?: string) => {
     try {
@@ -380,6 +386,15 @@ export const db = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from('Task').delete().eq('id', id);
       if (error) throw error;
+    },
+    deleteMany: async (ids: string[]): Promise<void> => {
+      const { error } = await supabase.from('Task').delete().in('id', ids);
+      if (error) throw error;
+    },
+    getMany: async (ids: string[]): Promise<Task[]> => {
+      const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').in('id', ids);
+      if (error) return [];
+      return data as Task[];
     }
   },
 

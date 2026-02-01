@@ -115,7 +115,8 @@ export interface Task {
   description?: string;
   status: TaskStatus;
   projectId?: string;
-  dueDate?: string;
+  dueDate?: string; // Start time
+  endTime?: string; // End time (optional)
   priority?: 'LOW' | 'MEDIUM' | 'HIGH';
   assigneeId?: string;
   assignee?: Contractor; 

@@ -35,7 +35,7 @@ import {
 } from 'lucide-react';
 
 // View Modes
-type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR';
+type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR' | 'LIST';
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -48,6 +48,7 @@ export default function TasksPage() {
   
   const [referenceDate, setReferenceDate] = useState(new Date()); 
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -332,16 +333,31 @@ export default function TasksPage() {
       e.preventDefault();
       const taskId = e.dataTransfer.getData('taskId');
       setDragOverSlot(null);
+      setDraggingTaskId(null);
       if (taskId) {
           const task = tasks.find(t => t.id === taskId);
-          if (task) {
-              const newDate = new Date(slotDate);
-              newDate.setHours(12, 0, 0, 0); 
-              const newIso = newDate.toISOString();
-              
-              await db.tasks.update(taskId, { dueDate: newIso });
-              await loadData();
-          }
+            if (task) {
+                const originalDate = new Date(task.dueDate || new Date());
+                const newDate = new Date(slotDate);
+
+                // If dropping on a specific time slot (Day/Week view), slotDate already has the time.
+                // If dropping on a Month View cell, slotDate is 00:00. We should preserve original time.
+                // We detect Month drop because slotDate hours are 0 usually, OR we pass a flag. 
+                // Better heuristic: Check viewMode. 
+                // If CALENDAR (Month), preserve original time.
+                // If WEEK/TODAY, use the slot time (which is passed as slotDate).
+                
+                if (viewMode === 'CALENDAR') {
+                    newDate.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
+                } else {
+                    // In TimeGrid, slotDate already includes the specific hour logic context
+                }
+                
+                const newIso = newDate.toISOString();
+                
+                await db.tasks.update(taskId, { dueDate: newIso });
+                await loadData();
+            }
       }
   };
 
@@ -391,6 +407,85 @@ export default function TasksPage() {
       });
 
       return { dayTasks, dayGoogle };
+  };
+
+  // --- LIST VIEW RENDERER ---
+  const renderListView = () => {
+      // Sort upcoming tasks
+      const sorted = [...filteredTasks].sort((a, b) => {
+          const dA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+          const dB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+          return dA - dB;
+      });
+
+      return (
+          <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-6">
+              <div className="max-w-4xl mx-auto space-y-4">
+                  {sorted.map(task => (
+                      <div key={task.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl hover:shadow-md transition-all">
+                          <div className="flex-shrink-0 w-16 text-center">
+                              <div className="text-xs font-bold text-gray-400 uppercase">
+                                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES', { month: 'short' }) : '-'}
+                              </div>
+                              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                                  {task.dueDate ? new Date(task.dueDate).getDate() : '-'}
+                              </div>
+                          </div>
+                          
+                          <div className={`w-1 h-12 rounded-full ${
+                              task.status === TaskStatus.DONE ? 'bg-green-500' :
+                              task.priority === 'HIGH' ? 'bg-red-500' : 
+                              'bg-blue-500'
+                          }`}></div>
+
+                          <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                  <h3 className={`font-semibold text-lg truncate ${task.status === TaskStatus.DONE ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                                      {task.title}
+                                  </h3>
+                                  {task.googleEventId && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-50" />}
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                                  <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3"/>
+                                      {task.dueDate ? new Date(task.dueDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Sin hora'}
+                                  </span>
+                                  {task.assignee && (
+                                      <span className="flex items-center gap-1">
+                                          <User className="w-3 h-3"/> {task.assignee.name}
+                                      </span>
+                                  )}
+                              </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleEdit(task)}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+                              >
+                                  <Edit2 className="w-4 h-4 text-gray-500"/>
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDelete(task)}
+                                className="h-8 w-8 p-0 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                  <Trash2 className="w-4 h-4 text-red-500"/>
+                              </Button>
+                          </div>
+                      </div>
+                  ))}
+                  {sorted.length === 0 && (
+                      <div className="text-center py-20 text-gray-400">
+                          <p>No hay tareas pendientes.</p>
+                      </div>
+                  )}
+              </div>
+          </div>
+      );
   };
 
   // --- TIME GRID RENDERER (Day/Week) ---
@@ -492,7 +587,7 @@ export default function TasksPage() {
                                   {/* Vertical Hour Lines (Subtle) */}
                                    <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
 
-                                  {/* Render Tasks */}
+                                   {/* Render Tasks */}
                                   {[...dayTasks, ...dayGoogle].map((item: any) => {
                                       let start: Date, id: string, title: string, isGoogle = false;
                                       
@@ -517,7 +612,16 @@ export default function TasksPage() {
                                               onClick={(e) => { e.stopPropagation(); !isGoogle && handleEdit(item); }}
                                               onContextMenu={(e) => !isGoogle && handleContextMenu(e, item)}
                                               draggable={!isGoogle}
-                                              onDragStart={(e) => !isGoogle && e.dataTransfer.setData('taskId', id)}
+                                               onDragStart={(e) => {
+                                                   if (!isGoogle) {
+                                                       e.dataTransfer.setData('taskId', id);
+                                                       setDraggingTaskId(id);
+                                                   }
+                                               }}
+                                               onDragEnd={() => {
+                                                   setDraggingTaskId(null);
+                                                   setDragOverSlot(null);
+                                               }}
                                               className={`
                                                   absolute left-1 right-2 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
                                                   ${isGoogle 
@@ -707,8 +811,8 @@ export default function TasksPage() {
         {/* Right: Controls */}
         <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
              {/* View Switcher */}
-             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex w-full md:w-auto">
-                 {([['TODAY', 'Día'], ['WEEK', 'Semana'], ['CALENDAR', 'Mes']] as const).map(([mode, label]) => (
+            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex w-full md:w-auto">
+                {([['TODAY', 'Día'], ['WEEK', 'Semana'], ['CALENDAR', 'Mes'], ['LIST', 'Lista']] as const).map(([mode, label]) => (
                      <button 
                         key={mode}
                         onClick={() => setViewMode(mode as ViewMode)} 
@@ -738,7 +842,9 @@ export default function TasksPage() {
       </div>
 
       {/* Content */}
-      {viewMode === 'CALENDAR' ? renderCalendar() : renderTimeGrid()}
+      {viewMode === 'CALENDAR' && renderCalendar()}
+      {viewMode === 'LIST' && renderListView()}
+      {(viewMode === 'WEEK' || viewMode === 'TODAY') && renderTimeGrid()}
 
       {/* Edit/Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'Editar Tarea' : 'Nueva Tarea'}>

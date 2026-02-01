@@ -4,16 +4,23 @@ import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
 import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
-import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform, ExternalLink } from 'lucide-react';
+import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform, ExternalLink, Info } from 'lucide-react';
+import { ActionDetailsModal } from './ActionDetailsModal';
 
 interface UndoPayload {
-    undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT';
+    undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT' | 'RESTORE_TASKS';
     data: any;
     description: string;
 }
 
 // --- MESSAGE RENDERER COMPONENT ---
-const MessageRenderer = ({ content, role }: { content: string, role: 'user' | 'assistant' }) => {
+const MessageRenderer = ({ content, role, entities, onShowDetails }: { 
+    content: string, 
+    role: 'user' | 'assistant',
+    entities?: Array<{type: string, id: string, name: string}>,
+    onShowDetails?: () => void
+}) => {
+    const navigate = useNavigate();
     // 1. Split by new lines to handle paragraphs and lists
     const lines = content.split('\n');
 
@@ -26,9 +33,9 @@ const MessageRenderer = ({ content, role }: { content: string, role: 'user' | 'a
                 const isBullet = line.trim().startsWith('-');
                 const cleanLine = isBullet ? line.trim().substring(1).trim() : line;
 
-                // 3. Parse Bold (**) and Links [text](url)
+                // 3. Parse Bold (**), Links [text](url), and [Ver Detalles] buttons
                 // We split by a regex that captures both bold and link patterns
-                const parts = cleanLine.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/g);
+                const parts = cleanLine.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\)|\[Ver Detalles\]|\[Ver Lista Completa\])/g);
 
                 return (
                     <div key={lineIdx} className={`${isBullet ? 'flex gap-2 ml-1' : ''}`}>
@@ -60,12 +67,41 @@ const MessageRenderer = ({ content, role }: { content: string, role: 'user' | 'a
                                         </a>
                                     );
                                 }
+                                // Handle [Ver Detalles] button
+                                if (part === '[Ver Detalles]' || part === '[Ver Lista Completa]') {
+                                    return (
+                                        <button
+                                            key={partIdx}
+                                            onClick={onShowDetails}
+                                            className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-colors mx-1 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200"
+                                        >
+                                            <Info className="w-3 h-3" /> {part.replace(/[\[\]]/g, '')}
+                                        </button>
+                                    );
+                                }
                                 return <span key={partIdx}>{part}</span>;
                             })}
                         </p>
                     </div>
                 );
             })}
+                {/* Entity Chips */}
+                {entities && entities.length > 0 && (
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                        {entities.map((entity, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => {
+                                    if (entity.type === 'CLIENT') navigate(`/projects/${entity.id}`);
+                                    if (entity.type === 'CONTRACTOR') navigate(`/team`);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+                            >
+                                {entity.type === 'CLIENT' ? '👤' : '👥'} {entity.name} →
+                            </button>
+                        ))}
+                    </div>
+                )}
         </div>
     );
 };
@@ -101,6 +137,14 @@ export const AIActionCenter = () => {
     const [pendingAction, setPendingAction] = useState<{type: string, payload: any} | null>(null);
     const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
     const [decisionOptions, setDecisionOptions] = useState<{label: string, action: string, payload: any}[] | null>(null);
+    
+    // Action Details Modal State
+    const [detailsModal, setDetailsModal] = useState<{
+        isOpen: boolean;
+        actionType: 'DELETE' | 'CREATE' | 'UPDATE';
+        items: Array<{id: string, title: string, subtitle?: string, metadata?: any}>;
+        messageId?: string;
+    }>({ isOpen: false, actionType: 'DELETE', items: [] });
 
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -176,19 +220,21 @@ export const AIActionCenter = () => {
         return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     };
 
-    const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload, error?: string }> => {
+    const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload, error?: string, details?: any[] }> => {
         try {
             console.log("Executing Action:", actionType, payload);
             
             if (actionType === 'CREATE_TASK') {
-                const safeTitle = payload.title || payload.description?.slice(0, 30) || "Tarea sin título";
                 const newTask = await db.tasks.create({
-                    title: safeTitle,
-                    status: TaskStatus.TODO,
+                    title: payload.title || "Nueva Tarea",
+                    description: payload.description || "",
+                    status: payload.status || TaskStatus.TODO,
+                    dueDate: payload.dueDate || new Date().toISOString(),
+                    endTime: payload.endTime, // Support for time ranges
                     priority: payload.priority || 'MEDIUM',
-                    dueDate: payload.dueDate || payload.due || null, 
-                    description: payload.description || '',
-                    projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
+                    assigneeId: payload.assigneeId,
+                    projectId: payload.projectId,
+                    sopId: payload.sopId
                 });
                 window.dispatchEvent(new Event('task-created'));
                 return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' } };
@@ -209,6 +255,21 @@ export const AIActionCenter = () => {
                 if (!payload.id) return { success: false, error: 'Falta ID del proyecto' };
                 await db.projects.delete(payload.id);
                 return { success: true };
+            }
+            if (actionType === 'DELETE_TASKS') {
+                if (!payload.ids || payload.ids.length === 0) return { success: false, error: 'Falta lista de IDs' };
+                // Fetch first for Undo
+                const tasksToRestore = await db.tasks.getMany(payload.ids);
+                await db.tasks.deleteMany(payload.ids);
+                window.dispatchEvent(new Event('task-created'));
+                return { 
+                    success: true, 
+                    undo: { 
+                        undoType: 'RESTORE_TASKS', 
+                        data: tasksToRestore, 
+                        description: `Restaurar ${payload.ids.length} tareas` 
+                    } 
+                };
             }
             if (actionType === 'CREATE_PROJECT') {
                 const newProject = await db.projects.create({
@@ -239,6 +300,14 @@ export const AIActionCenter = () => {
         try {
             if (undoData.undoType === 'DELETE_TASK') await db.tasks.delete(undoData.data.id);
             else if (undoData.undoType === 'DELETE_PROJECT') await db.projects.delete(undoData.data.id);
+            else if (undoData.undoType === 'RESTORE_TASKS') {
+                // Bulk Insert
+                const tasks = undoData.data.map((t: any) => {
+                    const { id, assignee, ...rest } = t; // remove relations if any
+                    return rest;
+                });
+                for(const t of tasks) await db.tasks.create(t);
+            }
             
             window.dispatchEvent(new Event('task-created'));
             await db.chat.markUndone(msg.id);
@@ -363,17 +432,35 @@ export const AIActionCenter = () => {
                     if(res.success) successCount++;
                     else failError = res.error || 'Error desconocido';
                 }
-                finalMessage = successCount > 0 ? `✅ Ejecuté ${successCount} acciones.` : `❌ Falló: ${failError}`;
+                finalMessage = successCount > 0 ? `✅ Ejecuté **${successCount} acciones**.` : `❌ Falló: ${failError}`;
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
             }
             else if (response.type === 'DECISION') {
-                setDecisionOptions(response.options);
+                setDecisionOptions(response.options || []);
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
+            }
+            else if (response.type === 'QUESTION') {
+                // AI is asking for clarification
+                await db.chat.addMessage(sessionId, 'assistant', `❓ ${response.message}\n\n_${response.context || 'Necesito esta información para continuar.'}_`);
             }
             else if (response.type === 'ACTION') {
                 const result = await executeAction(response.action, response.payload);
                 if (result.success) {
-                    await db.chat.addMessage(sessionId, 'assistant', finalMessage, { type: response.action, payload: result.undo });
+                    // Store details and entities in message metadata
+                    const metadata: any = { type: response.action, payload: result.undo };
+                    
+                    // Use details from executeAction if available, otherwise from AI response
+                    const actionDetails = result.details || response.details;
+                    if (actionDetails) metadata.details = actionDetails;
+                    if (response.entities) metadata.entities = response.entities;
+                    
+                    // Enhance message with [Ver Detalles] if bulk action
+                    let enhancedMessage = finalMessage;
+                    if (actionDetails && actionDetails.length > 0) {
+                        enhancedMessage += ` [Ver Detalles]`;
+                    }
+                    
+                    await db.chat.addMessage(sessionId, 'assistant', enhancedMessage, metadata);
                 } else {
                     await db.chat.addMessage(sessionId, 'assistant', `❌ No pude hacerlo: ${result.error || 'Error desconocido.'}`);
                 }
@@ -438,19 +525,43 @@ export const AIActionCenter = () => {
                                 <p className="text-xs">Soy tu Segundo Cerebro. {activeContextData ? `Hablemos de ${activeContextData.data.name}.` : "¿Qué ordenamos hoy?"}</p>
                             </div>
                         )}
-                        {messages.map((msg, idx) => (
-                            <div key={msg.id || idx} className={`flex flex-col max-w-[95%] md:max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
-                                <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
-                                    <MessageRenderer content={msg.content} role={msg.role} />
-                                </div>
+                         {messages.map((msg, idx) => {
+                             const metadata = msg.action_payload as any;
+                             const entities = metadata?.entities;
+                             const details = metadata?.details;
+                             
+                             return (
+                             <div key={msg.id || idx} className={`flex flex-col max-w-[95%] md:max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
+                                     <MessageRenderer 
+                                         content={msg.content} 
+                                         role={msg.role} 
+                                         entities={entities}
+                                         onShowDetails={details ? () => {
+                                             setDetailsModal({
+                                                 isOpen: true,
+                                                 actionType: metadata.type?.includes('DELETE') ? 'DELETE' : metadata.type?.includes('CREATE') ? 'CREATE' : 'UPDATE',
+                                                 items: details.map((d: any) => ({
+                                                     id: d.id,
+                                                     type: 'TASK' as const,
+                                                     title: d.title,
+                                                     subtitle: d.dueDate ? new Date(d.dueDate).toLocaleString('es-ES') : undefined,
+                                                     metadata: { Prioridad: d.priority, Estado: d.status }
+                                                 })),
+                                                 messageId: msg.id
+                                             });
+                                         } : undefined}
+                                     />
+                                 </div>
                                 <div className="flex items-center gap-2 mt-1 px-1">
                                     <span className="text-[10px] text-gray-300">{formatTime(msg.created_at)}</span>
                                     {msg.role === 'assistant' && msg.action_payload && !msg.is_undone && (
                                         <button onClick={() => handleUndoMessage(msg)} className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 px-2 py-0.5 rounded-full border border-gray-100"><RotateCcw className="w-2.5 h-2.5" /> Deshacer</button>
                                     )}
-                                </div>
-                            </div>
-                        ))}
+                                 </div>
+                             </div>
+                         );
+                         })}
                         {decisionOptions && (
                             <div className="self-start w-[95%] md:w-[85%] grid gap-2 animate-in slide-in-from-left-4">
                                 <p className="text-xs text-gray-400 font-bold ml-1 uppercase">Opciones:</p>
@@ -496,6 +607,19 @@ export const AIActionCenter = () => {
                      {isThinking || isTranscribing ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>
+            
+            {/* Action Details Modal */}
+            <ActionDetailsModal
+                isOpen={detailsModal.isOpen}
+                onClose={() => setDetailsModal(prev => ({ ...prev, isOpen: false }))}
+                actionType={detailsModal.actionType}
+                items={detailsModal.items}
+                onUndo={detailsModal.messageId ? async () => {
+                    const msg = messages.find(m => m.id === detailsModal.messageId);
+                    if (msg) await handleUndoMessage(msg);
+                    setDetailsModal(prev => ({ ...prev, isOpen: false }));
+                } : undefined}
+            />
         </div>
     );
 };
