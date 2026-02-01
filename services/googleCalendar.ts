@@ -66,6 +66,7 @@ export const googleCalendarService = {
                                 if (authReject) authReject(resp);
                             } else {
                                 isAuthenticated = true;
+                                (window as any).gapi.client.setToken(resp);
                                 if (authResolve) authResolve(true);
                             }
                         },
@@ -100,14 +101,15 @@ export const googleCalendarService = {
           tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
               client_id: clientId.trim(),
               scope: SCOPES,
-              callback: (resp: any) => {
-                  if (resp.error !== undefined) {
-                      if (authReject) authReject(resp);
-                  } else {
-                      isAuthenticated = true;
-                      if (authResolve) authResolve(true);
-                  }
-              },
+                        callback: (resp: any) => {
+                            if (resp.error !== undefined) {
+                                if (authReject) authReject(resp);
+                            } else {
+                                isAuthenticated = true;
+                                (window as any).gapi.client.setToken(resp);
+                                if (authResolve) authResolve(true);
+                            }
+                        },
           });
       }
 
