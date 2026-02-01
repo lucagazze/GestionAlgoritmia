@@ -141,7 +141,7 @@ export async function handleMultiActionResponse(
 }
 
 /**
- * Generates a human-readable summary of execution results with bullet points
+ * Generates a human-readable summary of execution results
  */
 function generateExecutionSummary(results: ExecutionResult[]): string {
     const successful = results.filter(r => r.success);
@@ -153,22 +153,24 @@ function generateExecutionSummary(results: ExecutionResult[]): string {
             return successful[0].message || '✅ Acción completada exitosamente';
         }
         
-        // Multiple successful actions - Use Markdown List
-        const summaryLines = successful.map(r => {
-            if (r.message) return `- ${r.message.replace(/^✅\s*/, '')}`; // Remove checkmark if present as we add it to header
-            const actionName = formatActionName(r.action);
-            return `- ${capitalize(actionName)} completada`;
+        // Multiple successful actions
+        const actionCounts: Record<string, number> = {};
+        successful.forEach(r => {
+            actionCounts[r.action] = (actionCounts[r.action] || 0) + 1;
         });
         
-        return `✅ **Completé ${successful.length} acciones:**\n${summaryLines.join('\n')}`;
+        const summary = Object.entries(actionCounts)
+            .map(([action, count]) => {
+                const actionName = formatActionName(action);
+                return count > 1 ? `${count} ${actionName}s` : actionName;
+            })
+            .join(', ');
+        
+        return `✅ Ejecuté exitosamente: ${summary}`;
     } else {
         // Some failures
-        return `⚠️ **Resumen de ejecución:**\n- ✅ ${successful.length} exitosas\n- ❌ ${failed.length} fallidas\n\n${failed.map(f => `- Error en ${formatActionName(f.action)}: ${f.error}`).join('\n')}`;
+        return `⚠️ Completé ${successful.length} de ${results.length} acciones. ${failed.length} fallaron.`;
     }
-}
-
-function capitalize(s: string) {
-    return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**

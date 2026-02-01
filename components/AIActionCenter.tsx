@@ -451,32 +451,17 @@ export const AIActionCenter = () => {
                  }
             }
 
-            const prevItems = detailsModal.items;
-
             // Remove item from modal
-            const newItems = prevItems.filter(i => i.id !== itemId);
             setDetailsModal(prev => ({
                 ...prev,
-                items: newItems
+                items: prev.items.filter(i => i.id !== itemId)
             }));
-
-            // Persist change to DB: Update the message payload to remove this item from details
-            // treating msg.action_payload as mutable for the update
-            const newPayload = { 
-                ...undoPayload, 
-                details: newItems // update the details array
-            };
-            
-            // If no more items, we might want to mark the whole message as undone or just keep it empty?
-            // If we mark as undone, the "Ver Detalles" button might disappear or entire undo might be disabled.
-            // Let's just update the payload.
-            await db.chat.updateMessagePayload(msg.id, newPayload);
             
             // Dispatch event to refresh lists
             window.dispatchEvent(new Event('task-created'));
             
             // Optional: If modal becomes empty, close it?
-            if (newItems.length === 0) {
+            if (detailsModal.items.length <= 1) {
                  setDetailsModal(prev => ({ ...prev, isOpen: false }));
             }
 

@@ -249,9 +249,6 @@ export const db = {
       },
       markUndone: async (messageId: string): Promise<void> => {
           await supabase.from('aichatlog').update({ is_undone: true }).eq('id', messageId);
-      },
-      updateMessagePayload: async (messageId: string, payload: any): Promise<void> => {
-          await supabase.from('aichatlog').update({ action_payload: payload }).eq('id', messageId);
       }
   },
 
