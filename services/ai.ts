@@ -4,6 +4,7 @@ import { db } from './db';
 
 // Using Gemini 3 Flash Preview as per guidelines for basic/complex text tasks
 const MODEL_NAME = 'gemini-3-flash-preview';
+const EMBEDDING_MODEL = 'text-embedding-004'; // For vector embeddings (RAG)
 
 // Helper to get an initialized client dynamically
 const getClient = async () => {
@@ -74,12 +75,30 @@ export const ai = {
       }
   },
 
+  /**
+   * Generate vector embedding for text (RAG)
+   */
+  embed: async (text: string): Promise<number[] | null> => {
+      try {
+          const client = await getClient();
+          const response = await client.models.embedContent({
+              model: EMBEDDING_MODEL,
+              contents: text
+          });
+          // Return the vector array
+          return response.embeddings?.[0]?.values || null;
+      } catch (error) {
+          console.error("Embedding Error:", error);
+          return null;
+      }
+  },
+
   agent: async (
       userInput: string | { mimeType: string; data: string },
-      contextHistory: Message[] = [],
-      contextData: ContextData = {}
+      contextHistory: any[] = [],
+      currentData: any
   ): Promise<any> => {
-      const { tasks = [], projects = [], services = [], contractors = [] } = contextData;
+      const { tasks = [], projects = [], services = [], contractors = [] } = currentData;
 
       const now = new Date();
       
@@ -92,6 +111,27 @@ export const ai = {
           weekday: 'long'
       });
       const argentinaTimeStr = argentinaFormatter.format(now);
+
+      // --- RAG: RETRIEVE RELEVANT MEMORIES ---
+      let relevantContext = "";
+      
+      if (typeof userInput === 'string') {
+          try {
+              const vector = await ai.embed(userInput);
+              if (vector) {
+                  const memories = await db.documents.search(vector);
+                  
+                  if (memories.length > 0) {
+                      relevantContext = memories.map((m: any) => 
+                          `[MEMORIA - ${m.metadata?.type || 'INFO'}]: ${m.content}`
+                      ).join('\n\n');
+                      console.log(`🧠 Found ${memories.length} relevant memories`);
+                  }
+              }
+          } catch (e) {
+              console.error("RAG search failed:", e);
+          }
+      }
 
       // --- RAG: FETCH SOPs ---
       let sopsContext = "";
@@ -131,13 +171,19 @@ export const ai = {
       4. Si usas "Z" (UTC) al final, debes sumar 3 horas. (10am AR = 13pm UTC).
       5. ERROR COMÚN A EVITAR: No pongas "T10:00:00Z" si el usuario dijo 10am, porque eso se guardará como 7am en Argentina.
 
-      TU BIBLIOTECA DE CONOCIMIENTO (SOPs & POLÍTICAS INTERNAS):
-      ${sopsContext || "No hay SOPs cargados aún."}
-
+      FECHA/HORA ACTUAL (Argentina): ${argentinaTimeStr}
+      
       BASE DE DATOS EN VIVO:
       ${activeProjects}
       ${activeTasks}
       ${contractors}
+      
+      MEMORIA A LARGO PLAZO (RAG):
+      ${relevantContext || "No hay memoria histórica relevante para esta consulta."}
+      
+      MANUALES Y SOPs:
+      ${sopsContext || "No hay SOPs disponibles."}
+      
       Eres el asistente ejecutivo del usuario. Tu nombre es "Segundo Cerebro".
       
       ⚠️️️ REGLA ABSOLUTA - NUNCA DIGAS "ENTENDIDO":

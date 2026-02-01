@@ -323,15 +323,21 @@ export const db = {
             growthStrategy: data.growthStrategy || ''
          };
     },
-    create: async (data: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
-       const payload = { ...data, createdAt: new Date().toISOString() };
-       const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
-       if (error) throw error;
-       
-       // Trigger Automation Engine (NEW_PROJECT)
-       await runAutomations('NEW_PROJECT', created, undefined);
+    create: async (data: Partial<Project>): Promise<Project> => {
+      const { data: created, error } = await supabase.from('Project').insert(data).select().single();
+      if (error) throw error;
 
-       return created;
+      // 🧠 AUTO-SAVE MEMORY
+      db.documents.create(
+          `Nuevo Proyecto: ${created.name}. Industria: ${created.industry || 'N/A'}. Fee mensual: $${created.monthlyRevenue || 0}. Estado: ${created.status}`,
+          'PROJECT',
+          created.id
+      ).catch(e => console.warn('Failed to save project memory:', e));
+
+      // Run automations for new projects
+      await runAutomations('NEW_PROJECT', created);
+      
+      return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
       const { error } = await supabase.from('Client').update(data).eq('id', id);
@@ -373,6 +379,14 @@ export const db = {
     create: async (data: Partial<Task>): Promise<Task> => {
       const { data: created, error } = await supabase.from('Task').insert(data).select().single();
       if (error) throw error;
+      
+      // 🧠 AUTO-SAVE MEMORY (fire and forget - don't block UI)
+      db.documents.create(
+          `Nueva Tarea: ${created.title}. ${created.description || 'Sin descripción'}. Estado: ${created.status}. Fecha: ${created.dueDate || 'Sin fecha'}`,
+          'TASK',
+          created.id
+      ).catch(e => console.warn('Failed to save task memory:', e));
+      
       return created;
     },
     updateStatus: async (id: string, status: TaskStatus): Promise<void> => {
@@ -485,6 +499,66 @@ export const db = {
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from('Contractor').delete().eq('id', id);
       if (error) throw error;
-    }
+    },
+  },
+
+  // --- VECTOR MEMORY (RAG) ---
+  documents: {
+      /**
+       * Store a memory with vector embedding
+       * @param content - Text content to remember
+       * @param type - Type of memory (TASK, PROJECT, CHAT, etc.)
+       * @param relatedId - Optional ID of related entity
+       */
+      create: async (content: string, type: string, relatedId?: string) => {
+          try {
+              // Import ai dynamically to avoid circular dependency
+              const { ai } = await import('./ai');
+              
+              // 1. Generate vector embedding
+              const embedding = await ai.embed(content);
+              if (!embedding) {
+                  console.warn("Failed to generate embedding for:", content.slice(0, 50));
+                  return;
+              }
+
+              // 2. Store in Supabase
+              const { error } = await supabase.from('documents').insert({
+                  content,
+                  metadata: { type, relatedId },
+                  embedding
+              });
+              
+              if (error) console.error("Error saving memory:", error);
+          } catch (error) {
+              console.error("Error in documents.create:", error);
+          }
+      },
+
+      /**
+       * Search for similar memories using vector similarity
+       * @param vector - Query embedding vector
+       * @param threshold - Similarity threshold (0-1, default 0.5)
+       * @param limit - Max results (default 5)
+       */
+      search: async (vector: number[], threshold = 0.5, limit = 5) => {
+          try {
+              const { data, error } = await supabase.rpc('match_documents', {
+                  query_embedding: vector,
+                  match_threshold: threshold,
+                  match_count: limit
+              });
+              
+              if (error) {
+                  console.error("Error searching memory:", error);
+                  return [];
+              }
+              
+              return data || [];
+          } catch (error) {
+              console.error("Error in documents.search:", error);
+              return [];
+          }
+      }
   }
 };
