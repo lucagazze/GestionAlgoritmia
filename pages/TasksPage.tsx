@@ -123,8 +123,14 @@ export default function TasksPage() {
 
           const events = await googleCalendarService.listEvents(start.toISOString(), end.toISOString());
           setGoogleEvents(events || []);
-      } catch (e) {
+      } catch (e: any) {
           console.error("Error fetching google events", e);
+          if (e.result && (e.result.error.code === 401 || e.result.error.code === 403)) {
+              console.warn("Token expired. Auto-logging out.");
+              handleGoogleLogout();
+          } else {
+             console.log("Full Google Error:", JSON.stringify(e, null, 2));
+          }
       }
   };
 
@@ -696,6 +702,7 @@ export default function TasksPage() {
                     <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-70" alt="G" />
                     {googleAuthDone ? "Conectado" : "Conectar"}
                 </Button>
+
             </div>
         </div>
         
