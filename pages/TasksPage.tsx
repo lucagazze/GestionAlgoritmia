@@ -153,21 +153,47 @@ export default function TasksPage() {
 
   const handleAiAssist = async () => {
       if (!formData.title) {
-          alert("Escribe un título primero para que la IA sepa en qué ayudarte.");
+          alert("Escribe un título primero (ej: 'Reunión con Juan el viernes a las 15').");
           return;
       }
       setIsAiGenerating(true);
       try {
-          const prompt = `Actúa como un Project Manager eficiente. Tengo una tarea titulada: "${formData.title}". Genera una descripción breve y 3-5 pasos accionables.`;
-          const response = await ai.chat([{ role: 'user', content: prompt }]);
+          const now = new Date();
+          const localTime = now.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' });
+          
+          const prompt = `
+            Actúa como un Asistente Personal Inteligente.
+            Contexto Temporal (Ahora): ${localTime}.
+            Input del Usuario: "${formData.title}".
+            
+            Tu misión:
+            1. Analizar el input para entender la intención, el título real y si hay fecha/hora.
+            2. Si hay fecha/hora (ej: "mañana", "el jueves", "a las 5pm", "en 2 horas"), calcula la fecha ISO exacta.
+            3. Genera una descripción breve profesional.
+            
+            Retorna SOLO un JSON (sin markdown):
+            {
+              "cleanTitle": "Título limpio y profesional (ej: 'Reunión con Juan')",
+              "description": "Descripción breve y accionable...",
+              "dueDate": "ISO_DATE_STRING_WITH_OFFSET (ej: 2024-02-10T15:00:00-03:00) o null si no se detecta fecha"
+            }
+          `;
+
+          const responseText = await ai.chat([{ role: 'user', content: prompt }]);
+          
+          // Clean response (remove markdown code blocks if present)
+          const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const data = JSON.parse(cleanJson);
           
           setFormData(prev => ({
               ...prev,
-              description: prev.description ? prev.description + "\n\n--- Sugerencia IA ---\n" + response : response
+              title: data.cleanTitle || prev.title,
+              description: prev.description ? prev.description + "\n\n" + data.description : data.description,
+              dueDate: data.dueDate ? data.dueDate.slice(0, 16) : prev.dueDate // Slice format for datetime-local
           }));
       } catch (error) {
           console.error(error);
-          alert("La IA no pudo responder en este momento.");
+          alert("La IA no pudo procesar la solicitud. Intenta ser más claro con la fecha.");
       } finally {
           setIsAiGenerating(false);
       }
@@ -239,7 +265,7 @@ export default function TasksPage() {
       if (!googleCalendarService.getIsAuthenticated() || !task.dueDate) return null;
 
       const start = new Date(task.dueDate);
-      const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour default
+      const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 mins default
 
       try {
           if (isUpdate && task.googleEventId) {
@@ -633,27 +659,32 @@ export default function TasksPage() {
                               
                               <div className="flex-1 overflow-y-auto space-y-0.5 custom-scrollbar">
                                   {/* APP TASKS */}
-                                  {dayTasks.map(t => (
-                                      <div 
-                                          key={t.id} 
-                                          draggable
-                                          onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
-                                          onContextMenu={(e) => handleContextMenu(e, t)}
-                                          onClick={() => handleEdit(t)}
-                                          className={`
-                                              text-[10px] px-1.5 py-0.5 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1 font-medium leading-none
-                                              ${t.status === TaskStatus.DONE 
-                                                  ? 'bg-green-100 text-green-800 border-green-200' 
-                                                  : t.priority === 'HIGH' 
-                                                      ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
-                                                      : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
-                                              }
-                                          `}
-                                      >
-                                          {t.googleEventId && <Link className="w-2 h-2 text-blue-500" />}
-                                          <span className="truncate">{t.title}</span>
-                                      </div>
-                                  ))}
+                                  {dayTasks
+                                      .sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime())
+                                      .map(t => {
+                                          const timeStr = t.dueDate ? new Date(t.dueDate).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : '';
+                                          return (
+                                          <div 
+                                              key={t.id} 
+                                              draggable
+                                              onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
+                                              onContextMenu={(e) => handleContextMenu(e, t)}
+                                              onClick={() => handleEdit(t)}
+                                              className={`
+                                                  text-[10px] px-1.5 py-0.5 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1 font-medium leading-none
+                                                  ${t.status === TaskStatus.DONE 
+                                                      ? 'bg-green-100 text-green-800 border-green-200' 
+                                                      : t.priority === 'HIGH' 
+                                                          ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
+                                                          : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
+                                                  }
+                                              `}
+                                          >
+                                              <span className="text-[9px] font-bold opacity-75 tabular-nums text-gray-600 dark:text-gray-400">{timeStr}</span>
+                                              {t.googleEventId && <Link className="w-2 h-2 text-blue-500 flex-shrink-0" />}
+                                              <span className="truncate">{t.title}</span>
+                                          </div>
+                                      )})}
 
                                   {/* EXTERNAL GOOGLE EVENTS */}
                                   {googleEvents
