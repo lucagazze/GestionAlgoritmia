@@ -28,24 +28,34 @@ export const googleCalendarService = {
    */
   loadScripts: () => {
     return new Promise<void>((resolve, reject) => {
-      if (gapiInited) return resolve();
+      if (gapiInited && (window as any).gapi?.client?.calendar) return resolve();
       
+      // Check if script already exists
+      if (document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
+          if ((window as any).gapi?.client?.calendar) { 
+              gapiInited = true; 
+              return resolve(); 
+          }
+      }
+
       const script = document.createElement('script');
       script.src = 'https://apis.google.com/js/api.js';
       script.async = true;
       script.defer = true;
       script.onload = () => {
+        if(!(window as any).gapi) {
+            return reject("Google API Script Loaded but window.gapi not found");
+        }
         (window as any).gapi.load('client', async () => {
           try {
             await (window as any).gapi.client.init({
               discoveryDocs: [DISCOVERY_DOC],
             });
             gapiInited = true;
-            // Intentar inyectar el token de la sesión actual
             await googleCalendarService.initializeSession();
             resolve();
           } catch (err) {
-            console.error("Error cargando GAPI:", err);
+            console.error("Error init GAPI:", err);
             reject(err);
           }
         });
@@ -53,6 +63,17 @@ export const googleCalendarService = {
       script.onerror = reject;
       document.body.appendChild(script);
     });
+  },
+
+  ensureInitialized: async () => {
+      if (!gapiInited || !(window as any).gapi?.client?.calendar) {
+          await googleCalendarService.loadScripts();
+      }
+      if (!(window as any).gapi?.client) {
+          throw new Error("GAPI Client not loaded");
+      }
+      // Re-inject token just in case
+      await googleCalendarService.initializeSession();
   },
 
   /**
@@ -105,7 +126,7 @@ export const googleCalendarService = {
   // --- MÉTODOS DE CALENDARIO (CRUD) ---
 
   createEvent: async (eventData: { title: string, description: string, startTime: string, endTime: string }) => {
-    await googleCalendarService.initializeSession(); 
+    await googleCalendarService.ensureInitialized();
     const event = {
       'summary': eventData.title,
       'description': eventData.description,
@@ -116,8 +137,7 @@ export const googleCalendarService = {
   },
 
   listEvents: async (timeMin?: string, timeMax?: string) => {
-    await googleCalendarService.initializeSession();
-    // Si falla por token expirado, Supabase debería haberlo refrescado, pero si GAPI falla, capturamos:
+    await googleCalendarService.ensureInitialized();
     try {
         const response = await (window as any).gapi.client.calendar.events.list({
         'calendarId': 'primary',
@@ -136,7 +156,7 @@ export const googleCalendarService = {
   },
 
   updateEvent: async (eventId: string, eventData: any) => {
-    await googleCalendarService.initializeSession();
+    await googleCalendarService.ensureInitialized();
     // 1. Obtener evento actual
     const getReq = await (window as any).gapi.client.calendar.events.get({ 'calendarId': 'primary', 'eventId': eventId });
     const current = getReq.result;
@@ -158,7 +178,7 @@ export const googleCalendarService = {
   },
 
   deleteEvent: async (eventId: string) => {
-    await googleCalendarService.initializeSession();
+    await googleCalendarService.ensureInitialized();
     return (window as any).gapi.client.calendar.events.delete({ 'calendarId': 'primary', 'eventId': eventId });
   }
 };
