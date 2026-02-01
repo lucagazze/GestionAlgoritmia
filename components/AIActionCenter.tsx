@@ -107,6 +107,7 @@ const MessageRenderer = ({ content, role, entities, onShowDetails }: {
 };
 
 import { parseMultiTaskRequest } from '../utils/taskParser';
+import { executeReActLoop } from '../utils/reactLoop';
 
 export const AIActionCenter = () => {
     const navigate = useNavigate();
@@ -412,6 +413,45 @@ export const AIActionCenter = () => {
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
             
+            // 🔄 DETECT COMPLEX MULTI-STEP REQUESTS
+            const complexKeywords = ['busca', 'encuentra', 'manda', 'envía', 'y luego', 'después', 'primero'];
+            const isComplexRequest = complexKeywords.some(keyword => userText.toLowerCase().includes(keyword));
+            
+            if (isComplexRequest && userText.split(' ').length > 10) {
+                console.log('🔄 Detected complex request - using ReAct loop');
+                setIsThinking(true);
+                
+                try {
+                    const result = await executeReActLoop(
+                        userText,
+                        sessionId,
+                        { tasks, projects, services, contractors },
+                        5 // max iterations
+                    );
+                    
+                    // Show thinking process
+                    if (result.iterations.length > 0) {
+                        const thinkingSteps = result.iterations.map((iter, idx) => 
+                            `**Paso ${idx + 1}**: ${iter.thought}\n${iter.observation ? `→ ${iter.observation}` : ''}`
+                        ).join('\n\n');
+                        
+                        await db.chat.addMessage(sessionId, 'assistant', 
+                            `🤔 **Proceso de pensamiento:**\n\n${thinkingSteps}\n\n---\n\n${result.message}`
+                        );
+                    } else {
+                        await db.chat.addMessage(sessionId, 'assistant', result.message);
+                    }
+                    
+                    await loadMessages(sessionId);
+                    setIsThinking(false);
+                    return;
+                } catch (error) {
+                    console.error('ReAct loop error:', error);
+                    // Fall back to normal processing
+                }
+            }
+            
+            // Normal single-step processing
             const response: any = await ai.agent(
                 userText, 
                 await db.chat.getMessages(sessionId), 

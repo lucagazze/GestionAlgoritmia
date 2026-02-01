@@ -340,6 +340,16 @@ export const db = {
       return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
+      // 📸 Create snapshot before update
+      try {
+        const current = await db.projects.getById(id);
+        if (current) {
+          await db.audit.createSnapshot('PROJECT', id, 'UPDATE', current, data);
+        }
+      } catch (e) {
+        console.warn('Failed to create audit snapshot:', e);
+      }
+      
       const { error } = await supabase.from('Client').update(data).eq('id', id);
       if (error) throw error;
       
@@ -394,14 +404,44 @@ export const db = {
       if (error) throw error;
     },
     update: async (id: string, data: Partial<Task>): Promise<void> => {
+        // 📸 Create snapshot before update
+        try {
+          const current = await db.tasks.getById(id);
+          if (current) {
+            await db.audit.createSnapshot('TASK', id, 'UPDATE', current, data);
+          }
+        } catch (e) {
+          console.warn('Failed to create audit snapshot:', e);
+        }
+        
         const { error } = await supabase.from('Task').update(data).eq('id', id);
         if (error) throw error;
     },
     delete: async (id: string): Promise<void> => {
+      // 📸 Create snapshot before delete
+      try {
+        const current = await db.tasks.getById(id);
+        if (current) {
+          await db.audit.createSnapshot('TASK', id, 'DELETE', current);
+        }
+      } catch (e) {
+        console.warn('Failed to create audit snapshot:', e);
+      }
+      
       const { error } = await supabase.from('Task').delete().eq('id', id);
       if (error) throw error;
     },
     deleteMany: async (ids: string[]): Promise<void> => {
+      // 📸 Create batch snapshot before delete
+      try {
+        const tasks = await db.tasks.getMany(ids);
+        if (tasks.length > 0) {
+          await db.audit.createSnapshot('TASK', ids[0], 'BATCH_DELETE', tasks, null, { count: tasks.length });
+        }
+      } catch (e) {
+        console.warn('Failed to create audit snapshot:', e);
+      }
+      
       const { error } = await supabase.from('Task').delete().in('id', ids);
       if (error) throw error;
     },
@@ -500,6 +540,168 @@ export const db = {
       const { error } = await supabase.from('Contractor').delete().eq('id', id);
       if (error) throw error;
     },
+  },
+
+  // --- AUDIT LOG (Transactional Undo) ---
+  audit: {
+      /**
+       * Create a snapshot before UPDATE/DELETE operations
+       * @param entityType - Type of entity (TASK, PROJECT, etc.)
+       * @param entityId - ID of the entity
+       * @param operation - Operation type (UPDATE, DELETE, BATCH_DELETE)
+       * @param snapshotBefore - Complete state before change
+       * @param snapshotAfter - State after (for UPDATE)
+       * @param metadata - Extra context
+       * @returns auditId for undo reference
+       */
+      createSnapshot: async (
+          entityType: string,
+          entityId: string,
+          operation: 'UPDATE' | 'DELETE' | 'BATCH_DELETE' | 'BATCH_UPDATE',
+          snapshotBefore: any,
+          snapshotAfter?: any,
+          metadata?: any
+      ): Promise<string | null> => {
+          try {
+              const { data, error } = await supabase.from('AuditLog').insert({
+                  entityType,
+                  entityId,
+                  operation,
+                  snapshotBefore,
+                  snapshotAfter,
+                  metadata,
+                  timestamp: new Date().toISOString()
+              }).select('id').single();
+              
+              if (error) {
+                  console.error("Error creating audit snapshot:", error);
+                  return null;
+              }
+              
+              return data.id;
+          } catch (error) {
+              console.error("Audit snapshot error:", error);
+              return null;
+          }
+      },
+
+      /**
+       * Get audit entry by ID
+       */
+      getById: async (auditId: string) => {
+          const { data, error } = await supabase
+              .from('AuditLog')
+              .select('*')
+              .eq('id', auditId)
+              .single();
+          
+          if (error) throw error;
+          return data;
+      },
+
+      /**
+       * Get audit history for an entity
+       */
+      getHistory: async (entityType: string, entityId: string, limit = 10) => {
+          const { data, error } = await supabase
+              .from('AuditLog')
+              .select('*')
+              .eq('entityType', entityType)
+              .eq('entityId', entityId)
+              .order('timestamp', { ascending: false })
+              .limit(limit);
+          
+          if (error) throw error;
+          return data || [];
+      },
+
+      /**
+       * Undo an operation using audit snapshot
+       * @param auditId - ID of the audit entry
+       * @returns Result of undo operation
+       */
+      undo: async (auditId: string): Promise<{ success: boolean; message: string; data?: any }> => {
+          try {
+              const audit = await db.audit.getById(auditId);
+              
+              if (!audit) {
+                  return { success: false, message: "Audit entry not found" };
+              }
+
+              console.log(`🔄 Undoing ${audit.operation} on ${audit.entityType}:${audit.entityId}`);
+
+              switch (audit.operation) {
+                  case 'DELETE':
+                      // Restore deleted entity
+                      if (audit.entityType === 'TASK') {
+                          const restored = await db.tasks.create(audit.snapshotBefore);
+                          return { 
+                              success: true, 
+                              message: `✅ Restauré la tarea: **${audit.snapshotBefore.title}**`,
+                              data: restored
+                          };
+                      } else if (audit.entityType === 'PROJECT') {
+                          const restored = await db.projects.create(audit.snapshotBefore);
+                          return { 
+                              success: true, 
+                              message: `✅ Restauré el proyecto: **${audit.snapshotBefore.name}**`,
+                              data: restored
+                          };
+                      }
+                      break;
+
+                  case 'UPDATE':
+                      // Restore previous state
+                      if (audit.entityType === 'TASK') {
+                          await db.tasks.update(audit.entityId, audit.snapshotBefore);
+                          return { 
+                              success: true, 
+                              message: `✅ Restauré el estado anterior de: **${audit.snapshotBefore.title}**`
+                          };
+                      } else if (audit.entityType === 'PROJECT') {
+                          await db.projects.update(audit.entityId, audit.snapshotBefore);
+                          return { 
+                              success: true, 
+                              message: `✅ Restauré el estado anterior de: **${audit.snapshotBefore.name}**`
+                          };
+                      }
+                      break;
+
+                  case 'BATCH_DELETE':
+                      // Restore multiple entities
+                      const snapshots = Array.isArray(audit.snapshotBefore) 
+                          ? audit.snapshotBefore 
+                          : [audit.snapshotBefore];
+                      
+                      let restored = 0;
+                      for (const snapshot of snapshots) {
+                          try {
+                              if (audit.entityType === 'TASK') {
+                                  await db.tasks.create(snapshot);
+                              } else if (audit.entityType === 'PROJECT') {
+                                  await db.projects.create(snapshot);
+                              }
+                              restored++;
+                          } catch (e) {
+                              console.error("Failed to restore:", e);
+                          }
+                      }
+                      
+                      return { 
+                          success: true, 
+                          message: `✅ Restauré **${restored}** ${audit.entityType.toLowerCase()}(s)`
+                      };
+
+                  default:
+                      return { success: false, message: `Unknown operation: ${audit.operation}` };
+              }
+
+              return { success: false, message: "Undo not implemented for this entity type" };
+          } catch (error: any) {
+              console.error("Undo error:", error);
+              return { success: false, message: `Error: ${error.message}` };
+          }
+      }
   },
 
   // --- VECTOR MEMORY (RAG) ---

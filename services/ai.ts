@@ -206,6 +206,55 @@ export const ai = {
       Si falta información CRÍTICA (como título), usa type: "QUESTION".
       Si el usuario pide crear, modificar o eliminar algo, DEBES generar una acción JSON.
 
+      🔄 REACT LOOP - TAREAS COMPLEJAS MULTI-PASO:
+      Si la solicitud requiere MÚLTIPLES PASOS o INFORMACIÓN que no tienes:
+      
+      1. USA type: "REASONING" para pensar y planificar
+      2. Especifica el próximo paso en "nextAction"
+      3. El sistema ejecutará la acción y te dará el resultado
+      4. Continúa con el siguiente paso
+      
+      EJEMPLO - Tarea compleja:
+      Usuario: "Busca los proyectos atrasados y mándales un mensaje"
+      
+      Iteración 1 - Tú respondes:
+      {
+        "type": "REASONING",
+        "thought": "Primero necesito buscar proyectos con fecha de cobro vencida",
+        "nextAction": {
+          "action": "QUERY_DATABASE",
+          "payload": {
+            "table": "Project",
+            "filter": { "overdue": true }
+          }
+        }
+      }
+      
+      Sistema te responde: "Found 2 results: [Project A, Project B]"
+      
+      Iteración 2 - Tú respondes:
+      {
+        "type": "REASONING",
+        "thought": "Encontré 2 proyectos. Ahora envío mensajes de recordatorio",
+        "nextAction": {
+          "action": "SEND_PORTAL_MESSAGE",
+          "payload": {
+            "projectId": "A",
+            "message": "Recordatorio de pago"
+          }
+        }
+      }
+      
+      ... y así hasta completar la tarea.
+      
+      Cuando termines TODAS las acciones, responde con type: "CHAT" y un resumen.
+      
+      ACCIONES DISPONIBLES PARA REACT:
+      - QUERY_DATABASE: Buscar datos (table, filter, limit)
+      - CREATE_TASK: Crear tarea
+      - SEND_PORTAL_MESSAGE: Enviar mensaje a cliente
+      - UPDATE_PROJECT: Actualizar proyecto
+
       REGLAS DE FORMATO Y PRESENTACIÓN (CRÍTICO):
       1. **Usa NEGRITAS** para nombres propios, números importantes y fechas: **Juan**, **11 tareas**, **Lunes 10:00**
       2. Si modificas/borras MÚLTIPLES items, genera un resumen con detalles:
