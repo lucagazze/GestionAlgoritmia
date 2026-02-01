@@ -37,6 +37,12 @@ export const googleCalendarService = {
                     discoveryDocs: [DISCOVERY_DOC],
                 });
                 gapiInited = true;
+                
+                // Try restore session immediately after GAPI init
+                if (googleCalendarService.restoreSession()) {
+                    console.log("Restored Google Session from Storage");
+                }
+
                 if (gisInited) resolve();
             });
         };
@@ -67,6 +73,12 @@ export const googleCalendarService = {
                             } else {
                                 isAuthenticated = true;
                                 (window as any).gapi.client.setToken(resp);
+                                // Save token to localStorage
+                                const expiresIn = resp.expires_in || 3599; // Default 1h
+                                const expiryTime = new Date().getTime() + (expiresIn * 1000);
+                                localStorage.setItem('google_access_token', JSON.stringify(resp));
+                                localStorage.setItem('google_token_expiry', expiryTime.toString());
+                                
                                 if (authResolve) authResolve(true);
                             }
                         },
@@ -79,9 +91,31 @@ export const googleCalendarService = {
             gisInited = true;
             if (gapiInited) resolve();
         };
-        script2.onerror = reject;
         document.body.appendChild(script2);
     });
+  },
+
+  /**
+   * Intenta restaurar el token desde localStorage
+   */
+  restoreSession: () => {
+      const storedToken = localStorage.getItem('google_access_token');
+      const expiry = localStorage.getItem('google_token_expiry');
+      
+      if (storedToken && expiry) {
+          const now = new Date().getTime();
+          if (now < parseInt(expiry)) {
+              const token = JSON.parse(storedToken);
+              (window as any).gapi.client.setToken(token);
+              isAuthenticated = true;
+              return true;
+          } else {
+              // Token expired
+              localStorage.removeItem('google_access_token');
+              localStorage.removeItem('google_token_expiry');
+          }
+      }
+      return false;
   },
 
   /**
@@ -107,6 +141,12 @@ export const googleCalendarService = {
                             } else {
                                 isAuthenticated = true;
                                 (window as any).gapi.client.setToken(resp);
+                                // Save token to localStorage
+                                const expiresIn = resp.expires_in || 3599; // Default 1h
+                                const expiryTime = new Date().getTime() + (expiresIn * 1000);
+                                localStorage.setItem('google_access_token', JSON.stringify(resp));
+                                localStorage.setItem('google_token_expiry', expiryTime.toString());
+
                                 if (authResolve) authResolve(true);
                             }
                         },
@@ -172,9 +212,10 @@ export const googleCalendarService = {
           const request = (window as any).gapi.client.calendar.events.list({
               'calendarId': 'primary',
               'timeMin': timeMin || (new Date()).toISOString(),
+              'timeMax': timeMax, 
               'showDeleted': false,
               'singleEvents': true,
-              'maxResults': 100,
+              'maxResults': 250, // Increased limit
               'orderBy': 'startTime'
           });
 

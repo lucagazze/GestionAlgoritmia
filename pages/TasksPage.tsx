@@ -40,7 +40,8 @@ type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR';
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [sops, setSops] = useState<SOP[]>([]); // Load SOPs
+  const [sops, setSops] = useState<SOP[]>([]); 
+  const [googleEvents, setGoogleEvents] = useState<any[]>([]); // New state for external events
   
   const [viewMode, setViewMode] = useState<ViewMode>('CALENDAR'); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,10 +84,50 @@ export default function TasksPage() {
     loadData();
     const handleTaskCreated = () => { loadData(); };
     window.addEventListener('task-created', handleTaskCreated);
-    // Init Google Scripts
-    googleCalendarService.loadScripts().catch(err => console.error("Could not load Google Scripts", err));
+    // Init Google Scripts and check session
+    googleCalendarService.loadScripts().then(() => {
+        if (googleCalendarService.restoreSession()) {
+            setGoogleAuthDone(true);
+        }
+    }).catch(err => console.error("Could not load Google Scripts", err));
+    
     return () => { window.removeEventListener('task-created', handleTaskCreated); };
   }, []);
+
+  // Fetch Google Events when reference date changes or auth is done
+  // Also poll every 60 seconds to keep it "live"
+  useEffect(() => {
+      let interval: NodeJS.Timeout;
+
+      const runSync = () => {
+        if (googleCalendarService.getIsAuthenticated()) {
+            fetchGoogleEvents();
+        }
+      };
+
+      runSync();
+
+      interval = setInterval(runSync, 60000); // Poll every 1 minute
+
+      return () => clearInterval(interval);
+  }, [referenceDate, googleAuthDone]);
+
+  const fetchGoogleEvents = async () => {
+      try {
+          const year = referenceDate.getFullYear();
+          const month = referenceDate.getMonth();
+          // Get range including padding for the grid
+          const start = new Date(year, month, 1);
+          start.setDate(start.getDate() - 10);
+          const end = new Date(year, month + 1, 0);
+          end.setDate(end.getDate() + 10);
+
+          const events = await googleCalendarService.listEvents(start.toISOString(), end.toISOString());
+          setGoogleEvents(events || []);
+      } catch (e) {
+          console.error("Error fetching google events", e);
+      }
+  };
 
   const loadData = async () => {
     try {
@@ -164,6 +205,7 @@ export default function TasksPage() {
       try {
           await googleCalendarService.authenticate();
           setGoogleAuthDone(true);
+          fetchGoogleEvents(); // Fetch immediately on fresh auth
           return true;
       } catch (e: any) {
           console.error("Auth error", e);
@@ -392,6 +434,7 @@ export default function TasksPage() {
                               </span>
                               
                               <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+                                  {/* APP TASKS */}
                                   {dayTasks.map(t => (
                                       <div 
                                           key={t.id} 
@@ -413,6 +456,28 @@ export default function TasksPage() {
                                           <span className="truncate">{t.title}</span>
                                       </div>
                                   ))}
+
+                                  {/* EXTERNAL GOOGLE EVENTS */}
+                                  {googleEvents
+                                    .filter(ev => {
+                                        const evDate = new Date(ev.start.dateTime || ev.start.date);
+                                        // Match date
+                                        if (evDate.getDate() !== date.getDate() || evDate.getMonth() !== date.getMonth() || evDate.getFullYear() !== date.getFullYear()) return false;
+                                        // De-duplicate: Don't show if this google ID is already linked to a local task
+                                        if (dayTasks.some(t => t.googleEventId === ev.id)) return false;
+                                        return true;
+                                    })
+                                    .map(ev => (
+                                        <div 
+                                            key={ev.id}
+                                            title="Evento de Google Calendar (Externo)"
+                                            className="text-[10px] px-2 py-1.5 rounded-md border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-80 hover:opacity-100"
+                                        >
+                                           <img src="https://www.google.com/favicon.ico" className="w-2 h-2 opacity-50" alt="G" />
+                                           <span className="truncate">{ev.summary}</span>
+                                        </div>
+                                    ))
+                                  }
                               </div>
                           </div>
                       );
@@ -462,7 +527,7 @@ export default function TasksPage() {
                                <div>
                                    <div className="flex items-center gap-2">
                                      <h4 className={`font-bold text-sm ${t.status === TaskStatus.DONE ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{t.title}</h4>
-                                     {t.googleEventId && <Link className="w-3 h-3 text-blue-400" title="Sincronizada con Google" />}
+                                     {t.googleEventId && <span title="Sincronizada con Google"><Link className="w-3 h-3 text-blue-400" /></span>}
                                    </div>
                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
                                        {t.dueDate && <span className={`flex items-center gap-1 ${new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE ? 'text-red-500 font-bold' : ''}`}><Clock className="w-3 h-3"/> {new Date(t.dueDate).toLocaleDateString()}</span>}
