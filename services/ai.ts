@@ -97,23 +97,6 @@ export const ai = {
   },
 
   /**
-   * Gemini Live Connection
-   */
-  connectLive: async (callbacks: any) => {
-      const client = await getClient();
-      return client.live.connect({
-          model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-          config: {
-              responseModalities: ['AUDIO'],
-              // Empty object enables transcription without model errors
-              inputAudioTranscription: {},
-              systemInstruction: { parts: [{ text: "You are a helpful assistant. Listen to the user's input." }] },
-          },
-          callbacks
-      });
-  },
-
-  /**
    * THE MASTER AGENT - Agency OS Brain (Enhanced with RAG)
    */
   agent: async (

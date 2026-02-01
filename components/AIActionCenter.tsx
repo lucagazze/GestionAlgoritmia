@@ -12,28 +12,6 @@ interface UndoPayload {
     description: string;
 }
 
-// Audio Utils for Gemini Live (Manual PCM Encoding)
-function b64Encode(bytes: Uint8Array) {
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function createBlob(data: Float32Array) {
-  const l = data.length;
-  const int16 = new Int16Array(l);
-  for (let i = 0; i < l; i++) {
-    int16[i] = data[i] * 32768;
-  }
-  return {
-    data: b64Encode(new Uint8Array(int16.buffer)),
-    mimeType: 'audio/pcm;rate=16000',
-  };
-}
-
 export const AIActionCenter = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -41,15 +19,11 @@ export const AIActionCenter = () => {
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
     
-    // Audio Real-Time State
+    // Audio Recording State
     const [isRecording, setIsRecording] = useState(false);
-    const [audioVolume, setAudioVolume] = useState(0);
-    
-    // Refs for cleaning up audio resources
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const mediaStreamRef = useRef<MediaStream | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
-    const liveSessionRef = useRef<any>(null);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     const [placeholder, setPlaceholder] = useState("¿Qué hacemos hoy, Jefe?");
     
@@ -116,12 +90,12 @@ export const AIActionCenter = () => {
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                if (isOpen && !isRecording && !isThinking) setIsOpen(false);
+                if (isOpen && !isRecording && !isTranscribing) setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [isOpen, isRecording, isThinking]);
+    }, [isOpen, isRecording, isTranscribing]);
 
     // --- Logic ---
     const loadSessions = async () => { const sess = await db.chat.getSessions(); setSessions(sess); };
@@ -192,6 +166,7 @@ export const AIActionCenter = () => {
             return { success: false };
         } catch (e: any) { 
             console.error("Execute Action Error:", e);
+            // Detect RLS errors
             if (e.message?.includes("policy") || e.message?.includes("permission") || e.code === '42501') {
                 return { success: false, error: "⚠️ Error de Permisos: Ve a 'Ajustes' y ejecuta el script de reparación." };
             }
@@ -216,92 +191,66 @@ export const AIActionCenter = () => {
         } catch (e) { alert("Error al deshacer."); } finally { setIsThinking(false); }
     };
 
-    // --- GEMINI LIVE REAL-TIME AUDIO ---
+    // --- AUDIO HANDLING ---
     const startRecording = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000 } });
-            mediaStreamRef.current = stream;
-            
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            audioContextRef.current = audioContext;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            let mimeType = 'audio/webm';
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4'; 
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
 
-            const source = audioContext.createMediaStreamSource(stream);
-            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-            processorRef.current = processor;
+            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
 
-            setIsOpen(true);
-            setIsRecording(true);
-            
-            const sessionPromise = ai.connectLive({
-                onopen: () => {
-                    console.log("Gemini Live Connected");
-                    processor.onaudioprocess = (e) => {
-                        const inputData = e.inputBuffer.getChannelData(0);
-                        
-                        // Volume visualizer simple logic
-                        let sum = 0;
-                        for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
-                        setAudioVolume(Math.sqrt(sum / inputData.length));
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) audioChunksRef.current.push(event.data);
+            };
 
-                        const pcmBlob = createBlob(inputData);
-                        sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-                    };
-                    source.connect(processor);
-                    processor.connect(audioContext.destination);
-                },
-                onmessage: (msg: any) => {
-                    // Handle Real-time Transcription: Append to input field
-                    if (msg.serverContent?.inputAudioTranscription?.text) {
-                        const text = msg.serverContent.inputAudioTranscription.text;
-                        setInput(prev => prev + text);
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+                
+                setIsTranscribing(true);
+                try {
+                    const base64Audio = await blobToBase64(audioBlob);
+                    const text = await ai.transcribe({ mimeType, data: base64Audio });
+                    if (text) {
+                        setInput(text.trim());
+                        setIsOpen(true);
+                        setTimeout(() => inputRef.current?.focus(), 100);
+                        // Auto-send if it was a voice command? For now, let user review.
                     }
-                },
-                onclose: () => {
-                    console.log("Gemini Live Closed");
-                    setIsRecording(false);
-                },
-                onerror: (e: any) => {
-                    console.error("Gemini Live Error", e);
-                    setIsRecording(false);
-                    stopRecording();
-                }
-            });
-            
-            liveSessionRef.current = sessionPromise;
+                } catch (e) { console.error("Transcription error", e); } 
+                finally { setIsTranscribing(false); setIsRecording(false); }
+                
+                stream.getTracks().forEach(track => track.stop());
+            };
 
+            mediaRecorder.start();
+            setIsRecording(true);
+            setIsOpen(true);
         } catch (err) {
-            console.error("Failed to start recording:", err);
-            alert("No se pudo acceder al micrófono o conectar con la IA.");
-            setIsRecording(false);
+            console.error(err);
+            alert("No se pudo acceder al micrófono.");
         }
     };
 
-    const stopRecording = async () => {
-        setIsRecording(false);
-        setAudioVolume(0);
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+        }
+    };
 
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-            processorRef.current.onaudioprocess = null;
-            processorRef.current = null;
-        }
-        if (audioContextRef.current) {
-            await audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
-            mediaStreamRef.current = null;
-        }
-        
-        // Close session
-        if (liveSessionRef.current) {
-            liveSessionRef.current.then((session: any) => session.close());
-            liveSessionRef.current = null;
-        }
-        
-        // Focus input after recording to allow editing/sending
-        setTimeout(() => inputRef.current?.focus(), 100);
+    const blobToBase64 = (blob: Blob): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                resolve(base64String.split(',')[1]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
     };
 
     const handleSend = async (textOverride?: string) => {
@@ -473,14 +422,15 @@ export const AIActionCenter = () => {
                             </div>
                         )}
                         {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Ejecutando...</span></div>}
-                        
+                        {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Escuchando...</span></div>}
+                        {isTranscribing && <div className="self-end bg-blue-50 border border-blue-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-blue-500" /><span className="text-xs text-blue-600 font-bold">Transcribiendo...</span></div>}
                         <div className="h-1"></div>
                      </div>
                  )}
             </div>
 
             {/* Quick Prompts (Chips) */}
-            {isOpen && !isThinking && !isRecording && !input && viewMode === 'CHAT' && messages.length === 0 && (
+            {isOpen && !isThinking && !isRecording && !isTranscribing && !input && viewMode === 'CHAT' && messages.length === 0 && (
                 <div className="absolute bottom-full mb-4 left-0 w-full flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar animate-in slide-in-from-bottom-2">
                     {quickChips.map((chip, idx) => (
                         <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
@@ -494,15 +444,15 @@ export const AIActionCenter = () => {
                 {/* Main Dynamic Button */}
                 <div 
                     onClick={(e) => { e.stopPropagation(); if (isRecording) stopRecording(); else startRecording(); }}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
                 >
-                    {isThinking ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" style={{transform: `scaleY(${1 + audioVolume * 5})`}} /> : <Mic className="w-5 h-5" />}
+                    {isThinking || isTranscribing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
                 </div>
                 
-                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isRecording && handleSend()} placeholder={isRecording ? "Escuchando en vivo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording} />
+                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
                 
                 <div className="flex items-center gap-2 pr-2">
-                     {isThinking ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
+                     {isThinking || isTranscribing ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>
         </div>
