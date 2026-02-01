@@ -153,7 +153,7 @@ export const ai = {
           .map((p: any) => `[CLIENTE] ID:${p.id} | Nombre:"${p.name}" | Fee:$${p.monthlyRevenue} | DíaCobro:${p.billingDay} | Estado:${p.status}`)
           .join('\n');
       
-      const contractors = currentData.contractors
+      const contractorsList = currentData.contractors
           .map((c: any) => `[EQUIPO] ID:${c.id} | Nombre:"${c.name}" | Rol:${c.role} | Costo:$${c.monthlyRate}`)
           .join('\n');
 
