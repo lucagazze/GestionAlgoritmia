@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
+import { supabase } from '../services/supabase';
 import { googleCalendarService } from '../services/googleCalendar';
 import { Task, TaskStatus, Contractor, SOP } from '../types';
 import { Button, Input, Label, Modal, Textarea, Badge } from '../components/UIComponents';
@@ -83,14 +84,33 @@ export default function TasksPage() {
     loadData();
     const handleTaskCreated = () => { loadData(); };
     window.addEventListener('task-created', handleTaskCreated);
-    // Init Google Scripts and check session
-    googleCalendarService.loadScripts().then(() => {
-        if (googleCalendarService.restoreSession()) {
+
+    // INICIALIZACIÓN NUEVA: Cargar scripts y escuchar a Supabase
+    googleCalendarService.loadScripts().then(async () => {
+        const isAuth = await googleCalendarService.getIsAuthenticated();
+        if (isAuth) {
+            await googleCalendarService.initializeSession();
             setGoogleAuthDone(true);
+            fetchGoogleEvents();
         }
-    }).catch(err => console.error("Could not load Google Scripts", err));
+    });
+
+    // Escuchar cambios de sesión (Login/Logout)
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+            await googleCalendarService.initializeSession();
+            setGoogleAuthDone(true);
+            fetchGoogleEvents();
+        } else if (event === 'SIGNED_OUT') {
+            setGoogleAuthDone(false);
+            setGoogleEvents([]);
+        }
+    });
     
-    return () => { window.removeEventListener('task-created', handleTaskCreated); };
+    return () => { 
+        window.removeEventListener('task-created', handleTaskCreated); 
+        authListener.subscription.unsubscribe();
+    };
   }, []);
 
   // Fetch Google Events when reference date changes or auth is done
@@ -375,23 +395,35 @@ export default function TasksPage() {
   
   const handleDrop = async (e: React.DragEvent, slotDate: Date) => {
       e.preventDefault();
-      const taskId = e.dataTransfer.getData('taskId');
+      const dataStr = e.dataTransfer.getData('taskId');
+      if (!dataStr) return;
+
+      let taskId, isGoogleEvent = false;
+      try {
+          const data = JSON.parse(dataStr);
+          taskId = data.id;
+          isGoogleEvent = data.isGoogle;
+      } catch {
+          taskId = dataStr; 
+      }
+
       setDragOverSlot(null);
-      if (taskId) {
+      
+      const newDate = new Date(slotDate);
+      newDate.setHours(12, 0, 0, 0); 
+      const newIso = newDate.toISOString();
+
+      if (isGoogleEvent) {
+          await googleCalendarService.updateEvent(taskId, { startTime: newIso });
+          fetchGoogleEvents(); 
+      } else {
           const task = tasks.find(t => t.id === taskId);
           if (task) {
-              const newDate = new Date(slotDate);
-              newDate.setHours(12, 0, 0, 0); 
-              const newIso = newDate.toISOString();
-              
-              // Sync if linked
               if (task.googleEventId && googleCalendarService.getIsAuthenticated()) {
                   await syncTaskToGoogle({ ...task, dueDate: newIso }, true);
               }
-
               await db.tasks.update(taskId, { dueDate: newIso });
               await loadData();
-              fetchGoogleEvents();
           }
       }
   };
@@ -568,10 +600,20 @@ export default function TasksPage() {
                                       return (
                                           <div
                                               key={id}
-                                              onClick={(e) => { e.stopPropagation(); !isGoogle && handleEdit(item); }}
-                                              onContextMenu={(e) => !isGoogle && handleContextMenu(e, item)}
-                                              draggable={!isGoogle}
-                                              onDragStart={(e) => !isGoogle && e.dataTransfer.setData('taskId', id)}
+                                              onClick={(e) => { 
+                                                  e.stopPropagation(); 
+                                                  handleEdit(isGoogle ? {
+                                                      id: id, 
+                                                      title: title,
+                                                      description: item.description,
+                                                      dueDate: start.toISOString(),
+                                                      status: TaskStatus.TODO,
+                                                      googleEventId: id,
+                                                      priority: 'MEDIUM'
+                                                  } as any : item); 
+                                              }}
+                                              draggable={true}
+                                              onDragStart={(e) => e.dataTransfer.setData('taskId', JSON.stringify({ id, isGoogle }))}
                                               className={`
                                                   absolute left-1 right-2 rounded-lg px-3 py-1 text-[10px] font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
                                                   ${isGoogle 
@@ -696,16 +738,32 @@ export default function TasksPage() {
                                         if (dayTasks.some(t => t.googleEventId === ev.id)) return false;
                                         return true;
                                     })
-                                    .map(ev => (
+                                    .map(ev => {
+                                        const startTime = ev.start.dateTime || ev.start.date;
+                                        return (
                                         <div 
                                             key={ev.id}
                                             title="Evento de Google Calendar (Externo)"
-                                            className="text-[10px] px-1.5 py-0.5 rounded-sm border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-90 hover:opacity-100 font-medium leading-none"
+                                            draggable={true}
+                                            onDragStart={(e) => e.dataTransfer.setData('taskId', JSON.stringify({ id: ev.id, isGoogle: true }))}
+                                            onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                handleEdit({
+                                                    id: ev.id, 
+                                                    title: ev.summary,
+                                                    description: ev.description,
+                                                    dueDate: startTime,
+                                                    status: TaskStatus.TODO,
+                                                    googleEventId: ev.id,
+                                                    priority: 'MEDIUM'
+                                                } as any); 
+                                            }}
+                                            className="text-[10px] px-1.5 py-0.5 rounded-sm border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-90 hover:opacity-100 font-medium leading-none cursor-grab active:cursor-grabbing hover:shadow-sm"
                                         >
                                            <img src="https://www.google.com/favicon.ico" className="w-2 h-2 opacity-50" alt="G" />
                                            <span className="truncate">{ev.summary}</span>
                                         </div>
-                                    ))
+                                    )})
                                   }
                               </div>
                           </div>
