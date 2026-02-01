@@ -249,11 +249,36 @@ export const ai = {
       
       Cuando termines TODAS las acciones, responde con type: "CHAT" y un resumen.
       
-      ACCIONES DISPONIBLES PARA REACT:
+      ACCIONES DISPONIBLES:
+      
+      📋 TAREAS:
+      - CREATE_TASK: Crear tarea (title, description, dueDate, priority, assigneeId, projectId)
+      - UPDATE_TASK: Actualizar tarea (id, ...campos)
+      - DELETE_TASK: Borrar tarea (id)
+      - DELETE_TASKS: Borrar múltiples (ids: string[])
+      
+      📂 PROYECTOS:
+      - CREATE_PROJECT: Crear proyecto (name, monthlyRevenue, industry)
+      - UPDATE_PROJECT: Actualizar proyecto (id, ...campos)
+      - DELETE_PROJECT: Borrar proyecto (id)
+      
+      💰 CRM & CLIENTES:
+      - ADD_CLIENT_NOTE: Agregar nota (clientId, content, type: 'CALL'|'EMAIL'|'MEETING'|'OTHER')
+      - UPDATE_CLIENT_HEALTH: Actualizar health score (clientId, healthScore: 'GOOD'|'RISK'|'CRITICAL')
+      - GET_CLIENT_NOTES: Consultar notas (clientId, limit?)
+      
+      🤖 AUTOMATIZACIÓN:
+      - CREATE_SOP: Crear manual (title, category, content)
+      - GET_SOPS: Consultar manuales (category?)
+      
+      🧭 NAVEGACIÓN:
+      - NAVIGATE_TO: Ir a página (path: '/tasks'|'/projects'|'/settings'|'/analytics')
+      - OPEN_PROJECT: Abrir proyecto (projectId)
+      - OPEN_TASK: Mostrar tarea (taskId)
+      
+      🔄 REACT LOOP (para tareas complejas):
       - QUERY_DATABASE: Buscar datos (table, filter, limit)
-      - CREATE_TASK: Crear tarea
       - SEND_PORTAL_MESSAGE: Enviar mensaje a cliente
-      - UPDATE_PROJECT: Actualizar proyecto
 
       REGLAS DE FORMATO Y PRESENTACIÓN (CRÍTICO):
       1. **Usa NEGRITAS** para nombres propios, números importantes y fechas: **Juan**, **11 tareas**, **Lunes 10:00**

@@ -108,6 +108,7 @@ const MessageRenderer = ({ content, role, entities, onShowDetails }: {
 
 import { parseMultiTaskRequest } from '../utils/taskParser';
 import { executeReActLoop } from '../utils/reactLoop';
+import { handleMultiActionResponse } from '../utils/multiActionHandler';
 
 export const AIActionCenter = () => {
     const navigate = useNavigate();
@@ -145,9 +146,17 @@ export const AIActionCenter = () => {
     const [detailsModal, setDetailsModal] = useState<{
         isOpen: boolean;
         actionType: 'DELETE' | 'CREATE' | 'UPDATE';
-        items: Array<{id: string, title: string, subtitle?: string, metadata?: any}>;
+        items: Array<{id: string, title: string, subtitle?: string, metadata?: any, type: 'TASK' | 'PROJECT' | 'CONTRACTOR'}>;
         messageId?: string;
     }>({ isOpen: false, actionType: 'DELETE', items: [] });
+    
+    // 📊 Execution Progress State
+    const [executionProgress, setExecutionProgress] = useState<{
+        total: number;
+        current: number;
+        status: 'executing' | 'summarizing' | 'complete';
+        currentAction?: string;
+    } | null>(null);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -223,7 +232,15 @@ export const AIActionCenter = () => {
         return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     };
 
-    const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload, error?: string, details?: any[] }> => {
+    const executeAction = async (actionType: string, payload: any): Promise<{ 
+        success: boolean, 
+        undo?: UndoPayload, 
+        error?: string, 
+        details?: any[],
+        message?: string,
+        data?: any,
+        navigate?: string
+    }> => {
         try {
             console.log("Executing Action:", actionType, payload);
             
@@ -285,6 +302,80 @@ export const AIActionCenter = () => {
                 });
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
+            
+            // 💰 FINANCE ACTIONS
+            if (actionType === 'ADD_CLIENT_NOTE') {
+                await db.clientNotes.create({
+                    clientId: payload.clientId,
+                    content: payload.content,
+                    type: payload.type || 'OTHER'
+                });
+                return { success: true, message: `✅ Agregué nota al cliente` };
+            }
+            
+            if (actionType === 'UPDATE_CLIENT_HEALTH') {
+                await db.projects.update(payload.clientId, {
+                    healthScore: payload.healthScore
+                });
+                return { success: true, message: `✅ Actualicé el health score a **${payload.healthScore}**` };
+            }
+            
+            if (actionType === 'GET_CLIENT_NOTES') {
+                const notes = await db.clientNotes.getByClient(payload.clientId);
+                return { 
+                    success: true, 
+                    data: notes,
+                    message: `📝 Encontré **${notes.length}** notas para este cliente`
+                };
+            }
+            
+            // 🤖 AUTOMATION ACTIONS
+            if (actionType === 'CREATE_SOP') {
+                await db.sops.create({
+                    title: payload.title,
+                    category: payload.category,
+                    content: payload.content
+                });
+                return { success: true, message: `✅ Creé el SOP: **${payload.title}**` };
+            }
+            
+            if (actionType === 'GET_SOPS') {
+                const sops = await db.sops.getAll();
+                const filtered = payload.category 
+                    ? sops.filter(s => s.category === payload.category)
+                    : sops;
+                return { 
+                    success: true, 
+                    data: filtered,
+                    message: `📚 Encontré **${filtered.length}** SOPs`
+                };
+            }
+            
+            // 🧭 NAVIGATION ACTIONS
+            if (actionType === 'NAVIGATE_TO') {
+                return { 
+                    success: true, 
+                    navigate: payload.path,
+                    message: `🧭 Navegando a **${payload.path}**`
+                };
+            }
+            
+            if (actionType === 'OPEN_PROJECT') {
+                return { 
+                    success: true, 
+                    navigate: `/projects/${payload.projectId}`,
+                    message: `📂 Abriendo proyecto`
+                };
+            }
+            
+            if (actionType === 'OPEN_TASK') {
+                return { 
+                    success: true, 
+                    navigate: `/tasks?highlight=${payload.taskId}`,
+                    message: `✅ Mostrando tarea`
+                };
+            }
+            
             return { success: false };
         } catch (e: any) { 
             console.error("Execute Action Error:", e);
@@ -478,37 +569,26 @@ export const AIActionCenter = () => {
             let finalMessage = parsedResponse.message || "✅ Acción completada.";
             
             if (parsedResponse.type === 'BATCH' && parsedResponse.actions) {
-                let successCount = 0;
-                let failError = '';
-                const createdTasks: any[] = [];
-                
-                for (const act of parsedResponse.actions) { 
-                    const res = await executeAction(act.action, act.payload); 
-                    if(res.success) {
-                        successCount++;
-                        // Collect created task details
-                        if (act.action === 'CREATE_TASK') {
-                            createdTasks.push({
-                                id: act.payload.id || 'new',
-                                title: act.payload.title,
-                                dueDate: act.payload.dueDate,
-                                endTime: act.payload.endTime
-                            });
-                        }
-                    }
-                    else failError = res.error || 'Error desconocido';
-                }
-                
-                if (successCount > 0) {
-                    finalMessage = `✅ Ejecuté **${successCount} acciones** exitosamente.`;
-                    // Store details for modal
-                    await db.chat.addMessage(sessionId, 'assistant', finalMessage + ' [Ver Detalles]', {
-                        type: 'BATCH_CREATE',
-                        details: createdTasks
-                    });
-                } else {
-                    finalMessage = `❌ Falló: ${failError}`;
-                    await db.chat.addMessage(sessionId, 'assistant', finalMessage);
+                // 🚀 Use multi-action handler for batch operations
+                try {
+                    const actions = parsedResponse.actions.map((act: any) => ({
+                        action: act.action,
+                        payload: act.payload
+                    }));
+                    
+                    const summary = await handleMultiActionResponse(
+                        actions,
+                        sessionId,
+                        executeAction,
+                        setExecutionProgress,
+                        navigate
+                    );
+                    
+                    await db.chat.addMessage(sessionId, 'assistant', summary);
+                    window.dispatchEvent(new Event('task-created'));
+                } catch (error) {
+                    console.error('Multi-action handler error:', error);
+                    await db.chat.addMessage(sessionId, 'assistant', '❌ Error ejecutando acciones múltiples');
                 }
             }
             else if (parsedResponse.type === 'DECISION') {
@@ -650,6 +730,34 @@ export const AIActionCenter = () => {
                             </div>
                         )}
                         {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Ejecutando...</span></div>}
+                        
+                        {/* 📊 Execution Progress UI */}
+                        {executionProgress && (
+                            <div className="self-start bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl rounded-bl-sm w-full max-w-md">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold text-indigo-700">
+                                        {executionProgress.status === 'executing' && '⚡ Ejecutando acciones...'}
+                                        {executionProgress.status === 'summarizing' && '🤖 Generando resumen...'}
+                                        {executionProgress.status === 'complete' && '✅ Completado'}
+                                    </span>
+                                    <span className="text-xs text-indigo-600 font-mono">
+                                        {executionProgress.current}/{executionProgress.total}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-white rounded-full h-2 overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
+                                        style={{ width: `${(executionProgress.current / executionProgress.total) * 100}%` }}
+                                    />
+                                </div>
+                                {executionProgress.currentAction && (
+                                    <p className="text-xs text-indigo-600 mt-2">
+                                        {executionProgress.currentAction}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                        
                         {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Escuchando...</span></div>}
                         {isTranscribing && <div className="self-end bg-blue-50 border border-blue-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-blue-500" /><span className="text-xs text-blue-600 font-bold">Transcribiendo...</span></div>}
                         <div className="h-1"></div>
