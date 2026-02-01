@@ -204,26 +204,24 @@ export default function TasksPage() {
       try {
           await googleCalendarService.authenticate();
           setGoogleAuthDone(true);
-          fetchGoogleEvents(); // Fetch immediately on fresh auth
+          fetchGoogleEvents(); 
           return true;
       } catch (e: any) {
           console.error("Auth error", e);
           if (e.error === 'access_denied') {
-              alert(
-                  "⚠️ ACCESO DENEGADO POR GOOGLE\n\n" +
-                  "Tu app está en modo 'Testing' en Google Cloud Console.\n" +
-                  "Para poder entrar, debes AGREGAR tu email a la lista de 'Test Users' (Usuarios de prueba).\n\n" +
-                  "PASOS:\n" +
-                  "1. Ve a console.cloud.google.com > APIs & Services > OAuth consent screen.\n" +
-                  "2. Baja a la sección 'Test users'.\n" +
-                  "3. Agrega tu email (lucagazze1@gmail.com).\n" +
-                  "4. Guarda y vuelve a intentar."
-              );
+              alert("Acceso denegado. Debes autorizar la app.");
           } else {
               alert("Error de autenticación: " + JSON.stringify(e));
           }
           return false;
       }
+  };
+
+  const handleGoogleLogout = () => {
+      googleCalendarService.logout();
+      setGoogleAuthDone(false);
+      setGoogleEvents([]); // Clear remote events
+      alert("Desconectado de Google Calendar.");
   };
 
   // --- SYNC CRUD LOGIC ---
@@ -252,8 +250,9 @@ export default function TasksPage() {
               });
               return result.id;
           }
-      } catch (e) {
+      } catch (e: any) {
           console.error("Google Sync Failed", e);
+          alert("Error de Sincronización Google: " + (e.message || JSON.stringify(e)));
           return null;
       }
   };
@@ -287,6 +286,8 @@ export default function TasksPage() {
       let gEventId = formData.googleEventId;
       if (googleCalendarService.getIsAuthenticated() && formData.dueDate) {
           gEventId = await syncTaskToGoogle({ ...payload, googleEventId: formData.googleEventId }, !!formData.id);
+      } else {
+          console.warn("Skipping Google Sync. Auth:", googleCalendarService.getIsAuthenticated(), "Date:", formData.dueDate);
       }
       if (gEventId) payload.googleEventId = gEventId;
 
@@ -443,22 +444,30 @@ export default function TasksPage() {
               </div>
 
               {/* Scrollable Grid */}
-              <div className="flex flex-1 overflow-y-auto relative custom-scrollbar">
+              <div className="flex flex-1 overflow-y-auto relative custom-scrollbar bg-white dark:bg-slate-900">
                   {/* Time Axis */}
-                  <div className="w-14 flex-shrink-0 flex flex-col items-end pr-2 pt-2 bg-white dark:bg-slate-900 sticky left-0 z-10 border-r border-gray-200 dark:border-slate-800">
+                  <div className="w-16 flex-shrink-0 relative h-[672px] bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
                       {hours.map(h => (
-                          <div key={h} className="h-[60px] text-xs text-gray-400 font-medium -mt-2.5">
-                              {h}:00
-                          </div>
+                          <span 
+                            key={h} 
+                            className="absolute right-3 text-xs font-medium text-gray-400 dark:text-gray-500 font-mono -translate-y-1/2"
+                            style={{ top: `${h * 28}px` }}
+                          >
+                                {h}:00
+                          </span>
                       ))}
                   </div>
 
                   {/* Columns */}
-                  <div className="flex-1 flex relative min-w-[500px]"> {/* min-w ensure scroll on mobile */}
+                  <div className="flex-1 flex relative min-w-[600px] h-[672px]"> 
                       {/* Horizontal Lines */}
                       <div className="absolute inset-0 z-0 pointer-events-none">
                           {hours.map(h => (
-                              <div key={h} className="h-[60px] border-b border-gray-100 dark:border-slate-800 w-full" />
+                              <div 
+                                key={h} 
+                                className="absolute left-0 right-0 border-b border-gray-100 dark:border-slate-800 dashed"
+                                style={{ top: `${h * 28}px` }}
+                              />
                           ))}
                       </div>
 
@@ -469,29 +478,31 @@ export default function TasksPage() {
                           return (
                               <div 
                                 key={i} 
-                                className={`flex-1 relative border-l border-gray-100 dark:border-slate-800 h-[1440px] group ${isToday ? 'bg-blue-50/10' : ''}`}
-                                onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} // Simple drag fallback
+                                className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors h-[672px] group ${isToday ? 'bg-blue-50/10' : ''}`}
+                                onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} 
                                 onDrop={(e) => handleDrop(e, date)}
                               >
+                                  {/* Vertical Hour Lines (Subtle) */}
+                                   <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
+
                                   {/* Render Tasks */}
                                   {[...dayTasks, ...dayGoogle].map((item: any) => {
-                                      // Calculate position
-                                      // Check if item is google event (has 'start') or task (has 'dueDate')
                                       let start: Date, id: string, title: string, isGoogle = false;
                                       
-                                      if (item.start) { // Google Event
+                                      if (item.start) { 
                                           start = new Date(item.start.dateTime || item.start.date);
                                           id = item.id;
                                           title = item.summary;
                                           isGoogle = true;
-                                      } else { // Local Task
+                                      } else { 
                                           start = new Date(item.dueDate);
                                           id = item.id;
                                           title = item.title;
                                       }
 
-                                      const top = start.getHours() * 60 + start.getMinutes();
-                                      const height = 60; // Default 1h duration
+                                      const minutesTotal = start.getHours() * 60 + start.getMinutes();
+                                      const top = minutesTotal * (28 / 60); 
+                                      const height = 28; 
 
                                       return (
                                           <div
@@ -501,18 +512,20 @@ export default function TasksPage() {
                                               draggable={!isGoogle}
                                               onDragStart={(e) => !isGoogle && e.dataTransfer.setData('taskId', id)}
                                               className={`
-                                                  absolute inset-x-1 rounded-lg px-2 py-1 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform z-10
+                                                  absolute left-1 right-2 rounded-lg px-3 py-1 text-[10px] font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
                                                   ${isGoogle 
-                                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-800 dark:text-indigo-200' 
+                                                      ? 'bg-white border-blue-200 text-blue-700 shadow-[0_2px_8px_rgba(59,130,246,0.15)] dark:bg-slate-800 dark:border-blue-900 dark:text-blue-300' 
                                                       : item.status === 'DONE' 
-                                                          ? 'bg-gray-100 text-gray-400 border-gray-200 line-through opacity-70' 
-                                                          : 'bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-200'
+                                                          ? 'bg-green-100 text-green-700 border-green-200 opacity-90' 
+                                                          : 'bg-gradient-to-br from-indigo-50 to-white border-indigo-200 text-indigo-800 dark:from-indigo-900 dark:to-slate-900 dark:border-indigo-700 dark:text-indigo-200'
                                                   }
                                               `}
                                               style={{ top: `${top}px`, height: `${height}px` }}
                                           >
-                                              {isGoogle && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 inline mr-1 opacity-70" alt="G" />}
-                                              {title}
+                                              <div className="flex items-center gap-1.5">
+                                                {isGoogle && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-70" alt="G" />}
+                                                <span className="truncate leading-tight">{title}</span>
+                                              </div>
                                           </div>
                                       );
                                   })}
@@ -524,9 +537,9 @@ export default function TasksPage() {
                       {daysToShow.some(d => d.toDateString() === new Date().toDateString()) && (
                           <div 
                               className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center"
-                              style={{ top: `${new Date().getHours() * 60 + new Date().getMinutes()}px` }}
+                              style={{ top: `${(new Date().getHours() * 60 + new Date().getMinutes()) * (28/60)}px` }}
                           >
-                              <div className="w-2 h-2 rounded-full bg-red-500 -ml-1"></div>
+                              <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-sm"></div>
                           </div>
                       )}
                   </div>
@@ -565,9 +578,9 @@ export default function TasksPage() {
               </div>
 
               {/* Grid */}
-              <div className="grid grid-cols-7 grid-rows-6 flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto">
+              <div className="grid grid-cols-7 auto-rows-fr flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto">
                   {daysArray.map((date, i) => {
-                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50"></div>;
+                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50 min-h-[80px]"></div>;
                       
                       const dayTasks = filteredTasks.filter(t => {
                           if (!t.dueDate) return false;
@@ -600,9 +613,9 @@ export default function TasksPage() {
                                           onContextMenu={(e) => handleContextMenu(e, t)}
                                           onClick={() => handleEdit(t)}
                                           className={`
-                                              text-[10px] px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1
+                                              text-[10px] px-2 py-1 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1
                                               ${t.status === TaskStatus.DONE 
-                                                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 border-gray-200 line-through' 
+                                                  ? 'bg-green-100 text-green-700 border-green-200 opacity-90' 
                                                   : t.priority === 'HIGH' 
                                                       ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
                                                       : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
@@ -649,18 +662,18 @@ export default function TasksPage() {
       
       {/* Header */}
       {/* Header */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 flex-shrink-0 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 flex-shrink-0 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
         
         {/* Left: Title & Date Nav */}
-        <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-                <CalendarIcon className="w-6 h-6 text-blue-600"/> Agenda
+        <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-blue-600"/> Agenda
             </h1>
             
-            <div className="flex items-center gap-4 mt-2">
-                <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-lg p-1">
-                    <button onClick={() => changeDate(-1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronLeft className="w-5 h-5"/></button>
-                    <button onClick={() => setReferenceDate(new Date())} className="px-3 py-1 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-black">Hoy</button>
+            <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-lg p-0.5">
+                    <button onClick={() => changeDate(-1)} className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronLeft className="w-4 h-4"/></button>
+                    <button onClick={() => setReferenceDate(new Date())} className="px-2 py-0.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-black">Hoy</button>
                     <button onClick={() => changeDate(1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronRight className="w-5 h-5"/></button>
                 </div>
                 <h2 className="text-xl font-medium capitalize text-gray-900 dark:text-white min-w-[200px]">
@@ -671,6 +684,18 @@ export default function TasksPage() {
                             : referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
                     }
                 </h2>
+                
+                {/* Google Status/Reconnect */}
+                <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={googleAuthDone ? handleGoogleLogout : handleGoogleAuth}
+                    className={`ml-2 text-xs border gap-1 rounded-lg h-7 px-2 ${googleAuthDone ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'}`}
+                    title={googleAuthDone ? "Conectado (Click para desconectar)" : "Desconectado (Click para conectar)"}
+                >
+                    <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-70" alt="G" />
+                    {googleAuthDone ? "Conectado" : "Conectar"}
+                </Button>
             </div>
         </div>
         

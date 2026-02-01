@@ -21,6 +21,14 @@ export const googleCalendarService = {
   
   getIsAuthenticated: () => isAuthenticated,
 
+  logout: () => {
+    isAuthenticated = false;
+    tokenClient = null;
+    (window as any).gapi.client.setToken(null);
+    localStorage.removeItem('google_access_token');
+    localStorage.removeItem('google_token_expiry');
+  },
+
   /**
    * Carga los scripts necesarios de Google (GAPI y GIS) dinámicamente
    */
