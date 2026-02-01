@@ -233,14 +233,14 @@ export const db = {
                       .order('created_at', { ascending: true })
           );
       },
-      addMessage: async (sessionId: string, role: 'user' | 'assistant', content: string, actionData?: { type: string, payload: any }): Promise<void> => {
+      addMessage: async (sessionId: string, role: 'user' | 'assistant', content: string, actionData?: { type: string, payload: any, details?: any[], entities?: any[] }): Promise<void> => {
           const { error } = await supabase.from('aichatlog').insert({
               session_id: sessionId,
               role,
               content,
               created_at: new Date().toISOString(),
               action_type: actionData?.type || null,
-              action_payload: actionData?.payload || null,
+              action_payload: actionData || null, // Save the ENTIRE actionData object, not just payload
               is_undone: false
           });
           if (error) console.error("Error adding message:", error);

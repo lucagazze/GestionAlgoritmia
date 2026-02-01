@@ -32,11 +32,22 @@ export const ai = {
                   role: 'user',
                   parts: [
                       { inlineData: audioData },
-                      { text: "Transcribe este audio." }
+                      { text: "Transcribe exactamente lo que se dice en este audio. Devuelve SOLO el texto transcrito, sin introducción, sin explicación, sin formato. Solo el texto que se escucha." }
                   ]
               }]
           });
-          return response.text;
+          
+          // Clean up response - remove markdown formatting and AI commentary
+          let text = response.text || '';
+          
+          // Remove common AI prefixes/suffixes
+          text = text.replace(/^(claro,?\s*)?aquí\s+(tienes|está)\s+(la\s+)?transcripción(\s+del\s+audio)?:?\s*/i, '');
+          text = text.replace(/^(la\s+)?transcripción\s+(es|dice):?\s*/i, '');
+          text = text.replace(/^["'`]+|["'`]+$/g, ''); // Remove quotes/backticks at start/end
+          text = text.replace(/^\*+|\*+$/g, ''); // Remove asterisks at start/end
+          text = text.trim();
+          
+          return text;
       } catch (error) {
           console.error("Transcription Error:", error);
           return null;

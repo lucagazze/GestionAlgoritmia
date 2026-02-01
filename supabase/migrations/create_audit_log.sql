@@ -18,8 +18,14 @@ CREATE INDEX IF NOT EXISTS idx_audit_entity ON "AuditLog"("entityType", "entityI
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON "AuditLog"(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_operation ON "AuditLog"(operation);
 
--- Enable Row Level Security (optional)
+-- Enable Row Level Security
 ALTER TABLE "AuditLog" ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow all operations (adjust based on your auth requirements)
+CREATE POLICY "Allow all operations on AuditLog" ON "AuditLog"
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
 
 -- Example queries:
 -- Get all changes for a task: SELECT * FROM "AuditLog" WHERE "entityType" = 'TASK' AND "entityId" = 'uuid';

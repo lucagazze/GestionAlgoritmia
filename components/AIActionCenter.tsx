@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
@@ -712,6 +713,17 @@ export const AIActionCenter = () => {
                              const entities = metadata?.entities;
                              const details = metadata?.details;
                              
+                             // Debug log
+                             if (msg.role === 'assistant' && metadata) {
+                                 console.log('📋 Message metadata:', { 
+                                     id: msg.id, 
+                                     content: msg.content.substring(0, 50),
+                                     metadata,
+                                     hasDetails: !!details,
+                                     details 
+                                 });
+                             }
+                             
                              return (
                              <div key={msg.id || idx} className={`flex flex-col max-w-[95%] md:max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
                                  <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
@@ -720,6 +732,7 @@ export const AIActionCenter = () => {
                                          role={msg.role} 
                                          entities={entities}
                                          onShowDetails={details ? () => {
+                                             console.log('🔍 Ver Detalles clicked:', { details, metadata });
                                              setDetailsModal({
                                                  isOpen: true,
                                                  actionType: metadata.type?.includes('DELETE') ? 'DELETE' : metadata.type?.includes('CREATE') ? 'CREATE' : 'UPDATE',
@@ -819,17 +832,21 @@ export const AIActionCenter = () => {
             </div>
             
             {/* Action Details Modal */}
-            <ActionDetailsModal
-                isOpen={detailsModal.isOpen}
-                onClose={() => setDetailsModal(prev => ({ ...prev, isOpen: false }))}
-                actionType={detailsModal.actionType}
-                items={detailsModal.items}
-                onUndo={detailsModal.messageId ? async () => {
-                    const msg = messages.find(m => m.id === detailsModal.messageId);
-                    if (msg) await handleUndoMessage(msg);
-                    setDetailsModal(prev => ({ ...prev, isOpen: false }));
-                } : undefined}
-            />
+            {/* Action Details Modal - Rendered in Portal to avoid transform issues */}
+            {detailsModal.isOpen && createPortal(
+                <ActionDetailsModal
+                    isOpen={detailsModal.isOpen}
+                    onClose={() => setDetailsModal(prev => ({ ...prev, isOpen: false }))}
+                    actionType={detailsModal.actionType}
+                    items={detailsModal.items}
+                    onUndo={detailsModal.messageId ? async () => {
+                        const msg = messages.find(m => m.id === detailsModal.messageId);
+                        if (msg) await handleUndoMessage(msg);
+                        setDetailsModal(prev => ({ ...prev, isOpen: false }));
+                    } : undefined}
+                />,
+                document.body
+            )}
         </div>
     );
 };
