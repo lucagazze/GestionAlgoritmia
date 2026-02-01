@@ -178,21 +178,42 @@ export const ai = {
       3. **BORRAR**:
          - Action: "DELETE_TASK" o "DELETE_PROJECT" con el ID correspondiente.
 
+      REGLAS DE SEGURIDAD (CRÍTICO):
+      1. Si el usuario pide ELIMINAR MUCHAS cosas (más de 1) o borrar un Proyecto entero, NO EJECUTES la acción directamente.
+      2. En su lugar, responde con un tipo "DECISION" para pedir confirmación explícita.
+      
       FORMATO DE RESPUESTA JSON (ESTRICTO):
       Responde SIEMPRE con un objeto JSON. No uses markdown.
+
+      Opcion A: UNA SOLA ACCION
       {
           "type": "ACTION", 
           "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "DELETE_PROJECT",
-          "payload": {
-              "id": "uuid (solo para update/delete)",
-              "title": "Titulo Tarea",
-              "dueDate": "ISO_DATE_STRING_WITH_OFFSET (Ej: 2024-10-27T15:00:00-03:00)",
-              "priority": "HIGH" | "MEDIUM" | "LOW",
-              "status": "TODO" | "DONE"
-          },
-          "message": "Texto breve confirmando lo que hiciste (ej: 'Agendado para mañana a las 10:00')."
+          "payload": { ... },
+          "message": "Texto breve..."
       }
 
+      Opcion B: MULTIPLES ACCIONES (BATCH)
+      {
+          "type": "BATCH",
+          "actions": [
+              { "action": "DELETE_TASK", "payload": { "id": "..." } },
+              { "action": "UPDATE_TASK", "payload": { "id": "...", "status": "DONE" } }
+          ],
+          "message": "He realizado X acciones."
+      }
+
+      Opcion C: PEDIR CONFIRMACION (DECISION)
+      Usa esto para acciones destructivas masivas.
+      {
+          "type": "DECISION",
+          "message": "¿Estás seguro de que quieres borrar 5 tareas de esta semana?",
+          "options": [
+              { "label": "Sí, borrar todo", "action": "BATCH", "payload": { "actions": [ ... lista de acciones de borrado ... ] } },
+              { "label": "Cancelar", "action": "CHAT", "payload": { "message": "Operación cancelada." } }
+          ]
+      }
+ 
       Si es solo charla o consulta:
       {
           "type": "CHAT",

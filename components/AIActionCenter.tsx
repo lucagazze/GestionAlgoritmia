@@ -221,7 +221,19 @@ export const AIActionCenter = () => {
                 });
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
-            return { success: false };
+            if (actionType === 'BATCH') {
+                const results = [];
+                for (const act of payload.actions) {
+                    const res = await executeAction(act.action, act.payload);
+                    results.push(res);
+                }
+                const successCount = results.filter(r => r.success).length;
+                return { 
+                    success: successCount > 0, 
+                    error: successCount === results.length ? undefined : `Ejecutadas ${successCount}/${results.length} acciones.` 
+                };
+            }
+            return { success: false, error: "Acción no reconocida" };
         } catch (e: any) { 
             console.error("Execute Action Error:", e);
             // Detect RLS errors
