@@ -57,7 +57,6 @@ export default function TasksPage() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; task: Task | null }>({ x: 0, y: 0, task: null });
 
   const [isAiGenerating, setIsAiGenerating] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [googleAuthDone, setGoogleAuthDone] = useState(false);
 
   const [formData, setFormData] = useState<{
@@ -107,7 +106,7 @@ export default function TasksPage() {
 
       runSync();
 
-      interval = setInterval(runSync, 60000); // Poll every 1 minute
+      interval = setInterval(runSync, 15000); // Poll every 15 seconds
 
       return () => clearInterval(interval);
   }, [referenceDate, googleAuthDone]);
@@ -294,11 +293,13 @@ export default function TasksPage() {
       if (formData.id) {
           await db.tasks.update(formData.id, payload);
       } else {
+          // If we have a google ID, we must save it with the task so duplication is avoided
           await db.tasks.create(payload);
       }
       setIsModalOpen(false);
       resetForm();
-      loadData();
+      await loadData(); // Reload local tasks first
+      fetchGoogleEvents(); // Then refresh google view
   };
 
   const resetForm = () => {
@@ -325,7 +326,8 @@ export default function TasksPage() {
       if(confirm('¿Borrar tarea?')) {
           if (task.googleEventId) await deleteFromGoogle(task.googleEventId);
           await db.tasks.delete(task.id);
-          loadData();
+          await loadData();
+          fetchGoogleEvents();
       }
       handleCloseContextMenu();
   };
@@ -347,38 +349,193 @@ export default function TasksPage() {
               }
 
               await db.tasks.update(taskId, { dueDate: newIso });
-              loadData();
+              await loadData();
+              fetchGoogleEvents();
           }
       }
   };
 
-  const manualSyncAll = async () => {
-      if (!await handleGoogleAuth()) return;
-      setIsSyncing(true);
-      try {
-          // Sync pending tasks that have dates but no google ID yet
-          const pending = tasks.filter(t => t.status !== TaskStatus.DONE && t.dueDate && !t.googleEventId);
-          let count = 0;
-          for (const t of pending) {
-              const gId = await syncTaskToGoogle(t, false);
-              if (gId) {
-                  await db.tasks.update(t.id, { googleEventId: gId });
-                  count++;
-              }
-          }
-          alert(`Sincronización completada. ${count} tareas enviadas a Google.`);
-          loadData();
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setIsSyncing(false);
-      }
-  };
+
 
   // --- RENDERING HELPERS ---
   const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // Calendar Logic
+  // Helpers
+  const changeDate = (direction: number) => {
+      const newDate = new Date(referenceDate);
+      if (viewMode === 'TODAY') {
+          newDate.setDate(newDate.getDate() + direction);
+      } else if (viewMode === 'WEEK') {
+          newDate.setDate(newDate.getDate() + (direction * 7));
+      } else {
+          newDate.setMonth(newDate.getMonth() + direction);
+      }
+      setReferenceDate(newDate);
+  };
+
+  const getWeekRange = (date: Date) => {
+      const start = new Date(date);
+      const day = start.getDay() || 7; // 1=Mon, 7=Sun
+      if (day !== 1) start.setHours(-24 * (day - 1)); // Go to Monday
+      
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      
+      return `${start.getDate()} - ${end.getDate()} ${end.toLocaleDateString('es-ES', { month: 'short' })}`;
+  };
+  
+  // Gets all events (local + google) for a specific date
+  const getEventsForDate = (date: Date) => {
+      const dayTasks = filteredTasks.filter(t => {
+          if (!t.dueDate) return false;
+          const tDate = new Date(t.dueDate);
+          return tDate.getDate() === date.getDate() && tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
+      });
+
+      const dayGoogle = googleEvents.filter(ev => {
+          const evDate = new Date(ev.start.dateTime || ev.start.date);
+          if (evDate.getDate() !== date.getDate() || evDate.getMonth() !== date.getMonth() || evDate.getFullYear() !== date.getFullYear()) return false;
+          // De-duplicate
+          if (dayTasks.some(t => t.googleEventId === ev.id)) return false;
+          return true;
+      });
+
+      return { dayTasks, dayGoogle };
+  };
+
+  // --- TIME GRID RENDERER (Day/Week) ---
+  const renderTimeGrid = () => {
+      const isWeek = viewMode === 'WEEK';
+      const hours = Array.from({ length: 24 }, (_, i) => i);
+      
+      // Determine columns
+      let daysToShow: Date[] = [];
+      if (isWeek) {
+          const start = new Date(referenceDate);
+          const day = start.getDay() || 7; 
+          start.setDate(start.getDate() - (day - 1)); // Monday
+          daysToShow = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date(start);
+              d.setDate(d.getDate() + i);
+              return d;
+          });
+      } else {
+          daysToShow = [new Date(referenceDate)];
+      }
+
+      return (
+          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              {/* Header Row */}
+              <div className="flex border-b border-gray-200 dark:border-slate-800 ml-14">
+                  {daysToShow.map((date, i) => {
+                       const isToday = new Date().toDateString() === date.toDateString();
+                       return (
+                           <div key={i} className={`flex-1 text-center py-3 border-l border-gray-100 dark:border-slate-800 ${isToday ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                               <div className={`text-xs uppercase font-semibold ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>
+                                   {date.toLocaleDateString('es-ES', { weekday: 'short' })}
+                               </div>
+                               <div className={`text-xl font-bold mt-1 inline-flex w-8 h-8 items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-gray-900 dark:text-white'}`}>
+                                   {date.getDate()}
+                               </div>
+                           </div>
+                       );
+                  })}
+              </div>
+
+              {/* Scrollable Grid */}
+              <div className="flex flex-1 overflow-y-auto relative custom-scrollbar">
+                  {/* Time Axis */}
+                  <div className="w-14 flex-shrink-0 flex flex-col items-end pr-2 pt-2 bg-white dark:bg-slate-900 sticky left-0 z-10 border-r border-gray-200 dark:border-slate-800">
+                      {hours.map(h => (
+                          <div key={h} className="h-[60px] text-xs text-gray-400 font-medium -mt-2.5">
+                              {h}:00
+                          </div>
+                      ))}
+                  </div>
+
+                  {/* Columns */}
+                  <div className="flex-1 flex relative min-w-[500px]"> {/* min-w ensure scroll on mobile */}
+                      {/* Horizontal Lines */}
+                      <div className="absolute inset-0 z-0 pointer-events-none">
+                          {hours.map(h => (
+                              <div key={h} className="h-[60px] border-b border-gray-100 dark:border-slate-800 w-full" />
+                          ))}
+                      </div>
+
+                      {daysToShow.map((date, i) => {
+                          const { dayTasks, dayGoogle } = getEventsForDate(date);
+                          const isToday = new Date().toDateString() === date.toDateString();
+
+                          return (
+                              <div 
+                                key={i} 
+                                className={`flex-1 relative border-l border-gray-100 dark:border-slate-800 h-[1440px] group ${isToday ? 'bg-blue-50/10' : ''}`}
+                                onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} // Simple drag fallback
+                                onDrop={(e) => handleDrop(e, date)}
+                              >
+                                  {/* Render Tasks */}
+                                  {[...dayTasks, ...dayGoogle].map((item: any) => {
+                                      // Calculate position
+                                      // Check if item is google event (has 'start') or task (has 'dueDate')
+                                      let start: Date, id: string, title: string, isGoogle = false;
+                                      
+                                      if (item.start) { // Google Event
+                                          start = new Date(item.start.dateTime || item.start.date);
+                                          id = item.id;
+                                          title = item.summary;
+                                          isGoogle = true;
+                                      } else { // Local Task
+                                          start = new Date(item.dueDate);
+                                          id = item.id;
+                                          title = item.title;
+                                      }
+
+                                      const top = start.getHours() * 60 + start.getMinutes();
+                                      const height = 60; // Default 1h duration
+
+                                      return (
+                                          <div
+                                              key={id}
+                                              onClick={(e) => { e.stopPropagation(); !isGoogle && handleEdit(item); }}
+                                              onContextMenu={(e) => !isGoogle && handleContextMenu(e, item)}
+                                              draggable={!isGoogle}
+                                              onDragStart={(e) => !isGoogle && e.dataTransfer.setData('taskId', id)}
+                                              className={`
+                                                  absolute inset-x-1 rounded-lg px-2 py-1 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform z-10
+                                                  ${isGoogle 
+                                                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/40 dark:border-indigo-800 dark:text-indigo-200' 
+                                                      : item.status === 'DONE' 
+                                                          ? 'bg-gray-100 text-gray-400 border-gray-200 line-through opacity-70' 
+                                                          : 'bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-200'
+                                                  }
+                                              `}
+                                              style={{ top: `${top}px`, height: `${height}px` }}
+                                          >
+                                              {isGoogle && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 inline mr-1 opacity-70" alt="G" />}
+                                              {title}
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          );
+                      })}
+                      
+                      {/* Current Time Line */}
+                      {daysToShow.some(d => d.toDateString() === new Date().toDateString()) && (
+                          <div 
+                              className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center"
+                              style={{ top: `${new Date().getHours() * 60 + new Date().getMinutes()}px` }}
+                          >
+                              <div className="w-2 h-2 rounded-full bg-red-500 -ml-1"></div>
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      );
+  };
+    
+  // Calendar Logic (Month)
   const renderCalendar = () => {
       const year = referenceDate.getFullYear();
       const month = referenceDate.getMonth();
@@ -491,60 +648,67 @@ export default function TasksPage() {
     <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col pb-6">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
-        <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Gestión de Tareas</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Organiza el trabajo del equipo.</p>
+      {/* Header */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 flex-shrink-0 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
+        
+        {/* Left: Title & Date Nav */}
+        <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+                <CalendarIcon className="w-6 h-6 text-blue-600"/> Agenda
+            </h1>
+            
+            <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-lg p-1">
+                    <button onClick={() => changeDate(-1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={() => setReferenceDate(new Date())} className="px-3 py-1 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:text-black">Hoy</button>
+                    <button onClick={() => changeDate(1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronRight className="w-5 h-5"/></button>
+                </div>
+                <h2 className="text-xl font-medium capitalize text-gray-900 dark:text-white min-w-[200px]">
+                    {viewMode === 'TODAY' 
+                        ? referenceDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) 
+                        : viewMode === 'WEEK'
+                            ? `Semana del ${getWeekRange(referenceDate)}`
+                            : referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+                    }
+                </h2>
+            </div>
         </div>
         
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-xl flex self-start md:self-auto">
-                 <button onClick={() => setViewMode('CALENDAR')} className={`p-2 rounded-lg transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><CalendarIcon className="w-4 h-4"/></button>
-                 <button onClick={() => setViewMode('WEEK')} className={`p-2 rounded-lg transition-all ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
+        {/* Right: Controls */}
+        <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
+             {/* View Switcher */}
+             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex w-full md:w-auto">
+                 {([['TODAY', 'Día'], ['WEEK', 'Semana'], ['CALENDAR', 'Mes']] as const).map(([mode, label]) => (
+                     <button 
+                        key={mode}
+                        onClick={() => setViewMode(mode as ViewMode)} 
+                        className={`
+                            flex-1 md:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all
+                            ${viewMode === mode 
+                                ? 'bg-white dark:bg-slate-700 text-black dark:text-white shadow-sm' 
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}
+                        `}
+                     >
+                         {label}
+                     </button>
+                 ))}
              </div>
-             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar tarea..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-             <Button onClick={manualSyncAll} variant="secondary" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100">
-                 {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarCheck className="w-4 h-4 mr-2" />} Sync Calendar
+
+             <div className="h-6 w-px bg-gray-300 dark:bg-slate-700 hidden md:block mx-2"></div>
+
+             <div className="relative flex-1 md:min-w-[200px] w-full">
+                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+                 <Input placeholder="Buscar..." className="pl-9 h-10 w-full bg-gray-50 dark:bg-slate-800/50 border-transparent focus:bg-white transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+             </div>
+             
+             <Button onClick={() => { setIsModalOpen(true); resetForm(); }} className="w-full md:w-auto shadow-lg bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
+                 <Plus className="w-4 h-4 mr-2" /> Crear
              </Button>
-             <Button onClick={() => { setIsModalOpen(true); resetForm(); }} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Nueva Tarea</Button>
         </div>
       </div>
 
       {/* Content */}
-      {viewMode === 'CALENDAR' ? renderCalendar() : (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm overflow-auto flex-1 custom-scrollbar">
-              <div className="space-y-2">
-                   {filteredTasks.length === 0 && <p className="text-center text-gray-400 py-10">No hay tareas encontradas.</p>}
-                   {filteredTasks.map(t => (
-                       <div key={t.id} onContextMenu={(e) => handleContextMenu(e, t)} onClick={() => handleEdit(t)} className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-800 cursor-pointer group transition-all">
-                           <div className="flex items-center gap-4">
-                               <button 
-                                onClick={(e) => { e.stopPropagation(); db.tasks.updateStatus(t.id, t.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(loadData); }}
-                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${t.status === TaskStatus.DONE ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500'}`}
-                                >
-                                   {t.status === TaskStatus.DONE && <CheckCircle2 className="w-4 h-4" />}
-                               </button>
-                               <div>
-                                   <div className="flex items-center gap-2">
-                                     <h4 className={`font-bold text-sm ${t.status === TaskStatus.DONE ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{t.title}</h4>
-                                     {t.googleEventId && <span title="Sincronizada con Google"><Link className="w-3 h-3 text-blue-400" /></span>}
-                                   </div>
-                                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                       {t.dueDate && <span className={`flex items-center gap-1 ${new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE ? 'text-red-500 font-bold' : ''}`}><Clock className="w-3 h-3"/> {new Date(t.dueDate).toLocaleDateString()}</span>}
-                                       {t.assignee && <span className="flex items-center gap-1"><User className="w-3 h-3"/> {t.assignee.name}</span>}
-                                       {t.sopId && <span className="flex items-center gap-1 text-purple-500"><Book className="w-3 h-3"/> Con SOP</span>}
-                                   </div>
-                               </div>
-                           </div>
-                           <div className="flex items-center gap-3">
-                               <Badge variant={t.priority === 'HIGH' ? 'red' : t.priority === 'MEDIUM' ? 'yellow' : 'blue'}>{t.priority}</Badge>
-                               <button onClick={(e) => {e.stopPropagation(); handleEdit(t)}} className="p-2 text-gray-300 hover:text-black dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4"/></button>
-                           </div>
-                       </div>
-                   ))}
-              </div>
-          </div>
-      )}
+      {viewMode === 'CALENDAR' ? renderCalendar() : renderTimeGrid()}
 
       {/* Edit/Create Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'Editar Tarea' : 'Nueva Tarea'}>
@@ -634,7 +798,7 @@ export default function TasksPage() {
       <ContextMenu 
         x={contextMenu.x} y={contextMenu.y} isOpen={!!contextMenu.task} onClose={handleCloseContextMenu}
         items={[
-            { label: contextMenu.task?.status === TaskStatus.DONE ? 'Marcar Pendiente' : 'Completar Tarea', icon: CheckCircle2, onClick: () => { if(contextMenu.task) db.tasks.updateStatus(contextMenu.task.id, contextMenu.task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(loadData); handleCloseContextMenu(); } },
+            { label: contextMenu.task?.status === TaskStatus.DONE ? 'Marcar Pendiente' : 'Completar Tarea', icon: CheckCircle2, onClick: () => { if(contextMenu.task) db.tasks.updateStatus(contextMenu.task.id, contextMenu.task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(() => { loadData(); fetchGoogleEvents(); }); handleCloseContextMenu(); } },
             { label: 'Editar', icon: Edit2, onClick: () => { if(contextMenu.task) handleEdit(contextMenu.task); } },
             { label: 'Ver SOP Asociado', icon: Book, onClick: () => { if(contextMenu.task?.sopId) handleViewSOP(contextMenu.task.sopId); else alert("Esta tarea no tiene SOP vinculado."); handleCloseContextMenu(); } },
             { label: 'Recordar por WhatsApp', icon: MessageCircle, onClick: () => { if(contextMenu.task) sendPartnerReminder(contextMenu.task); handleCloseContextMenu(); } },
