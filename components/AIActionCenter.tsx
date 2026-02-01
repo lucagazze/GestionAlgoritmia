@@ -106,6 +106,8 @@ const MessageRenderer = ({ content, role, entities, onShowDetails }: {
     );
 };
 
+import { parseMultiTaskRequest } from '../utils/taskParser';
+
 export const AIActionCenter = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -422,21 +424,25 @@ export const AIActionCenter = () => {
                 return; 
             }
             
+            // ✨ APPLY MULTI-TASK PARSER
+            const parsedResponse = parseMultiTaskRequest(userText, response);
+            console.log('📊 PARSED RESPONSE:', parsedResponse);
+            
             // Validate response - NEVER allow passive responses
-            if (response.type === 'CHAT' && (!response.message || response.message.toLowerCase().includes('entendido'))) {
+            if (parsedResponse.type === 'CHAT' && (!parsedResponse.message || parsedResponse.message.toLowerCase().includes('entendido'))) {
                 await db.chat.addMessage(sessionId, 'assistant', "⚠️ Error interno: Respuesta inválida. Por favor reformula tu solicitud.");
                 setIsThinking(false);
                 return;
             }
             
-            let finalMessage = response.message || "✅ Acción completada.";
+            let finalMessage = parsedResponse.message || "✅ Acción completada.";
             
-            if (response.type === 'BATCH' && response.actions) {
+            if (parsedResponse.type === 'BATCH' && parsedResponse.actions) {
                 let successCount = 0;
                 let failError = '';
                 const createdTasks: any[] = [];
                 
-                for (const act of response.actions) { 
+                for (const act of parsedResponse.actions) { 
                     const res = await executeAction(act.action, act.payload); 
                     if(res.success) {
                         successCount++;
@@ -465,16 +471,16 @@ export const AIActionCenter = () => {
                     await db.chat.addMessage(sessionId, 'assistant', finalMessage);
                 }
             }
-            else if (response.type === 'DECISION') {
-                setDecisionOptions(response.options || []);
+            else if (parsedResponse.type === 'DECISION') {
+                setDecisionOptions(parsedResponse.options || []);
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
             }
             else if (response.type === 'QUESTION') {
                 // AI is asking for clarification
                 await db.chat.addMessage(sessionId, 'assistant', `❓ ${response.message}\n\n_${response.context || 'Necesito esta información para continuar.'}_`);
             }
-            else if (response.type === 'ACTION') {
-                const result = await executeAction(response.action, response.payload);
+            else if (parsedResponse.type === 'ACTION') {
+                const result = await executeAction(parsedResponse.action, parsedResponse.payload);
                 if (result.success) {
                     // Store details and entities in message metadata
                     const metadata: any = { type: response.action, payload: result.undo };
@@ -482,7 +488,7 @@ export const AIActionCenter = () => {
                     // Use details from executeAction if available, otherwise from AI response
                     const actionDetails = result.details || response.details;
                     if (actionDetails) metadata.details = actionDetails;
-                    if (response.entities) metadata.entities = response.entities;
+                    if (parsedResponse.entities) metadata.entities = parsedResponse.entities;
                     
                     // Enhance message with [Ver Detalles] if bulk action
                     let enhancedMessage = finalMessage;
