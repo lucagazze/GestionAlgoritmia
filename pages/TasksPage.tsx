@@ -30,7 +30,8 @@ import {
   Share2,
   Download,
   CalendarCheck,
-  RefreshCw
+  RefreshCw,
+  Link
 } from 'lucide-react';
 
 // View Modes
@@ -56,6 +57,7 @@ export default function TasksPage() {
 
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [googleAuthDone, setGoogleAuthDone] = useState(false);
 
   const [formData, setFormData] = useState<{
     id?: string;
@@ -66,6 +68,7 @@ export default function TasksPage() {
     priority: 'LOW' | 'MEDIUM' | 'HIGH';
     status: TaskStatus;
     sopId: string; // New
+    googleEventId?: string; // New
   }>({
     title: '',
     description: '',
@@ -157,57 +160,58 @@ export default function TasksPage() {
 
   // --- CALENDAR SYNC FUNCTIONS ---
   
-  const formatDateForCalendar = (dateStr: string) => {
-      const date = new Date(dateStr);
-      return date.toISOString().replace(/-|:|\.\d\d\d/g, "");
+  const handleGoogleAuth = async () => {
+      try {
+          await googleCalendarService.authenticate();
+          setGoogleAuthDone(true);
+          return true;
+      } catch (e: any) {
+          console.error("Auth error", e);
+          if (e.error === 'access_denied') {
+              alert("Acceso denegado. Asegúrate de añadir tu usuario en 'Test Users' en Google Cloud si la app está en modo prueba.");
+          }
+          return false;
+      }
   };
 
-  const handleGoogleSync = async () => {
-      // 1. Get Pending Tasks
-      const pendingTasks = tasks.filter(t => t.status !== TaskStatus.DONE && t.dueDate);
-      if (pendingTasks.length === 0) return alert("No hay tareas pendientes con fecha para sincronizar.");
+  // --- SYNC CRUD LOGIC ---
+  const syncTaskToGoogle = async (task: any, isUpdate: boolean = false) => {
+      // Only sync if auth is done and date is present
+      if (!googleCalendarService.getIsAuthenticated() || !task.dueDate) return null;
 
-      setIsSyncing(true);
+      const start = new Date(task.dueDate);
+      const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour default
+
       try {
-          // 2. Auth with Google
-          await googleCalendarService.authenticate();
-          
-          let count = 0;
-          // 3. Loop and Create
-          for (const t of pendingTasks) {
-              if (!t.dueDate) continue;
-              const start = new Date(t.dueDate);
-              const end = new Date(start.getTime() + 60 * 60 * 1000); // 1 hour default
-
-              await googleCalendarService.createEvent({
-                  title: `[OS] ${t.title}`,
-                  description: t.description || 'Tarea sincronizada desde Algoritmia OS',
+          if (isUpdate && task.googleEventId) {
+              await googleCalendarService.updateEvent(task.googleEventId, {
+                  title: `[OS] ${task.title}`,
+                  description: task.description || '',
                   startTime: start.toISOString(),
                   endTime: end.toISOString()
               });
-              count++;
-          }
-          alert(`¡Éxito! Se han sincronizado ${count} tareas a tu Google Calendar.`);
-      } catch (e: any) {
-          console.error("Google Sync Error", e);
-          
-          if (e.error === 'access_denied' || e.error === 'popup_closed_by_user') {
-              alert(
-                "⚠️ ACCESO DENEGADO (Modo Testing)\n\n" +
-                "Tu app en Google Cloud está en modo 'Testing' y tu email no está autorizado.\n\n" +
-                "SOLUCIÓN RÁPIDA:\n" +
-                "1. Ve a Google Cloud Console > APIs & Services > OAuth Consent Screen\n" +
-                "2. Busca 'Test users' (Usuarios de prueba)\n" +
-                "3. Agrega tu email: lucagazze1@gmail.com\n" +
-                "4. Guarda e intenta de nuevo."
-              );
-          } else if (e.message?.includes("client_id")) {
-              alert("Error: Falta configurar el 'OAuth Client ID' en Ajustes.");
+              return task.googleEventId;
           } else {
-              alert("Error al sincronizar. Si estás en Vercel, asegúrate de haber agregado la URL a 'Authorized Javascript Origins' en Google Cloud Console.");
+              const result = await googleCalendarService.createEvent({
+                  title: `[OS] ${task.title}`,
+                  description: task.description || '',
+                  startTime: start.toISOString(),
+                  endTime: end.toISOString()
+              });
+              return result.id;
           }
-      } finally {
-          setIsSyncing(false);
+      } catch (e) {
+          console.error("Google Sync Failed", e);
+          return null;
+      }
+  };
+
+  const deleteFromGoogle = async (googleEventId: string) => {
+      if (!googleCalendarService.getIsAuthenticated()) return;
+      try {
+          await googleCalendarService.deleteEvent(googleEventId);
+      } catch (e) {
+          console.error("Google Delete Failed", e);
       }
   };
   
@@ -227,14 +231,25 @@ export default function TasksPage() {
       
       if (formData.assigneeId) payload.assigneeId = formData.assigneeId;
 
+      // Google Sync Logic
+      let gEventId = formData.googleEventId;
+      if (googleCalendarService.getIsAuthenticated() && formData.dueDate) {
+          gEventId = await syncTaskToGoogle({ ...payload, googleEventId: formData.googleEventId }, !!formData.id);
+      }
+      if (gEventId) payload.googleEventId = gEventId;
+
       if (formData.id) {
           await db.tasks.update(formData.id, payload);
       } else {
           await db.tasks.create(payload);
       }
       setIsModalOpen(false);
-      setFormData({ title: '', description: '', assigneeId: '', dueDate: '', priority: 'MEDIUM', status: TaskStatus.TODO, sopId: '' });
+      resetForm();
       loadData();
+  };
+
+  const resetForm = () => {
+      setFormData({ title: '', description: '', assigneeId: '', dueDate: '', priority: 'MEDIUM', status: TaskStatus.TODO, sopId: '', googleEventId: undefined });
   };
 
   const handleEdit = (task: Task) => {
@@ -246,15 +261,17 @@ export default function TasksPage() {
           dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
           priority: task.priority || 'MEDIUM',
           status: task.status,
-          sopId: task.sopId || ''
+          sopId: task.sopId || '',
+          googleEventId: task.googleEventId
       });
       setIsModalOpen(true);
       handleCloseContextMenu();
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (task: Task) => {
       if(confirm('¿Borrar tarea?')) {
-          await db.tasks.delete(id);
+          if (task.googleEventId) await deleteFromGoogle(task.googleEventId);
+          await db.tasks.delete(task.id);
           loadData();
       }
       handleCloseContextMenu();
@@ -265,11 +282,43 @@ export default function TasksPage() {
       const taskId = e.dataTransfer.getData('taskId');
       setDragOverSlot(null);
       if (taskId) {
-          // Set time to noon to avoid timezone shifts for now, or keep existing time
-          const newDate = new Date(slotDate);
-          newDate.setHours(12, 0, 0, 0); 
-          await db.tasks.update(taskId, { dueDate: newDate.toISOString() });
+          const task = tasks.find(t => t.id === taskId);
+          if (task) {
+              const newDate = new Date(slotDate);
+              newDate.setHours(12, 0, 0, 0); 
+              const newIso = newDate.toISOString();
+              
+              // Sync if linked
+              if (task.googleEventId && googleCalendarService.getIsAuthenticated()) {
+                  await syncTaskToGoogle({ ...task, dueDate: newIso }, true);
+              }
+
+              await db.tasks.update(taskId, { dueDate: newIso });
+              loadData();
+          }
+      }
+  };
+
+  const manualSyncAll = async () => {
+      if (!await handleGoogleAuth()) return;
+      setIsSyncing(true);
+      try {
+          // Sync pending tasks that have dates but no google ID yet
+          const pending = tasks.filter(t => t.status !== TaskStatus.DONE && t.dueDate && !t.googleEventId);
+          let count = 0;
+          for (const t of pending) {
+              const gId = await syncTaskToGoogle(t, false);
+              if (gId) {
+                  await db.tasks.update(t.id, { googleEventId: gId });
+                  count++;
+              }
+          }
+          alert(`Sincronización completada. ${count} tareas enviadas a Google.`);
           loadData();
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setIsSyncing(false);
       }
   };
 
@@ -340,7 +389,7 @@ export default function TasksPage() {
                                           onContextMenu={(e) => handleContextMenu(e, t)}
                                           onClick={() => handleEdit(t)}
                                           className={`
-                                              text-[10px] px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all
+                                              text-[10px] px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1
                                               ${t.status === TaskStatus.DONE 
                                                   ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 border-gray-200 line-through' 
                                                   : t.priority === 'HIGH' 
@@ -349,7 +398,8 @@ export default function TasksPage() {
                                               }
                                           `}
                                       >
-                                          {t.title}
+                                          {t.googleEventId && <Link className="w-2 h-2 text-blue-500" />}
+                                          <span className="truncate">{t.title}</span>
                                       </div>
                                   ))}
                               </div>
@@ -377,10 +427,10 @@ export default function TasksPage() {
                  <button onClick={() => setViewMode('WEEK')} className={`p-2 rounded-lg transition-all ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
              </div>
              <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar tarea..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-             <Button onClick={handleGoogleSync} variant="secondary" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100">
+             <Button onClick={manualSyncAll} variant="secondary" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100">
                  {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarCheck className="w-4 h-4 mr-2" />} Sync Calendar
              </Button>
-             <Button onClick={() => { setIsModalOpen(true); setFormData({title:'', description:'', assigneeId:'', dueDate:'', priority:'MEDIUM', status:TaskStatus.TODO, sopId: ''}); }} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Nueva Tarea</Button>
+             <Button onClick={() => { setIsModalOpen(true); resetForm(); }} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Nueva Tarea</Button>
         </div>
       </div>
 
@@ -399,7 +449,10 @@ export default function TasksPage() {
                                    {t.status === TaskStatus.DONE && <CheckCircle2 className="w-4 h-4" />}
                                </button>
                                <div>
-                                   <h4 className={`font-bold text-sm ${t.status === TaskStatus.DONE ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{t.title}</h4>
+                                   <div className="flex items-center gap-2">
+                                     <h4 className={`font-bold text-sm ${t.status === TaskStatus.DONE ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{t.title}</h4>
+                                     {t.googleEventId && <Link className="w-3 h-3 text-blue-400" title="Sincronizada con Google" />}
+                                   </div>
                                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
                                        {t.dueDate && <span className={`flex items-center gap-1 ${new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE ? 'text-red-500 font-bold' : ''}`}><Clock className="w-3 h-3"/> {new Date(t.dueDate).toLocaleDateString()}</span>}
                                        {t.assignee && <span className="flex items-center gap-1"><User className="w-3 h-3"/> {t.assignee.name}</span>}
@@ -459,6 +512,7 @@ export default function TasksPage() {
                   <div>
                       <Label>Fecha Vencimiento</Label>
                       <Input type="datetime-local" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
+                      <p className="text-[10px] text-blue-500 mt-1 flex items-center gap-1"><Link className="w-3 h-3"/> Se sincronizará con Google Calendar</p>
                   </div>
               </div>
 
@@ -477,7 +531,7 @@ export default function TasksPage() {
               
               <div className="flex gap-2 pt-4">
                   {formData.id && (
-                      <Button type="button" variant="destructive" onClick={() => handleDelete(formData.id!)} className="mr-auto">
+                      <Button type="button" variant="destructive" onClick={() => handleDelete({ id: formData.id!, title: formData.title, status: formData.status, googleEventId: formData.googleEventId } as Task)} className="mr-auto">
                           <Trash2 className="w-4 h-4"/>
                       </Button>
                   )}
@@ -508,7 +562,7 @@ export default function TasksPage() {
             { label: 'Editar', icon: Edit2, onClick: () => { if(contextMenu.task) handleEdit(contextMenu.task); } },
             { label: 'Ver SOP Asociado', icon: Book, onClick: () => { if(contextMenu.task?.sopId) handleViewSOP(contextMenu.task.sopId); else alert("Esta tarea no tiene SOP vinculado."); handleCloseContextMenu(); } },
             { label: 'Recordar por WhatsApp', icon: MessageCircle, onClick: () => { if(contextMenu.task) sendPartnerReminder(contextMenu.task); handleCloseContextMenu(); } },
-            { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => { if(contextMenu.task) handleDelete(contextMenu.task.id); } }
+            { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => { if(contextMenu.task) handleDelete(contextMenu.task); } }
         ]}
       />
     </div>

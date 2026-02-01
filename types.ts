@@ -1,5 +1,4 @@
 
-
 export enum ServiceType {
   ONE_TIME = 'ONE_TIME',
   RECURRING = 'RECURRING',
@@ -122,6 +121,7 @@ export interface Task {
   assignee?: Contractor; 
   created_at?: string;
   sopId?: string; // New: Link to SOP
+  googleEventId?: string; // ID del evento en Google Calendar
 }
 
 export interface ClientNote {

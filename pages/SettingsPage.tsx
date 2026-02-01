@@ -120,6 +120,7 @@ alter table "Client" add column if not exists "growthStrategy" text;
 
 alter table "Contractor" add column if not exists phone text;
 alter table "Task" add column if not exists "sopId" uuid references "SOP"(id);
+alter table "Task" add column if not exists "googleEventId" text; -- Nueva columna para Google Sync
 alter table "AgencySettings" add column if not exists key text unique;
 
 -- ==========================================

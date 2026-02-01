@@ -1,7 +1,8 @@
 
 import { db } from './db';
 
-const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+// SCOPE ACTUALIZADO: Permite ver, editar, compartir y borrar permanentemente todos los calendarios
+const SCOPES = 'https://www.googleapis.com/auth/calendar'; 
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
 // ID Proporcionado por el usuario (Fijo y Prioritario)
@@ -10,6 +11,7 @@ const DEFAULT_CLIENT_ID = "461911891249-m1dahst7hd2nlm2tj8iigitm70d6lpia.apps.go
 let tokenClient: any;
 let gapiInited = false;
 let gisInited = false;
+let isAuthenticated = false;
 
 // Store the resolve function for the authentication promise
 let authResolve: ((value: boolean) => void) | null = null;
@@ -17,6 +19,8 @@ let authReject: ((reason?: any) => void) | null = null;
 
 export const googleCalendarService = {
   
+  getIsAuthenticated: () => isAuthenticated,
+
   /**
    * Carga los scripts necesarios de Google (GAPI y GIS) dinámicamente
    */
@@ -61,6 +65,7 @@ export const googleCalendarService = {
                             if (resp.error !== undefined) {
                                 if (authReject) authReject(resp);
                             } else {
+                                isAuthenticated = true;
                                 if (authResolve) authResolve(true);
                             }
                         },
@@ -99,6 +104,7 @@ export const googleCalendarService = {
                   if (resp.error !== undefined) {
                       if (authReject) authReject(resp);
                   } else {
+                      isAuthenticated = true;
                       if (authResolve) authResolve(true);
                   }
               },
@@ -120,7 +126,7 @@ export const googleCalendarService = {
   },
 
   /**
-   * Sube un evento a Google Calendar
+   * Sube un evento a Google Calendar (INSERT)
    */
   createEvent: async (eventData: { title: string, description: string, startTime: string, endTime: string }) => {
       try {
@@ -138,7 +144,6 @@ export const googleCalendarService = {
               'reminders': {
                   'useDefault': false,
                   'overrides': [
-                      {'method': 'email', 'minutes': 24 * 60},
                       {'method': 'popup', 'minutes': 10}
                   ]
               }
@@ -150,9 +155,96 @@ export const googleCalendarService = {
           });
 
           const response = await request;
-          return response;
+          return response.result;
       } catch (error) {
           console.error("Error creating Google Calendar event", error);
+          throw error;
+      }
+  },
+
+  /**
+   * Lista los eventos de un calendario (LIST)
+   */
+  listEvents: async (timeMin?: string, timeMax?: string) => {
+      try {
+          const request = (window as any).gapi.client.calendar.events.list({
+              'calendarId': 'primary',
+              'timeMin': timeMin || (new Date()).toISOString(),
+              'showDeleted': false,
+              'singleEvents': true,
+              'maxResults': 100,
+              'orderBy': 'startTime'
+          });
+
+          const response = await request;
+          return response.result.items;
+      } catch (error) {
+          console.error("Error listing Google Calendar events", error);
+          throw error;
+      }
+  },
+
+  /**
+   * Actualiza un evento existente (UPDATE / PATCH)
+   */
+  updateEvent: async (eventId: string, eventData: { title?: string, description?: string, startTime?: string, endTime?: string }) => {
+      try {
+          // Primero obtenemos el evento actual para no sobrescribir otros campos
+          const getRequest = (window as any).gapi.client.calendar.events.get({
+              'calendarId': 'primary',
+              'eventId': eventId
+          });
+          const currentEvent = (await getRequest).result;
+
+          const updatedResource: any = { ...currentEvent };
+          
+          if (eventData.title) updatedResource.summary = eventData.title;
+          if (eventData.description) updatedResource.description = eventData.description;
+          if (eventData.startTime) updatedResource.start = { dateTime: eventData.startTime, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+          if (eventData.endTime) updatedResource.end = { dateTime: eventData.endTime, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+
+          const request = (window as any).gapi.client.calendar.events.update({
+              'calendarId': 'primary',
+              'eventId': eventId,
+              'resource': updatedResource
+          });
+
+          const response = await request;
+          return response.result;
+      } catch (error) {
+          console.error("Error updating Google Calendar event", error);
+          throw error;
+      }
+  },
+
+  /**
+   * Elimina un evento (DELETE)
+   */
+  deleteEvent: async (eventId: string) => {
+      try {
+          const request = (window as any).gapi.client.calendar.events.delete({
+              'calendarId': 'primary',
+              'eventId': eventId
+          });
+
+          await request;
+          return true;
+      } catch (error) {
+          console.error("Error deleting Google Calendar event", error);
+          throw error;
+      }
+  },
+
+  /**
+   * Lista todos los calendarios disponibles (LIST CALENDARS)
+   */
+  listCalendars: async () => {
+      try {
+          const request = (window as any).gapi.client.calendar.calendarList.list();
+          const response = await request;
+          return response.result.items;
+      } catch (error) {
+          console.error("Error listing calendars", error);
           throw error;
       }
   }
