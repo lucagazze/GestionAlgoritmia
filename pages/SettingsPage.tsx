@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
@@ -45,7 +44,10 @@ export default function SettingsPage() {
     };
 
     const sqlScript = `
--- 1. Crear tabla de Procedimientos (SOPs)
+-- ==========================================
+-- 1. ESTRUCTURA DE TABLAS (SI NO EXISTEN)
+-- ==========================================
+
 create table if not exists "SOP" (
   id uuid default gen_random_uuid() primary key,
   title text not null,
@@ -54,16 +56,14 @@ create table if not exists "SOP" (
   "updatedAt" timestamp with time zone default now()
 );
 
--- 2. Crear tabla de Notas de Cliente (Para Bitácora IA)
 create table if not exists "ClientNote" (
   id uuid default gen_random_uuid() primary key,
   "clientId" uuid references "Client"(id) on delete cascade,
   content text not null,
-  type text not null, -- 'MEETING', 'NOTE', 'CALL', 'PAYMENT'
+  type text not null, 
   "createdAt" timestamp with time zone default now()
 );
 
--- 3. Tabla de Automatizaciones (Zapier Interno)
 create table if not exists "Automation" (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -74,28 +74,29 @@ create table if not exists "Automation" (
   "isActive" boolean default true
 );
 
--- 4. Tabla de Entregables (Client Portal 2.0)
 create table if not exists "Deliverable" (
   id uuid default gen_random_uuid() primary key,
   "projectId" uuid references "Client"(id) on delete cascade,
   name text not null,
   url text,
-  status text default 'PENDING', -- PENDING, APPROVED, CHANGES_REQUESTED
+  status text default 'PENDING',
   feedback text,
   "createdAt" timestamp with time zone default now()
 );
 
--- 5. Tabla de Chat del Portal (Client Portal 2.0)
 create table if not exists "PortalMessage" (
   id uuid default gen_random_uuid() primary key,
   "projectId" uuid references "Client"(id) on delete cascade,
-  sender text not null, -- AGENCY, CLIENT
+  sender text not null, 
   content text not null,
   "readAt" timestamp with time zone,
   "createdAt" timestamp with time zone default now()
 );
 
--- 6. Actualizar tabla Clientes (Scanner y Portal)
+-- ==========================================
+-- 2. ACTUALIZACIÓN DE COLUMNAS FALTANTES
+-- ==========================================
+
 alter table "Client" add column if not exists phone text;
 alter table "Client" add column if not exists "outsourcingCost" numeric default 0;
 alter table "Client" add column if not exists "assignedPartnerId" uuid references "Contractor"(id);
@@ -112,10 +113,50 @@ alter table "Client" add column if not exists "publicToken" text;
 alter table "Client" add column if not exists progress integer default 0;
 alter table "Client" add column if not exists "growthStrategy" text;
 
--- 7. Actualizar otras tablas
 alter table "Contractor" add column if not exists phone text;
 alter table "Task" add column if not exists "sopId" uuid references "SOP"(id);
 alter table "AgencySettings" add column if not exists key text unique;
+
+-- ==========================================
+-- 3. PERMISOS TOTALES (SOLUCIÓN "NO PUEDO BORRAR")
+-- ==========================================
+
+-- Habilitar RLS en todas las tablas para poder aplicar políticas
+alter table "Task" enable row level security;
+alter table "Client" enable row level security;
+alter table "Contractor" enable row level security;
+alter table "Service" enable row level security;
+alter table "Proposal" enable row level security;
+alter table "ProposalItem" enable row level security;
+alter table "ClientNote" enable row level security;
+alter table "SOP" enable row level security;
+alter table "Automation" enable row level security;
+alter table "AgencySettings" enable row level security;
+alter table "Deliverable" enable row level security;
+alter table "PortalMessage" enable row level security;
+alter table "aichatlog" enable row level security;
+alter table "aichatsession" enable row level security;
+
+-- Eliminar políticas antiguas para evitar conflictos
+drop policy if exists "Public Access" on "Task";
+drop policy if exists "Public Access" on "Client";
+-- (Repetir para asegurar limpieza)
+
+-- CREAR POLÍTICAS DE ACCESO TOTAL (ANON & AUTHENTICATED)
+create policy "Enable all for Task" on "Task" for all using (true) with check (true);
+create policy "Enable all for Client" on "Client" for all using (true) with check (true);
+create policy "Enable all for Contractor" on "Contractor" for all using (true) with check (true);
+create policy "Enable all for Service" on "Service" for all using (true) with check (true);
+create policy "Enable all for Proposal" on "Proposal" for all using (true) with check (true);
+create policy "Enable all for ProposalItem" on "ProposalItem" for all using (true) with check (true);
+create policy "Enable all for ClientNote" on "ClientNote" for all using (true) with check (true);
+create policy "Enable all for SOP" on "SOP" for all using (true) with check (true);
+create policy "Enable all for Automation" on "Automation" for all using (true) with check (true);
+create policy "Enable all for AgencySettings" on "AgencySettings" for all using (true) with check (true);
+create policy "Enable all for Deliverable" on "Deliverable" for all using (true) with check (true);
+create policy "Enable all for PortalMessage" on "PortalMessage" for all using (true) with check (true);
+create policy "Enable all for ChatLog" on "aichatlog" for all using (true) with check (true);
+create policy "Enable all for ChatSession" on "aichatsession" for all using (true) with check (true);
     `.trim();
 
     return (
@@ -139,7 +180,7 @@ alter table "AgencySettings" add column if not exists key text unique;
                             <div>
                                 <p className="font-bold">Conexión Segura</p>
                                 <p className="opacity-90 mt-1">
-                                    Tu clave de API se guarda en la base de datos (Supabase). Usamos <strong>Gemini 2.5 Flash</strong> para máximo rendimiento y audio.
+                                    Tu clave de API se guarda en la base de datos (Supabase). Usamos <strong>Gemini 3 Flash</strong> para máximo rendimiento.
                                 </p>
                             </div>
                         </div>
@@ -182,25 +223,28 @@ alter table "AgencySettings" add column if not exists key text unique;
                 </Card>
             </div>
 
-            <Card className="border-orange-100 dark:border-orange-900/30">
-                 <CardHeader className="bg-orange-50/50 dark:bg-orange-900/10 border-b border-orange-100 dark:border-orange-900/30">
-                    <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-200">
-                        <Database className="w-5 h-5 text-orange-600" /> Diagnóstico de Base de Datos
+            <Card className="border-red-100 dark:border-red-900/30">
+                 <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/30">
+                    <CardTitle className="flex items-center gap-2 text-red-800 dark:text-red-200">
+                        <Database className="w-5 h-5 text-red-600" /> REPARACIÓN DE BASE DE DATOS
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
                     <div className="text-sm text-gray-600 dark:text-gray-300 space-y-4">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
-                            <p>
-                                Si ves errores como <strong>"Table not found"</strong> o funcionalidades faltantes (Scanner incompleto, error en SOPs), 
-                                copia y ejecuta este script en el <strong>SQL Editor</strong> de Supabase:
-                            </p>
+                            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0 animate-pulse" />
+                            <div>
+                                <p className="font-bold text-red-700 dark:text-red-400">¿No puedes crear o borrar tareas?</p>
+                                <p className="mt-1">
+                                    Esto es un problema de <strong>Permisos (RLS)</strong> en Supabase. 
+                                    Copia el siguiente script y ejecútalo en el <strong>SQL Editor</strong> de Supabase para desbloquear todo.
+                                </p>
+                            </div>
                         </div>
                         
                         <div className="relative group">
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button size="sm" variant="secondary" onClick={() => {navigator.clipboard.writeText(sqlScript); alert("Script copiado!")}}>
+                                <Button size="sm" variant="secondary" onClick={() => {navigator.clipboard.writeText(sqlScript); alert("Script copiado! Pégalo en Supabase SQL Editor.")}}>
                                     <Copy className="w-3 h-3 mr-2" /> Copiar SQL
                                 </Button>
                             </div>

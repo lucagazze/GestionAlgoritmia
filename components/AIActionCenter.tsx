@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
@@ -117,14 +118,12 @@ export const AIActionCenter = () => {
         return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     };
 
-    const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload }> => {
+    const executeAction = async (actionType: string, payload: any): Promise<{ success: boolean, undo?: UndoPayload, error?: string }> => {
         try {
             console.log("Executing Action:", actionType, payload);
             
             if (actionType === 'CREATE_TASK') {
-                // FALLBACK DE SEGURIDAD: Nunca enviar title null
                 const safeTitle = payload.title || payload.description?.slice(0, 30) || "Tarea sin título";
-                
                 const newTask = await db.tasks.create({
                     title: safeTitle,
                     status: TaskStatus.TODO,
@@ -133,38 +132,24 @@ export const AIActionCenter = () => {
                     description: payload.description || '',
                     projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
                 });
-                // Force UI update
                 window.dispatchEvent(new Event('task-created'));
                 return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' } };
             }
-            if (actionType === 'CREATE_CONTRACTOR') {
-                 await db.contractors.create({
-                     name: payload.name || "Nuevo Socio",
-                     role: payload.role || "Colaborador",
-                     monthlyRate: payload.monthlyRate || 0,
-                     status: 'ACTIVE'
-                 });
-                 return { success: true };
-            }
-            if (actionType === 'UPDATE_PROJECT') {
-                const targetId = payload.id || (activeContextData?.type === 'PROJECT' ? activeContextData.data.id : null);
-                if (!targetId) return { success: false };
-                await db.projects.update(targetId, payload);
-                if (activeContextData?.type === 'PROJECT') window.location.reload(); 
-                return { success: true };
-            }
             if (actionType === 'UPDATE_TASK') {
-                if (!payload.id) return { success: false };
-                // Call generic update
+                if (!payload.id) return { success: false, error: 'Falta ID' };
                 await db.tasks.update(payload.id, payload);
-                
                 window.dispatchEvent(new Event('task-created')); 
                 return { success: true };
             }
             if (actionType === 'DELETE_TASK') {
-                if (!payload.id) return { success: false };
+                if (!payload.id) return { success: false, error: 'Falta ID' };
                 await db.tasks.delete(payload.id);
                 window.dispatchEvent(new Event('task-created'));
+                return { success: true };
+            }
+            if (actionType === 'DELETE_PROJECT') {
+                if (!payload.id) return { success: false, error: 'Falta ID del proyecto' };
+                await db.projects.delete(payload.id);
                 return { success: true };
             }
             if (actionType === 'CREATE_PROJECT') {
@@ -179,7 +164,14 @@ export const AIActionCenter = () => {
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
             return { success: false };
-        } catch (e) { console.error("Execute Action Error:", e); return { success: false }; }
+        } catch (e: any) { 
+            console.error("Execute Action Error:", e);
+            // Detect RLS errors
+            if (e.message?.includes("policy") || e.message?.includes("permission") || e.code === '42501') {
+                return { success: false, error: "⚠️ Error de Permisos: Ve a 'Ajustes' y ejecuta el script de reparación." };
+            }
+            return { success: false, error: "Error en base de datos." }; 
+        }
     };
 
     const handleUndoMessage = async (msg: AIChatLog) => {
@@ -307,8 +299,13 @@ export const AIActionCenter = () => {
             
             if (response.type === 'BATCH' && response.actions) {
                 let successCount = 0;
-                for (const act of response.actions) { await executeAction(act.action, act.payload); successCount++; }
-                finalMessage = `✅ Ejecuté ${successCount} acciones múltiples.`;
+                let failError = '';
+                for (const act of response.actions) { 
+                    const res = await executeAction(act.action, act.payload); 
+                    if(res.success) successCount++;
+                    else failError = res.error || 'Error desconocido';
+                }
+                finalMessage = successCount > 0 ? `✅ Ejecuté ${successCount} acciones.` : `❌ Falló: ${failError}`;
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
             }
             else if (response.type === 'DECISION') {
@@ -317,7 +314,11 @@ export const AIActionCenter = () => {
             }
             else if (response.type === 'ACTION') {
                 const result = await executeAction(response.action, response.payload);
-                await db.chat.addMessage(sessionId, 'assistant', finalMessage, result.success ? { type: response.action, payload: result.undo } : undefined);
+                if (result.success) {
+                    await db.chat.addMessage(sessionId, 'assistant', finalMessage, { type: response.action, payload: result.undo });
+                } else {
+                    await db.chat.addMessage(sessionId, 'assistant', `❌ No pude hacerlo: ${result.error || 'Error desconocido.'}`);
+                }
             }
             else {
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
@@ -337,7 +338,7 @@ export const AIActionCenter = () => {
         setIsThinking(true);
         setDecisionOptions(null);
         const result = await executeAction(option.action, option.payload);
-        const msg = result.success ? `✅ Hecho: ${option.label}` : "❌ Error.";
+        const msg = result.success ? `✅ Hecho: ${option.label}` : `❌ Error: ${result.error}`;
         await db.chat.addMessage(currentSessionId, 'assistant', msg, result.success ? {type: option.action, payload: result.undo} : undefined);
         await loadMessages(currentSessionId);
         setIsThinking(false);

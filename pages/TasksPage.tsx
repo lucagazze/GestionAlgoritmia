@@ -176,7 +176,12 @@ export default function TasksPage() {
       
       const updatedTasks = tasks.map(t => t.id === task.id ? { ...t, status: newStatus } : t);
       setTasks(updatedTasks);
-      await db.tasks.updateStatus(task.id, newStatus);
+      try {
+          await db.tasks.updateStatus(task.id, newStatus);
+      } catch (err) {
+          alert("Error de permisos: No se pudo actualizar el estado. Revisa los Ajustes.");
+          loadData(); // Revert logic
+      }
   };
 
   const openCreateModal = () => {
@@ -234,7 +239,8 @@ export default function TasksPage() {
         setIsModalOpen(false);
         loadData(); 
     } catch (err) {
-        alert("Error al guardar la tarea");
+        console.error(err);
+        alert("ERROR CRÍTICO: No se pudo guardar. Es un problema de permisos en Supabase. Ve a 'Ajustes' y ejecuta el script de reparación.");
     }
   };
 
@@ -242,9 +248,18 @@ export default function TasksPage() {
     setContextMenu({ x: 0, y: 0, task: null });
     
     if(confirm('¿Estás seguro de eliminar esta tarea?')) {
+        // Optimistic UI update
+        const previousTasks = [...tasks];
         setTasks(prev => prev.filter(t => t.id !== id)); 
-        await db.tasks.delete(id);
         setIsModalOpen(false);
+
+        try {
+            await db.tasks.delete(id);
+        } catch (error) {
+            console.error(error);
+            setTasks(previousTasks); // Revert
+            alert("NO SE PUDO BORRAR: Error de permisos. Ve a Ajustes > Copiar SQL y ejecútalo en Supabase.");
+        }
     }
   };
 
@@ -298,8 +313,12 @@ export default function TasksPage() {
       const updatedTasks = tasks.map(t => t.id === id ? { ...t, dueDate: newDate.toISOString() } : t);
       setTasks(updatedTasks);
       
-      await db.tasks.update(id, { dueDate: newDate.toISOString() });
-      loadData();
+      try {
+          await db.tasks.update(id, { dueDate: newDate.toISOString() });
+      } catch (err) {
+          alert("Error de permisos al mover la tarea.");
+          loadData();
+      }
   };
 
   const getTaskStyles = (status: TaskStatus) => {

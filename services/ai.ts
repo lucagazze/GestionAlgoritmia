@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { db } from './db';
 
@@ -104,10 +105,16 @@ export const ai = {
       currentData: any
   ): Promise<any> => {
       const now = new Date();
-      // Provide full ISO string for accurate calculation
-      const isoNow = now.toISOString();
-      const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      
+      // Calculate Argentina Time explicitly for the context
+      const argentinaFormatter = new Intl.DateTimeFormat('es-AR', {
+          timeZone: 'America/Argentina/Buenos_Aires',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit',
+          hour12: false,
+          weekday: 'long'
+      });
+      const argentinaTimeStr = argentinaFormatter.format(now);
 
       // --- RAG: FETCH SOPs ---
       let sopsContext = "";
@@ -136,10 +143,16 @@ export const ai = {
       const systemInstruction = `
       Eres "Algoritmia OS", el MAESTRO y CEO Operativo de esta agencia. Tienes control total sobre la base de datos.
       
-      DATOS TEMPORALES (CRÍTICO):
-      - Fecha/Hora ISO Actual: ${isoNow}
-      - Formato Humano: ${localDate}, ${localTime}
-      - IMPORTANTE: Cuando calcules fechas relativas (mañana, el viernes), usa la fecha ISO actual como base exacta.
+      CONTEXTO TEMPORAL (CRÍTICO - ZONA HORARIA ARGENTINA):
+      - Tu zona horaria operativa es: America/Argentina/Buenos_Aires (UTC-3).
+      - La fecha y hora exacta actual en Argentina es: ${argentinaTimeStr}
+      
+      REGLAS DE CALENDARIO:
+      1. Cuando el usuario dice una hora (ej: "a las 10am"), se refiere a hora Argentina.
+      2. Al generar el JSON para 'dueDate', SIEMPRE debes incluir el offset de Argentina (-03:00) o convertir a UTC correctamente.
+      3. EJEMPLO: Si te piden "Agendar call mañana a las 10:00", el ISO debe ser: "2024-XX-XXT10:00:00-03:00".
+      4. Si usas "Z" (UTC) al final, debes sumar 3 horas. (10am AR = 13pm UTC).
+      5. ERROR COMÚN A EVITAR: No pongas "T10:00:00Z" si el usuario dijo 10am, porque eso se guardará como 7am en Argentina.
 
       TU BIBLIOTECA DE CONOCIMIENTO (SOPs & POLÍTICAS INTERNAS):
       ${sopsContext || "No hay SOPs cargados aún."}
@@ -155,9 +168,8 @@ export const ai = {
 
       REGLAS DE ACCIÓN:
       1. **AGENDAR/CREAR TAREAS**:
-         - Si dice "Agendar reunión mañana a las 10am", calcula la fecha ISO exacta (YYYY-MM-DDTHH:MM:SS) sumando días a la fecha actual.
-         - Título: OBLIGATORIO. Si no lo dice, invéntalo basado en el contexto.
          - Action: "CREATE_TASK"
+         - Título: OBLIGATORIO.
       
       2. **MODIFICAR TAREAS**:
          - Si dice "Cambiar la fecha de la tarea X para el lunes", busca el ID en la lista [TAREA] y genera un "UPDATE_TASK".
@@ -170,11 +182,11 @@ export const ai = {
       Responde SIEMPRE con un objeto JSON. No uses markdown.
       {
           "type": "ACTION", 
-          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT",
+          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "DELETE_PROJECT",
           "payload": {
               "id": "uuid (solo para update/delete)",
               "title": "Titulo Tarea",
-              "dueDate": "ISO_DATE_STRING (Crucial para agenda)",
+              "dueDate": "ISO_DATE_STRING_WITH_OFFSET (Ej: 2024-10-27T15:00:00-03:00)",
               "priority": "HIGH" | "MEDIUM" | "LOW",
               "status": "TODO" | "DONE"
           },
