@@ -11,6 +11,10 @@ let tokenClient: any;
 let gapiInited = false;
 let gisInited = false;
 
+// Store the resolve function for the authentication promise
+let authResolve: ((value: boolean) => void) | null = null;
+let authReject: ((reason?: any) => void) | null = null;
+
 export const googleCalendarService = {
   
   /**
@@ -45,14 +49,21 @@ export const googleCalendarService = {
                 // Usar siempre el ID por defecto si existe, o buscar en DB como fallback
                 let clientId = DEFAULT_CLIENT_ID;
                 if (!clientId) {
-                    clientId = await db.settings.getApiKey('google_oauth_client_id');
+                    const dbKey = await db.settings.getApiKey('google_oauth_client_id');
+                    if (dbKey) clientId = dbKey;
                 }
 
                 if (clientId) {
                     tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-                        client_id: clientId,
+                        client_id: clientId.trim(), // IMPORTANT: Trim whitespace
                         scope: SCOPES,
-                        callback: '', // Se define al autenticar
+                        callback: (resp: any) => {
+                            if (resp.error !== undefined) {
+                                if (authReject) authReject(resp);
+                            } else {
+                                if (authResolve) authResolve(true);
+                            }
+                        },
                     });
                 }
             } catch (e) {
@@ -75,25 +86,28 @@ export const googleCalendarService = {
       if (!tokenClient) {
           let clientId = DEFAULT_CLIENT_ID;
           if (!clientId) {
-              clientId = await db.settings.getApiKey('google_oauth_client_id');
+              const dbKey = await db.settings.getApiKey('google_oauth_client_id');
+              if (dbKey) clientId = dbKey;
           }
           
           if (!clientId) throw new Error("Falta configurar el 'OAuth Client ID' en Ajustes o en el código.");
           
           tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-              client_id: clientId,
+              client_id: clientId.trim(),
               scope: SCOPES,
-              callback: '',
+              callback: (resp: any) => {
+                  if (resp.error !== undefined) {
+                      if (authReject) authReject(resp);
+                  } else {
+                      if (authResolve) authResolve(true);
+                  }
+              },
           });
       }
 
       return new Promise((resolve, reject) => {
-          tokenClient.callback = async (resp: any) => {
-              if (resp.error !== undefined) {
-                  reject(resp);
-              }
-              resolve(true);
-          };
+          authResolve = resolve;
+          authReject = reject;
           
           // Trigger the popup
           const existingToken = (window as any).gapi.client.getToken();
