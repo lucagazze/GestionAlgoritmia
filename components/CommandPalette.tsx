@@ -1,7 +1,8 @@
 
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Briefcase, CheckSquare, Users, FileText, Settings, ArrowRight, Command, Book, Rocket, Zap } from 'lucide-react';
+import { Search, Briefcase, CheckSquare, Users, FileText, Settings, ArrowRight, Command, Book, Rocket, Zap, Workflow } from 'lucide-react';
 import { db } from '../services/db';
 import { sounds } from '../services/sounds';
 import { Project, Task, Service, Contractor, SOP, TaskStatus } from '../types';
@@ -72,6 +73,7 @@ export const CommandPalette = () => {
                 { id: 'p-proj', type: 'PAGE', title: 'Proyectos & CRM', url: '/projects', icon: Briefcase },
                 { id: 'p-lab', type: 'PAGE', title: 'The Lab (Simulador)', url: '/lab', icon: Rocket },
                 { id: 'p-book', type: 'PAGE', title: 'Playbooks (SOPs)', url: '/playbooks', icon: Book },
+                { id: 'p-auto', type: 'PAGE', title: 'Automations', url: '/automations', icon: Workflow },
                 { id: 'p-task', type: 'PAGE', title: 'Tareas', url: '/tasks', icon: CheckSquare },
                 { id: 'p-calc', type: 'PAGE', title: 'Calculadora', url: '/calculator', icon: FileText },
                 { id: 'p-set', type: 'PAGE', title: 'Ajustes', url: '/settings', icon: Settings },

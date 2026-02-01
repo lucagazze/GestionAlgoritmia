@@ -1,10 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { sounds } from '../services/sounds';
-import { Project, Task, TaskStatus, ProjectStatus } from '../types';
-import { Card, Button, Badge, Modal } from '../components/UIComponents';
+import { Project, Task, TaskStatus, ProjectStatus, Contractor } from '../types';
+import { Card, Button, Badge } from '../components/UIComponents';
 import { 
   TrendingUp, 
   Calendar, 
@@ -14,14 +15,19 @@ import {
   Clock,
   MessageCircle,
   Activity,
-  AlertOctagon
+  AlertOctagon,
+  PieChart,
+  BarChart as BarChartIcon,
+  DollarSign
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart as RePieChart, Pie, Legend } from 'recharts';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Local Calculated Risks (For Instant UI)
@@ -34,9 +40,10 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const [p, t] = await Promise.all([db.projects.getAll(), db.tasks.getAll()]);
+      const [p, t, c] = await Promise.all([db.projects.getAll(), db.tasks.getAll(), db.contractors.getAll()]);
       setProjects(p);
       setTasks(t);
+      setContractors(c);
       calculateRisks(p, t);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
@@ -47,8 +54,6 @@ export default function DashboardPage() {
 
   const calculateRisks = (projList: Project[], taskList: Task[]) => {
       const today = new Date();
-      
-      // 1. Ghosting Risks (> 7 days)
       const risks = projList.filter(p => {
           if (p.status !== ProjectStatus.ACTIVE && p.status !== ProjectStatus.ONBOARDING) return false;
           const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : new Date(p.createdAt);
@@ -57,52 +62,77 @@ export default function DashboardPage() {
       }).map(p => ({...p, daysSinceContact: Math.ceil(Math.abs(today.getTime() - (p.lastContactDate ? new Date(p.lastContactDate).getTime() : new Date(p.createdAt).getTime())) / (1000 * 60 * 60 * 24))}));
       setRiskClients(risks);
 
-      // 2. Overdue Tasks
       const overdue = taskList.filter(t => t.status !== TaskStatus.DONE && t.dueDate && new Date(t.dueDate) < today);
       setOverdueTasksList(overdue);
   };
 
-  const handleScan = () => {
-      navigate('/audit');
-  };
+  const handleScan = () => navigate('/audit');
 
-  // --- Metrics & Logic ---
+  // --- CHART DATA PREPARATION ---
+  
+  // 1. MRR Trend (Last 6 Months)
+  const mrrData = useMemo(() => {
+      const data = [];
+      const today = new Date();
+      for (let i = 5; i >= 0; i--) {
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const monthName = d.toLocaleDateString('es-ES', { month: 'short' });
+          
+          const activeAtTime = projects.filter(p => {
+              const created = new Date(p.createdAt);
+              const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+              return created <= endOfMonth && (p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.ONBOARDING);
+          });
+          
+          const totalMrr = activeAtTime.reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
+          data.push({ name: monthName, mrr: totalMrr });
+      }
+      return data;
+  }, [projects]);
+
+  // 2. Funnel Data
+  const funnelData = useMemo(() => {
+      const leads = projects.filter(p => p.status === ProjectStatus.LEAD || p.status === ProjectStatus.DISCOVERY).length;
+      const proposals = projects.filter(p => p.status === ProjectStatus.PROPOSAL || p.status === ProjectStatus.NEGOTIATION).length;
+      const closed = projects.filter(p => p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.ONBOARDING).length;
+      return [
+          { name: 'Leads', value: leads, color: '#94a3b8' },
+          { name: 'Propuestas', value: proposals, color: '#60a5fa' },
+          { name: 'Cierres', value: closed, color: '#22c55e' }
+      ];
+  }, [projects]);
+
+  // 3. Workload (Tasks by Partner)
+  const workloadData = useMemo(() => {
+      const activeTasks = tasks.filter(t => t.status !== TaskStatus.DONE);
+      const counts: Record<string, number> = {};
+      
+      activeTasks.forEach(t => {
+          const name = t.assigneeId ? contractors.find(c => c.id === t.assigneeId)?.name || 'Desconocido' : 'Sin Asignar';
+          counts[name] = (counts[name] || 0) + 1;
+      });
+
+      return Object.entries(counts).map(([name, value], index) => ({
+          name, value, fill: ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#a4de6c'][index % 5]
+      }));
+  }, [tasks, contractors]);
+
+
   const activeProjects = projects.filter(p => p.status === ProjectStatus.ACTIVE);
   const mrr = activeProjects.reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
   
-  const todayDate = new Date();
-  const currentDay = todayDate.getDate();
-
-  const todaysTasks = tasks.filter(t => {
-      if (t.status === TaskStatus.DONE) return false;
-      if (!t.dueDate) return t.priority === 'HIGH'; 
-      const d = new Date(t.dueDate);
-      return d.getDate() === todayDate.getDate() && d.getMonth() === todayDate.getMonth();
-  });
-
-  const billingAlerts = activeProjects.map(p => {
-    const billDay = p.billingDay || 1;
-    let status: 'upcoming' | 'today' | 'overdue' | 'ok' = 'ok';
-    let daysDiff = billDay - currentDay;
-
-    if (daysDiff === 0) status = 'today';
-    else if (daysDiff < 0 && daysDiff > -5) status = 'overdue'; 
-    else if (daysDiff > 0 && daysDiff <= 3) status = 'upcoming';
-
-    return { ...p, billingStatus: status, daysDiff };
-  }).filter(p => p.billingStatus !== 'ok').sort((a, b) => a.daysDiff - b.daysDiff);
-  
-  const getWhatsAppLink = (p: Project, customMsg?: string) => {
-      if (!p.phone) return null;
-      const cleanPhone = p.phone.replace(/\D/g, '');
-      
-      let message = customMsg;
-      if (!message) {
-          const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-          const currentMonth = monthNames[new Date().getMonth()];
-          message = `Hola ${p.name.split(' ')[0]}! 👋 Te paso el total del mes de *${currentMonth}* por valor de *$${p.monthlyRevenue.toLocaleString()}*.\n\nAvísame cuando realices el pago así lo registro. Gracias!`;
+  const CustomTooltip = ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+          return (
+              <div className="bg-white dark:bg-slate-800 p-3 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl">
+                  <p className="font-bold text-xs mb-1">{label}</p>
+                  <p className="text-sm font-mono text-indigo-600 dark:text-indigo-400">
+                      {payload[0].name === 'mrr' ? `$${payload[0].value.toLocaleString()}` : payload[0].value}
+                  </p>
+              </div>
+          );
       }
-      return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+      return null;
   };
 
   if (loading) return <div className="flex h-screen items-center justify-center text-gray-400 bg-[#FAFAFA] dark:bg-[#020617]"><div className="animate-pulse">Cargando Sistema...</div></div>;
@@ -114,7 +144,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-8 pb-4 gap-4">
           <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Bienvenido, Luca.</h1>
-              <p className="text-gray-500 dark:text-gray-400 mt-2">Resumen operativo de hoy.</p>
+              <p className="text-gray-500 dark:text-gray-400 mt-2">Tablero de Control Ejecutivo.</p>
           </div>
           <div className="flex gap-3">
               {(riskClients.length > 0 || overdueTasksList.length > 0) && (
@@ -132,130 +162,145 @@ export default function DashboardPage() {
           </div>
       </div>
 
-      {/* 2. Action Center (Alerts) */}
-      {(billingAlerts.length > 0 || overdueTasksList.length > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {billingAlerts.map(p => (
-                  <div key={p.id} className={`p-4 rounded-2xl flex items-center justify-between border ${p.billingStatus === 'overdue' ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800 text-red-900 dark:text-red-300' : p.billingStatus === 'today' ? 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800 text-green-900 dark:text-green-300' : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-100 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300'}`}>
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white dark:bg-white/10 rounded-full shadow-sm">
-                              <Calendar className="w-5 h-5" />
+      {/* 2. OPERATIONAL WIDGETS (MOVED TO TOP) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Billing Alerts Widget */}
+          <Card className="flex-1 flex flex-col border-emerald-100 dark:border-emerald-900/30">
+              <div className="p-5 border-b border-gray-100/50 dark:border-gray-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <h3 className="font-bold text-emerald-900 dark:text-emerald-200 text-sm flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" /> Próximos Cobros
+                  </h3>
+              </div>
+              <div className="p-2 space-y-1">
+                  {activeProjects.sort((a,b) => (a.billingDay||1) - (b.billingDay||1)).slice(0, 3).map(p => (
+                      <div key={p.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-default">
+                          <div className="flex items-center gap-3">
+                              <div className="font-bold text-gray-500 w-6 text-center text-xs bg-gray-100 dark:bg-slate-700 rounded px-1">
+                                  {p.billingDay}
+                              </div>
+                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
                           </div>
-                          <div>
-                              <p className="font-bold text-sm">{p.name}</p>
-                              <p className="text-xs opacity-80">{p.billingStatus === 'today' ? 'Cobrar hoy' : p.billingStatus === 'overdue' ? 'Pago vencido' : 'Vence pronto'}</p>
-                          </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold">${p.monthlyRevenue.toLocaleString()}</span>
-                          {p.phone && (
-                              <a href={getWhatsAppLink(p)!} target="_blank" rel="noreferrer" onClick={sounds.pop} className="p-2 bg-white dark:bg-white/10 rounded-full shadow-sm hover:scale-110 transition-transform text-green-600 dark:text-green-400">
-                                  <MessageCircle className="w-4 h-4" />
-                              </a>
-                          )}
-                      </div>
-                  </div>
-              ))}
-              {overdueTasksList.slice(0, 2).map(t => (
-                  <div key={t.id} className="p-4 rounded-2xl flex items-center justify-between border bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-800 text-orange-900 dark:text-orange-300">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white dark:bg-white/10 rounded-full shadow-sm">
-                              <Clock className="w-5 h-5" />
-                          </div>
-                          <div>
-                              <p className="font-bold text-sm truncate max-w-[200px]">{t.title}</p>
-                              <p className="text-xs opacity-80">Tarea atrasada</p>
+                          <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-gray-500 font-bold">${p.monthlyRevenue.toLocaleString()}</span>
                           </div>
                       </div>
-                      <button onClick={handleScan} className="text-xs underline font-bold">Ver Todo</button>
-                  </div>
-              ))}
-          </div>
-      )}
+                  ))}
+              </div>
+              <div className="mt-auto p-4 border-t border-gray-100/50 dark:border-gray-800">
+                  <Link to="/payments">
+                    <Button variant="ghost" size="sm" className="w-full text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">Ver Calendario de Pagos</Button>
+                  </Link>
+              </div>
+          </Card>
 
-      {/* 3. Main Widgets Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Focus of the Day */}
-          <Card className="lg:col-span-2 flex flex-col min-h-[400px]">
-              <div className="p-6 border-b border-gray-100/50 dark:border-gray-800 flex justify-between items-center">
+          {/* Recent Activity / Focus */}
+          <Card className="flex flex-col border-indigo-100 dark:border-indigo-900/30">
+              <div className="p-6 border-b border-gray-100/50 dark:border-gray-800 flex justify-between items-center bg-indigo-50/50 dark:bg-indigo-900/10">
                   <div className="flex items-center gap-3">
-                      <div className="p-2 bg-black dark:bg-white text-white dark:text-black rounded-lg"><Zap className="w-4 h-4" /></div>
+                      <div className="p-2 bg-indigo-600 text-white rounded-lg"><Zap className="w-4 h-4" /></div>
                       <div>
-                          <h3 className="font-bold text-gray-900 dark:text-white">Foco de Hoy</h3>
-                          <p className="text-xs text-gray-400">Tareas prioritarias y entregas</p>
+                          <h3 className="font-bold text-indigo-900 dark:text-indigo-200">Foco de Hoy</h3>
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400">Tareas prioritarias</p>
                       </div>
                   </div>
                   <Link to="/tasks" className="text-xs font-semibold text-gray-400 hover:text-black dark:hover:text-white transition-colors">Ver Todo</Link>
               </div>
               <div className="p-4 flex-1 overflow-y-auto space-y-3 bg-gray-50/30 dark:bg-slate-900/30">
-                  {todaysTasks.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4 py-10">
-                          <div className="w-16 h-16 rounded-full bg-green-50 dark:bg-green-900/20 text-green-500 flex items-center justify-center">
-                              <CheckCircle2 className="w-8 h-8" />
-                          </div>
-                          <p>Estás al día con tus prioridades.</p>
-                      </div>
-                  ) : (
-                      todaysTasks.map(t => (
-                          <div key={t.id} className="group bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all flex items-start gap-4">
-                              <button className="mt-1 w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-500 hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"></button>
-                              <div className="flex-1">
-                                  <div className="flex justify-between">
-                                      <p className="font-semibold text-gray-800 dark:text-white text-sm">{t.title}</p>
-                                      {t.priority === 'HIGH' && <Badge variant="outline" className="text-[10px] text-red-600 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900">Alta</Badge>}
-                                  </div>
-                                  <p className="text-xs text-gray-400 mt-1 line-clamp-1">{t.description || "Sin descripción"}</p>
+                  {tasks.filter(t => t.status !== TaskStatus.DONE).slice(0,3).map(t => (
+                      <div key={t.id} className="group bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all flex items-start gap-4">
+                          <div className="flex-1">
+                              <div className="flex justify-between">
+                                  <p className="font-semibold text-gray-800 dark:text-white text-sm">{t.title}</p>
+                                  {t.priority === 'HIGH' && <Badge variant="outline" className="text-[10px] text-red-600 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900">Alta</Badge>}
                               </div>
                           </div>
-                      ))
-                  )}
+                      </div>
+                  ))}
+                  {tasks.filter(t => t.status !== TaskStatus.DONE).length === 0 && <p className="text-center text-gray-400 text-xs py-4">Todo al día.</p>}
+              </div>
+          </Card>
+      </div>
+
+      {/* 3. BI CHARTS (STRATEGIC) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* MRR Trend */}
+          <Card className="lg:col-span-2 p-6 flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-6">
+                  <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Crecimiento MRR (6 Meses)</p>
+                      <h2 className="text-2xl font-bold tracking-tight mt-1">${mrr.toLocaleString()} <span className="text-sm font-normal text-gray-400">/ mes actual</span></h2>
+                  </div>
+                  <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600"><TrendingUp className="w-5 h-5"/></div>
+              </div>
+              <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={mrrData}>
+                          <defs>
+                              <linearGradient id="colorMrr" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.3}/>
+                                  <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                              </linearGradient>
+                          </defs>
+                          <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Area type="monotone" dataKey="mrr" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
+                      </AreaChart>
+                  </ResponsiveContainer>
               </div>
           </Card>
 
-          {/* Right: Financial & Stats */}
+          {/* Side Charts Column */}
           <div className="space-y-6">
-              <Card className="bg-gray-900 dark:bg-white text-white dark:text-black p-6 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-6 opacity-20">
-                      <TrendingUp className="w-24 h-24" />
+              
+              {/* Funnel */}
+              <Card className="p-6 h-[200px] flex flex-col">
+                  <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Funnel de Ventas</p>
+                      <BarChartIcon className="w-4 h-4 text-gray-400" />
                   </div>
-                  <p className="text-gray-400 dark:text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">MRR Actual</p>
-                  <h2 className="text-4xl font-bold tracking-tight">${mrr.toLocaleString()}</h2>
-                  <div className="mt-4 pt-4 border-t border-white/10 dark:border-black/10 flex items-center gap-2 text-sm text-gray-300 dark:text-gray-600">
-                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                      {activeProjects.length} Clientes Activos
+                  <div className="flex-1 w-full text-xs">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={funnelData} layout="vertical" margin={{top: 0, right: 30, left: 0, bottom: 0}}>
+                              <XAxis type="number" hide />
+                              <YAxis dataKey="name" type="category" width={70} tick={{fontSize: 10, fill: '#6b7280'}} tickLine={false} axisLine={false} />
+                              <Tooltip cursor={{fill: 'transparent'}} content={<CustomTooltip />} />
+                              <Bar dataKey="value" barSize={15} radius={[0, 4, 4, 0]}>
+                                  {funnelData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                              </Bar>
+                          </BarChart>
+                      </ResponsiveContainer>
                   </div>
               </Card>
 
-              <Card className="flex-1 flex flex-col">
-                  <div className="p-5 border-b border-gray-100/50 dark:border-gray-800">
-                      <h3 className="font-bold text-gray-900 dark:text-white text-sm">Próximos Cobros</h3>
+              {/* Workload */}
+              <Card className="p-6 h-[200px] flex flex-col">
+                  <div className="flex justify-between items-center mb-2">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Carga de Equipo</p>
+                      <PieChart className="w-4 h-4 text-gray-400" />
                   </div>
-                  <div className="p-2 space-y-1">
-                      {activeProjects.sort((a,b) => (a.billingDay||1) - (b.billingDay||1)).slice(0, 3).map(p => (
-                          <div key={p.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-default">
-                              <div className="flex items-center gap-3">
-                                  <div className="font-bold text-gray-500 w-6 text-center text-xs">
-                                      {p.billingDay}
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                  <span className="text-xs font-mono text-gray-500">${p.monthlyRevenue.toLocaleString()}</span>
-                                  {p.phone && (
-                                      <a href={getWhatsAppLink(p)!} target="_blank" rel="noreferrer" onClick={sounds.pop} className="text-green-500 hover:text-green-600">
-                                          <MessageCircle className="w-3 h-3" />
-                                      </a>
-                                  )}
-                              </div>
-                          </div>
-                      ))}
-                  </div>
-                  <div className="mt-auto p-4 border-t border-gray-100/50 dark:border-gray-800">
-                      <Link to="/projects">
-                        <Button variant="ghost" size="sm" className="w-full text-xs">Ver todos los clientes</Button>
-                      </Link>
+                  <div className="flex-1 w-full text-xs flex items-center justify-center">
+                      <ResponsiveContainer width="100%" height="100%">
+                          <RePieChart>
+                              <Pie 
+                                data={workloadData} 
+                                innerRadius={40} 
+                                outerRadius={60} 
+                                paddingAngle={5} 
+                                dataKey="value"
+                              >
+                                  {workloadData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                                  ))}
+                              </Pie>
+                              <Tooltip content={<CustomTooltip />} />
+                          </RePieChart>
+                      </ResponsiveContainer>
                   </div>
               </Card>
+
           </div>
       </div>
     </div>

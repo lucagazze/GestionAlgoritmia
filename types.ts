@@ -1,4 +1,5 @@
 
+
 export enum ServiceType {
   ONE_TIME = 'ONE_TIME',
   RECURRING = 'RECURRING',
@@ -184,6 +185,49 @@ export interface SOP {
     category: 'SALES' | 'ONBOARDING' | 'FULFILLMENT' | 'ADMIN' | 'OTHER';
     content: string;
     updatedAt: string;
+}
+
+export interface AutomationRecipe {
+    id: string;
+    name: string;
+    triggerType: 'PROJECT_STATUS_CHANGE' | 'NEW_PROJECT';
+    triggerValue?: string; // e.g., 'ACTIVE' or 'ONBOARDING'
+    conditions: {
+        field: 'industry' | 'monthlyRevenue';
+        operator: 'contains' | 'greater_than' | 'equals';
+        value: string;
+    }[];
+    actions: {
+        type: 'CREATE_TASK';
+        payload: {
+            title: string;
+            priority: 'HIGH' | 'MEDIUM' | 'LOW';
+            delayDays?: number; // Due date offset
+            assigneeRole?: string; // e.g. "Auto assign to Media Buyer" (future)
+        }
+    }[];
+    isActive: boolean;
+}
+
+export type DeliverableStatus = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED';
+
+export interface Deliverable {
+    id: string;
+    projectId: string;
+    name: string;
+    url: string;
+    status: DeliverableStatus;
+    feedback?: string;
+    createdAt: string;
+}
+
+export interface PortalMessage {
+    id: string;
+    projectId: string;
+    sender: 'AGENCY' | 'CLIENT';
+    content: string;
+    readAt?: string;
+    createdAt: string;
 }
 
 export type ServiceCategory = 'Web & Tech' | 'Branding' | 'Contenido' | 'Ads / Tráfico' | 'Automatización' | 'Consultoría';

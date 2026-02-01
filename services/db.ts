@@ -1,6 +1,7 @@
 
+
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP } from '../types';
+import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -16,6 +17,58 @@ const handleResponse = async <T>(query: any): Promise<T[]> => {
   }
   return data || [];
 };
+
+// --- AUTOMATION ENGINE HELPER ---
+const runAutomations = async (triggerType: 'PROJECT_STATUS_CHANGE' | 'NEW_PROJECT', project: Project, triggerValue?: string) => {
+    try {
+        console.log(`Checking automations for ${triggerType} on ${project.name}...`);
+        
+        // 1. Fetch active recipes
+        const { data: recipes } = await supabase.from('Automation').select('*').eq('isActive', true).eq('triggerType', triggerType);
+        
+        if (!recipes || recipes.length === 0) return;
+
+        for (const recipe of (recipes as AutomationRecipe[])) {
+            // 2. Check Trigger Value (e.g. Status must match)
+            if (recipe.triggerValue && recipe.triggerValue !== triggerValue) continue;
+
+            // 3. Check Conditions (e.g. Industry must be SaaS)
+            let conditionsMet = true;
+            if (recipe.conditions && recipe.conditions.length > 0) {
+                for (const cond of recipe.conditions) {
+                    if (cond.field === 'industry') {
+                        if (!project.industry?.toLowerCase().includes(cond.value.toLowerCase())) conditionsMet = false;
+                    } else if (cond.field === 'monthlyRevenue') {
+                        if (project.monthlyRevenue < parseFloat(cond.value)) conditionsMet = false;
+                    }
+                }
+            }
+
+            if (!conditionsMet) continue;
+
+            // 4. Execute Actions
+            console.log(`> Executing Recipe: ${recipe.name}`);
+            for (const action of recipe.actions) {
+                if (action.type === 'CREATE_TASK') {
+                    const dueDate = new Date();
+                    if (action.payload.delayDays) dueDate.setDate(dueDate.getDate() + action.payload.delayDays);
+                    
+                    await supabase.from('Task').insert({
+                        title: action.payload.title,
+                        description: `🤖 Generada por automatización: ${recipe.name}`,
+                        priority: action.payload.priority,
+                        status: TaskStatus.TODO,
+                        projectId: project.id,
+                        dueDate: action.payload.delayDays ? dueDate.toISOString() : null
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Automation Engine Error:", e);
+    }
+};
+
 
 export const db = {
   // --- SETTINGS (For API Keys & Automation) ---
@@ -69,6 +122,26 @@ export const db = {
     }
   },
 
+  // --- AUTOMATIONS CRUD ---
+  automations: {
+      getAll: async (): Promise<AutomationRecipe[]> => {
+          return handleResponse<AutomationRecipe>(supabase.from('Automation').select('*'));
+      },
+      create: async (data: Omit<AutomationRecipe, 'id'>): Promise<AutomationRecipe> => {
+          const { data: created, error } = await supabase.from('Automation').insert(data).select().single();
+          if (error) throw error;
+          return created;
+      },
+      update: async (id: string, data: Partial<AutomationRecipe>): Promise<void> => {
+          const { error } = await supabase.from('Automation').update(data).eq('id', id);
+          if (error) throw error;
+      },
+      delete: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('Automation').delete().eq('id', id);
+          if (error) throw error;
+      }
+  },
+
   // --- KNOWLEDGE BASE (SOPs) ---
   sops: {
       getAll: async (): Promise<SOP[]> => {
@@ -86,6 +159,42 @@ export const db = {
       delete: async (id: string): Promise<void> => {
           const { error } = await supabase.from('SOP').delete().eq('id', id);
           if (error) throw error;
+      }
+  },
+
+  // --- CLIENT PORTAL (Deliverables & Chat) ---
+  portal: {
+      getDeliverables: async (projectId: string): Promise<Deliverable[]> => {
+          return handleResponse<Deliverable>(
+              supabase.from('Deliverable').select('*').eq('projectId', projectId).order('createdAt', { ascending: false })
+          );
+      },
+      createDeliverable: async (data: Omit<Deliverable, 'id' | 'createdAt' | 'status'>): Promise<Deliverable> => {
+          const { data: created, error } = await supabase.from('Deliverable').insert({
+              ...data, status: 'PENDING', createdAt: new Date().toISOString()
+          }).select().single();
+          if (error) throw error;
+          return created;
+      },
+      updateDeliverable: async (id: string, data: Partial<Deliverable>): Promise<void> => {
+          const { error } = await supabase.from('Deliverable').update(data).eq('id', id);
+          if (error) throw error;
+      },
+      deleteDeliverable: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('Deliverable').delete().eq('id', id);
+          if (error) throw error;
+      },
+      getMessages: async (projectId: string): Promise<PortalMessage[]> => {
+          return handleResponse<PortalMessage>(
+              supabase.from('PortalMessage').select('*').eq('projectId', projectId).order('createdAt', { ascending: true })
+          );
+      },
+      sendMessage: async (data: Omit<PortalMessage, 'id' | 'createdAt' | 'readAt'>): Promise<PortalMessage> => {
+          const { data: created, error } = await supabase.from('PortalMessage').insert({
+              ...data, createdAt: new Date().toISOString()
+          }).select().single();
+          if (error) throw error;
+          return created;
       }
   },
 
@@ -214,28 +323,22 @@ export const db = {
        const { data: created, error } = await supabase.from('Client').insert(payload).select().single();
        if (error) throw error;
        
-       if (data.status === ProjectStatus.ONBOARDING) {
-           const onboardingTasks = [
-               { title: `📝 Enviar contrato a ${data.name}`, priority: 'HIGH' },
-               { title: `📂 Crear carpeta de Drive/Assets para ${data.name}`, priority: 'MEDIUM' },
-               { title: `🔑 Pedir accesos (Web, Redes, Ads) a ${data.name}`, priority: 'HIGH' },
-               { title: `🚀 Agendar Call de Kick-off con ${data.name}`, priority: 'MEDIUM' }
-           ];
-           for (const t of onboardingTasks) {
-               await supabase.from('Task').insert({
-                   title: t.title,
-                   priority: t.priority,
-                   status: TaskStatus.TODO,
-                   projectId: created.id,
-                   description: "Generado automáticamente por Onboarding Automation."
-               });
-           }
-       }
+       // Trigger Automation Engine (NEW_PROJECT)
+       await runAutomations('NEW_PROJECT', created, undefined);
+
        return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
       const { error } = await supabase.from('Client').update(data).eq('id', id);
       if (error) throw error;
+      
+      // Trigger Automation Engine (STATUS_CHANGE)
+      if (data.status) {
+          const { data: currentProject } = await supabase.from('Client').select('*').eq('id', id).single();
+          if (currentProject) {
+              await runAutomations('PROJECT_STATUS_CHANGE', currentProject, data.status);
+          }
+      }
     },
     delete: async (id: string): Promise<void> => {
         const { error } = await supabase.from('Client').delete().eq('id', id);
@@ -296,6 +399,9 @@ export const db = {
             }).select().single();
             if (clientError) throw clientError;
             clientId = newClient.id;
+            
+            // Trigger Automation for Proposal -> Client creation
+            await runAutomations('NEW_PROJECT', newClient, undefined);
         }
 
         const proposalPayload = {

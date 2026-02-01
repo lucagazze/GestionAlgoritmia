@@ -1,14 +1,15 @@
 
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
-import { Project, ProjectStatus, Contractor, ClientNote, Task, TaskStatus } from '../types';
-import { Badge, Button, Input, Label, Textarea, Card, Slider } from '../components/UIComponents';
+import { Project, ProjectStatus, Contractor, ClientNote, Task, TaskStatus, Deliverable, PortalMessage } from '../types';
+import { Badge, Button, Input, Label, Textarea, Card, Slider, Modal } from '../components/UIComponents';
 import { 
   ArrowLeft, Mic2, ListTodo, Plus, Trash2, ExternalLink, Copy, 
   Sparkles, Globe, Loader2, Save,
-  CheckCircle2, User, Wallet, Palette, FileText
+  CheckCircle2, User, Wallet, Palette, FileText, UploadCloud, MessageSquare, Send
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
@@ -20,14 +21,24 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'MEETINGS' | 'FINANCE' | 'PORTAL' | 'GROWTH' | 'HISTORY'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ENTREGAS' | 'PORTAL' | 'FINANCE' | 'MEETINGS' | 'HISTORY'>('PROFILE');
 
   const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
   const [clientTasks, setClientTasks] = useState<Task[]>([]);
+  const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
+  const [portalMessages, setPortalMessages] = useState<PortalMessage[]>([]);
   
   const [meetingNotes, setMeetingNotes] = useState('');
   const [isProcessingMeeting, setIsProcessingMeeting] = useState(false);
   const [isGeneratingGrowth, setIsGeneratingGrowth] = useState(false);
+
+  // Deliverable Form
+  const [isDelivModalOpen, setIsDelivModalOpen] = useState(false);
+  const [delivForm, setDelivForm] = useState({ name: '', url: '' });
+
+  // Chat Input
+  const [chatInput, setChatInput] = useState('');
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<Partial<Project>>({});
 
@@ -43,14 +54,20 @@ export default function ProjectDetailPage() {
       if (id) loadProject();
   }, [id]);
 
+  useEffect(() => {
+      if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [portalMessages, activeTab]);
+
   const loadProject = async () => {
       if (!id) return;
       setLoading(true);
-      const [proj, conts, notes, tasks] = await Promise.all([
+      const [proj, conts, notes, tasks, delivs, msgs] = await Promise.all([
           db.projects.getAll().then(res => res.find(p => p.id === id)),
           db.contractors.getAll(),
           db.clientNotes.getByClient(id),
-          db.tasks.getAll().then(res => res.filter(t => t.projectId === id))
+          db.tasks.getAll().then(res => res.filter(t => t.projectId === id)),
+          db.portal.getDeliverables(id),
+          db.portal.getMessages(id)
       ]);
       
       if (proj) {
@@ -60,6 +77,8 @@ export default function ProjectDetailPage() {
       setContractors(conts);
       setClientNotes(notes);
       setClientTasks(tasks);
+      setDeliverables(delivs);
+      setPortalMessages(msgs);
       setLoading(false);
   };
 
@@ -68,6 +87,42 @@ export default function ProjectDetailPage() {
       await db.projects.update(id, formData);
       loadProject();
       alert("Guardado correctamente.");
+  };
+
+  const handleAddDeliverable = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!delivForm.name || !id) return;
+      await db.portal.createDeliverable({
+          projectId: id,
+          name: delivForm.name,
+          url: delivForm.url,
+      });
+      setIsDelivModalOpen(false);
+      setDelivForm({ name: '', url: '' });
+      const delivs = await db.portal.getDeliverables(id);
+      setDeliverables(delivs);
+  };
+
+  const handleDeleteDeliverable = async (delivId: string) => {
+      if(confirm('¿Borrar entregable?')) {
+          await db.portal.deleteDeliverable(delivId);
+          if (id) {
+              const delivs = await db.portal.getDeliverables(id);
+              setDeliverables(delivs);
+          }
+      }
+  };
+
+  const handleSendPortalMessage = async () => {
+      if (!chatInput.trim() || !id) return;
+      await db.portal.sendMessage({
+          projectId: id,
+          sender: 'AGENCY',
+          content: chatInput
+      });
+      setChatInput('');
+      const msgs = await db.portal.getMessages(id);
+      setPortalMessages(msgs);
   };
 
   const processMeetingNotes = async () => {
@@ -89,57 +144,9 @@ export default function ProjectDetailPage() {
       } catch (e) { console.error(e); alert("Error procesando IA."); } finally { setIsProcessingMeeting(false); }
   };
 
-  const generateGrowthStrategy = async () => {
-      setIsGeneratingGrowth(true);
-      try {
-          const prompt = `Actúa como Director de Estrategia. Crea un Roadmap de Crecimiento Trimestral para "${formData.name}" (Rubro: ${formData.industry}). 
-          Objetivo: Aumentar facturación.
-          Formato:
-          - Mes 1: Quick Wins (2 items)
-          - Mes 2: Optimización (2 items)
-          - Mes 3: Escala (2 items)
-          Sé breve y conciso.`;
-          const res = await ai.chat([{ role: 'user', content: prompt }]);
-          setFormData({...formData, growthStrategy: res});
-      } catch(e) { console.error(e); } finally { setIsGeneratingGrowth(false); }
-  };
-
-  const generateInvoice = () => {
-      const doc: any = new jsPDF();
-      doc.setFontSize(20);
-      doc.text("INVOICE / FACTURA", 20, 20);
-      
-      doc.setFontSize(12);
-      doc.text(`Cliente: ${formData.name}`, 20, 40);
-      doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 20, 50);
-      doc.text(`Vencimiento: Día ${formData.billingDay}`, 20, 60);
-      
-      doc.line(20, 70, 190, 70);
-      
-      doc.text("Descripción", 20, 80);
-      doc.text("Monto", 160, 80);
-      
-      doc.setFontSize(10);
-      doc.text(`Servicios de Agencia - Mensualidad (${new Date().toLocaleDateString('es-ES', { month: 'long' })})`, 20, 90);
-      doc.text(`$${formData.monthlyRevenue?.toLocaleString()}`, 160, 90);
-      
-      doc.line(20, 100, 190, 100);
-      doc.setFontSize(14);
-      doc.text(`TOTAL: $${formData.monthlyRevenue?.toLocaleString()}`, 140, 115);
-      
-      doc.save(`Invoice_${formData.name}_${new Date().toISOString().slice(0,7)}.pdf`);
-  };
-
   const applyColorPreset = (colors: string[]) => {
       setFormData({...formData, brandColors: colors});
   };
-
-  const revenue = formData.monthlyRevenue || 0;
-  const partnerCost = formData.outsourcingCost || 0;
-  const internalCost = formData.internalCost || 0;
-  const totalCost = partnerCost + internalCost;
-  const profit = revenue - totalCost;
-  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
   if (loading || !project) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-gray-300 w-8 h-8"/></div>;
 
@@ -168,11 +175,11 @@ export default function ProjectDetailPage() {
             {/* Tabs */}
             <div className="flex gap-1 mb-8 overflow-x-auto no-scrollbar pb-1">
                 {[
-                    { id: 'PROFILE', label: 'Perfil & Recursos', icon: User },
-                    { id: 'MEETINGS', label: 'Bitácora IA', icon: Mic2 },
+                    { id: 'PROFILE', label: 'Perfil', icon: User },
+                    { id: 'ENTREGAS', label: 'Entregables', icon: UploadCloud },
+                    { id: 'PORTAL', label: 'Chat Portal', icon: MessageSquare },
                     { id: 'FINANCE', label: 'Rentabilidad', icon: Wallet },
-                    { id: 'GROWTH', label: 'Growth Strategy', icon: Sparkles },
-                    { id: 'PORTAL', label: 'Guest Portal', icon: Globe },
+                    { id: 'MEETINGS', label: 'Bitácora IA', icon: Mic2 },
                     { id: 'HISTORY', label: 'Historial', icon: ListTodo },
                 ].map(tab => {
                     const Icon = tab.icon;
@@ -191,7 +198,7 @@ export default function ProjectDetailPage() {
             {/* Content Area */}
             <div className="grid grid-cols-1 gap-6">
                 
-                {/* PROFILE TAB (Merged with Resources) */}
+                {/* PROFILE TAB */}
                 {activeTab === 'PROFILE' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in">
                         <div className="space-y-6">
@@ -208,13 +215,6 @@ export default function ProjectDetailPage() {
                                         </div>
                                     </div>
                                     <div><Label>Día de Cobro</Label><Input type="number" value={formData.billingDay} onChange={e => setFormData({...formData, billingDay: parseInt(e.target.value)})} /></div>
-                                    <div>
-                                        <Label>Estado</Label>
-                                        <select className="w-full h-12 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 text-sm dark:text-white" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
-                                            <option value="ONBOARDING">Onboarding</option><option value="ACTIVE">Activo</option><option value="PAUSED">Pausado</option><option value="COMPLETED">Completado</option>
-                                            <optgroup label="Ventas"><option value="LEAD">Lead</option><option value="PROPOSAL">Propuesta</option></optgroup>
-                                        </select>
-                                    </div>
                                 </div>
                             </Card>
 
@@ -242,7 +242,7 @@ export default function ProjectDetailPage() {
                         <div className="space-y-6">
                             <Card className="p-6 space-y-4 h-full">
                                 <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-2">
-                                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> The Vault (Recursos)</h3>
+                                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> Recursos (The Vault)</h3>
                                     <button onClick={() => setFormData({...formData, resources: [...(formData.resources||[]), {id: Date.now().toString(), name: 'Nuevo Link', url: '', type: 'OTHER'}]})} className="text-xs bg-black dark:bg-white text-white dark:text-black px-2 py-1 rounded flex items-center"><Plus className="w-3 h-3 mr-1"/> Agregar</button>
                                 </div>
                                 <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
@@ -264,20 +264,140 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
 
+                {/* DELIVERABLES TAB (NEW) */}
+                {activeTab === 'ENTREGAS' && (
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Entregables para Aprobación</h2>
+                            <Button onClick={() => setIsDelivModalOpen(true)}><Plus className="w-4 h-4 mr-2"/> Subir Entregable</Button>
+                        </div>
+
+                        {deliverables.length === 0 ? (
+                            <div className="text-center py-20 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl text-gray-400">
+                                <UploadCloud className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                                <p>No hay entregables pendientes.</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4">
+                                {deliverables.map(deliv => (
+                                    <Card key={deliv.id} className="p-4 flex items-center justify-between group">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${deliv.status === 'APPROVED' ? 'bg-green-100 text-green-600' : deliv.status === 'CHANGES_REQUESTED' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
+                                                {deliv.status === 'APPROVED' ? <CheckCircle2 className="w-5 h-5"/> : <FileText className="w-5 h-5"/>}
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 dark:text-white">{deliv.name}</h4>
+                                                <a href={deliv.url} target="_blank" className="text-xs text-blue-500 hover:underline truncate max-w-[200px] block">{deliv.url}</a>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <Badge variant={deliv.status === 'APPROVED' ? 'green' : deliv.status === 'CHANGES_REQUESTED' ? 'outline' : 'blue'}>
+                                                {deliv.status === 'APPROVED' ? 'APROBADO' : deliv.status === 'CHANGES_REQUESTED' ? 'CAMBIOS SOLICITADOS' : 'PENDIENTE'}
+                                            </Badge>
+                                            <button onClick={() => handleDeleteDeliverable(deliv.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4"/></button>
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+
+                        <Modal isOpen={isDelivModalOpen} onClose={() => setIsDelivModalOpen(false)} title="Nuevo Entregable">
+                            <form onSubmit={handleAddDeliverable} className="space-y-4">
+                                <div><Label>Nombre del Archivo/Entrega</Label><Input value={delivForm.name} onChange={e => setDelivForm({...delivForm, name: e.target.value})} placeholder="Ej: Diseño Home v1" autoFocus/></div>
+                                <div><Label>Link (Drive, Figma, WeTransfer)</Label><Input value={delivForm.url} onChange={e => setDelivForm({...delivForm, url: e.target.value})} placeholder="https://..." /></div>
+                                <div className="flex justify-end pt-2"><Button type="submit">Publicar en Portal</Button></div>
+                            </form>
+                        </Modal>
+                    </div>
+                )}
+
+                {/* PORTAL CHAT TAB (NEW) */}
+                {activeTab === 'PORTAL' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in h-[600px]">
+                        <div className="lg:col-span-2 flex flex-col bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+                            <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
+                                <h3 className="font-bold flex items-center gap-2"><MessageSquare className="w-4 h-4"/> Chat con Cliente</h3>
+                                <div className="flex items-center gap-2">
+                                    <div className="text-xs text-gray-500 bg-white dark:bg-slate-900 px-2 py-1 rounded border">Link del Portal:</div>
+                                    <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-mono">
+                                        <Globe className="w-3 h-3" /> /portal/{formData.publicToken?.slice(0,6)}...
+                                    </div>
+                                    <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/#/portal/${formData.publicToken}`)} className="p-1 hover:bg-gray-200 rounded"><Copy className="w-3 h-3"/></button>
+                                </div>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 dark:bg-slate-950" ref={chatScrollRef}>
+                                {portalMessages.length === 0 && <div className="text-center text-gray-400 mt-20 text-sm">El historial de chat está vacío.</div>}
+                                {portalMessages.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.sender === 'AGENCY' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[70%] p-3 rounded-xl text-sm ${msg.sender === 'AGENCY' ? 'bg-black text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'}`}>
+                                            <p>{msg.content}</p>
+                                            <div className={`text-[10px] mt-1 text-right ${msg.sender === 'AGENCY' ? 'text-gray-400' : 'text-gray-400'}`}>
+                                                {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-4 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
+                                <div className="flex gap-2">
+                                    <Input 
+                                        value={chatInput} 
+                                        onChange={e => setChatInput(e.target.value)} 
+                                        onKeyDown={e => e.key === 'Enter' && handleSendPortalMessage()}
+                                        placeholder="Escribe un mensaje al cliente..." 
+                                        className="flex-1"
+                                    />
+                                    <Button onClick={handleSendPortalMessage} className="px-4"><Send className="w-4 h-4"/></Button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <Card className="p-6 text-center">
+                                <Globe className="w-10 h-10 mx-auto text-blue-500 mb-2" />
+                                <h3 className="font-bold">Acceso al Portal</h3>
+                                <p className="text-xs text-gray-500 mb-4">El cliente ve el progreso, chat y entregables aquí.</p>
+                                {formData.publicToken ? (
+                                    <a href={`/#/portal/${formData.publicToken}`} target="_blank" className="block w-full">
+                                        <Button variant="outline" className="w-full">Abrir Portal <ExternalLink className="w-3 h-3 ml-2"/></Button>
+                                    </a>
+                                ) : (
+                                    <Button onClick={() => setFormData({...formData, publicToken: Math.random().toString(36).substring(2)})} className="w-full">Generar Link</Button>
+                                )}
+                            </Card>
+                            
+                            <Card className="p-6">
+                                <Label>Progreso Visible ({formData.progress}%)</Label>
+                                <Slider value={formData.progress || 0} min={0} max={100} onChange={e => setFormData({...formData, progress: parseInt(e.target.value)})} />
+                            </Card>
+                        </div>
+                    </div>
+                )}
+
+                {/* MEETINGS TAB */}
+                {activeTab === 'MEETINGS' && (
+                    <div className="max-w-3xl mx-auto animate-in fade-in">
+                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-6 rounded-2xl mb-6">
+                            <h3 className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2 mb-2"><Mic2 className="w-5 h-5"/> Asistente de Reuniones</h3>
+                            <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-4">Toma notas rápidas. La IA las limpiará y creará las tareas.</p>
+                            <Textarea className="bg-white dark:bg-slate-900 min-h-[200px]" placeholder="- Notas..." value={meetingNotes} onChange={e => setMeetingNotes(e.target.value)} />
+                            <div className="flex justify-end mt-4"><Button onClick={processMeetingNotes} disabled={isProcessingMeeting}>Procesar Notas</Button></div>
+                        </div>
+                    </div>
+                )}
+
                 {/* FINANCE TAB */}
                 {activeTab === 'FINANCE' && (
                     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
-                        <div className="flex justify-end">
-                            <Button onClick={generateInvoice} variant="secondary"><FileText className="w-4 h-4 mr-2"/> Generar Factura PDF</Button>
-                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Card className="p-6">
-                                <h3 className="font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white"><Wallet className="w-4 h-4"/> Estructura de Costos (Mensual)</h3>
+                                <h3 className="font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white"><Wallet className="w-4 h-4"/> Estructura de Costos</h3>
                                 <div className="space-y-4">
                                     <div><Label>Ingreso (Fee Cliente)</Label><Input type="number" className="font-mono font-bold text-green-700" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})} /></div>
-                                    
                                     <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
-                                        <Label>Costo Asignado a Socio (Fijo Mensual)</Label>
+                                        <Label>Costo Socio</Label>
                                         <div className="flex gap-2">
                                             <select 
                                                 className="flex h-12 w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 text-sm dark:text-white" 
@@ -298,101 +418,9 @@ export default function ProjectDetailPage() {
                                             <Input type="number" className="w-32 font-mono text-red-600" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: parseFloat(e.target.value)})} placeholder="$ Pago" />
                                         </div>
                                     </div>
-
-                                    <div>
-                                        <Label>Costos Fijos Internos</Label>
-                                        <Input type="number" className="font-mono text-red-600" value={formData.internalCost} onChange={e => setFormData({...formData, internalCost: parseFloat(e.target.value)})} placeholder="$0" />
-                                    </div>
+                                    <div><Label>Costos Fijos Internos</Label><Input type="number" className="font-mono text-red-600" value={formData.internalCost} onChange={e => setFormData({...formData, internalCost: parseFloat(e.target.value)})} placeholder="$0" /></div>
                                 </div>
                             </Card>
-
-                            <div className="space-y-6">
-                                <div className={`p-6 rounded-2xl shadow-xl text-white ${profit >= 0 ? 'bg-gray-900 dark:bg-slate-800' : 'bg-red-900'}`}>
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Ganancia Neta Mensual</p>
-                                    <div className="text-4xl font-bold mt-2 tracking-tight">${profit.toLocaleString()}</div>
-                                    <div className="flex gap-4 mt-4 text-sm font-medium">
-                                        <span className={`${margin > 50 ? 'text-green-400' : margin > 20 ? 'text-yellow-400' : 'text-red-400'}`}>Margen: {margin.toFixed(1)}%</span>
-                                        <span className="text-gray-500">|</span>
-                                        <span className="text-gray-400">Costos: ${totalCost.toLocaleString()}</span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-gray-200 dark:border-slate-800 h-[180px] flex flex-col justify-center">
-                                    <Label className="mb-4">Distribución Financiera</Label>
-                                    <div className="w-full h-8 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden flex shadow-inner">
-                                        <div style={{width: `${(partnerCost/revenue)*100}%`}} className="h-full bg-red-400" title="Socio"></div>
-                                        <div style={{width: `${(internalCost/revenue)*100}%`}} className="h-full bg-orange-400" title="Interno"></div>
-                                        <div style={{width: `${(profit/revenue)*100}%`}} className="h-full bg-green-500" title="Ganancia"></div>
-                                    </div>
-                                    <div className="flex justify-between text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-wide">
-                                        <span className="text-red-500">Outsourcing</span>
-                                        <span className="text-orange-500">Fijos</span>
-                                        <span className="text-green-600">Profit</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* GROWTH TAB (New) */}
-                {activeTab === 'GROWTH' && (
-                    <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in">
-                        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-6 rounded-2xl border border-purple-100 dark:border-purple-800">
-                            <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 className="font-bold text-purple-900 dark:text-purple-300 text-lg flex items-center gap-2"><Sparkles className="w-5 h-5"/> Growth Roadmap</h3>
-                                    <p className="text-sm text-purple-700 dark:text-purple-400">Estrategia de crecimiento trimestral para el cliente.</p>
-                                </div>
-                                <Button onClick={generateGrowthStrategy} disabled={isGeneratingGrowth} size="sm" className="bg-purple-600 hover:bg-purple-700 text-white border-transparent">
-                                    {isGeneratingGrowth ? <Loader2 className="animate-spin w-4 h-4"/> : "Generar con IA"}
-                                </Button>
-                            </div>
-                            <Textarea 
-                                className="min-h-[300px] bg-white/80 dark:bg-slate-900/80 border-purple-200 dark:border-purple-800 text-purple-900 dark:text-purple-200 font-medium leading-relaxed" 
-                                value={formData.growthStrategy} 
-                                onChange={e => setFormData({...formData, growthStrategy: e.target.value})}
-                                placeholder="1. Quick Wins: ..." 
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* MEETINGS TAB */}
-                {activeTab === 'MEETINGS' && (
-                    <div className="max-w-3xl mx-auto animate-in fade-in">
-                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-6 rounded-2xl mb-6">
-                            <h3 className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2 mb-2"><Mic2 className="w-5 h-5"/> Asistente de Reuniones</h3>
-                            <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-4">Toma notas rápidas. La IA las limpiará y creará las tareas.</p>
-                            <Textarea className="bg-white dark:bg-slate-900 min-h-[200px]" placeholder="- Notas..." value={meetingNotes} onChange={e => setMeetingNotes(e.target.value)} />
-                            <div className="flex justify-end mt-4"><Button onClick={processMeetingNotes} disabled={isProcessingMeeting}>Procesar Notas</Button></div>
-                        </div>
-                    </div>
-                )}
-
-                {/* PORTAL TAB */}
-                {activeTab === 'PORTAL' && (
-                    <div className="max-w-2xl mx-auto space-y-6 animate-in fade-in text-center">
-                        <div className="p-8 bg-white dark:bg-slate-900 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-sm">
-                            <Globe className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Portal de Cliente</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mb-6">Link único para que el cliente vea su estado en tiempo real.</p>
-                            
-                            {formData.publicToken ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 p-3 rounded-xl border border-gray-200 dark:border-slate-700">
-                                        <input readOnly value={`${window.location.origin}/#/portal/${formData.publicToken}`} className="flex-1 text-xs text-gray-600 dark:text-gray-300 bg-transparent outline-none font-mono" />
-                                        <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/#/portal/${formData.publicToken}`)} className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-gray-500"><Copy className="w-4 h-4"/></button>
-                                        <a href={`/#/portal/${formData.publicToken}`} target="_blank" className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-blue-600"><ExternalLink className="w-4 h-4"/></a>
-                                    </div>
-                                    <div className="text-left bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800">
-                                        <Label>Progreso Visible ({formData.progress}%)</Label>
-                                        <Slider value={formData.progress || 0} min={0} max={100} onChange={e => setFormData({...formData, progress: parseInt(e.target.value)})} />
-                                    </div>
-                                </div>
-                            ) : (
-                                <Button onClick={() => setFormData({...formData, publicToken: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2)})} className="bg-black text-white">Generar Link Mágico</Button>
-                            )}
                         </div>
                     </div>
                 )}

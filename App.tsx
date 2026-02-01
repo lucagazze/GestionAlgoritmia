@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays, Moon, Sun, Activity } from 'lucide-react';
+import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays, Moon, Sun, Activity, Workflow } from 'lucide-react';
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -16,6 +17,7 @@ import PlaybooksPage from './pages/PlaybooksPage';
 import ClientPortalPage from './pages/ClientPortalPage'; 
 import PaymentsPage from './pages/PaymentsPage';
 import AuditPage from './pages/AuditPage';
+import AutomationsPage from './pages/AutomationsPage';
 import { AIActionCenter } from './components/AIActionCenter';
 import { CommandPalette } from './components/CommandPalette';
 import { db } from './services/db';
@@ -48,6 +50,7 @@ const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: bool
           title: "SISTEMA",
           items: [
               { path: '/services', icon: <LayoutGrid className="w-5 h-5" />, label: 'Catálogo', color: 'text-gray-600 dark:text-gray-400' },
+              { path: '/automations', icon: <Workflow className="w-5 h-5" />, label: 'Automations', color: 'text-purple-600 dark:text-purple-400' },
               { path: '/settings', icon: <Settings className="w-5 h-5" />, label: 'Ajustes', color: 'text-gray-600 dark:text-gray-400' },
           ]
       }
@@ -204,6 +207,7 @@ const MainLayout = () => {
               <Route path="/sales-copilot" element={<SalesCopilotPage />} />
               <Route path="/lab" element={<LabPage />} />
               <Route path="/playbooks" element={<PlaybooksPage />} />
+              <Route path="/automations" element={<AutomationsPage />} />
               <Route path="/portal/:token" element={<ClientPortalPage />} />
               <Route path="/audit" element={<AuditPage />} />
             </Routes>

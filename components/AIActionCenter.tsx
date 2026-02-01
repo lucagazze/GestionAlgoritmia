@@ -25,9 +25,9 @@ export const AIActionCenter = () => {
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
-    const [placeholder, setPlaceholder] = useState("¿Qué hacemos hoy?");
+    const [placeholder, setPlaceholder] = useState("¿Qué hacemos hoy, Jefe?");
     
-    // Proactive Context State
+    // Context State
     const [activeContextData, setActiveContextData] = useState<any>(null);
     const [quickChips, setQuickChips] = useState<{label: string, prompt: string}[]>([]);
     
@@ -53,30 +53,24 @@ export const AIActionCenter = () => {
         const checkContext = async () => {
             const projectMatch = matchPath("/projects/:id", location.pathname);
             if (projectMatch && projectMatch.params.id) {
-                // We are inside a project. Load it.
                 const projects = await db.projects.getAll();
                 const project = projects.find(p => p.id === projectMatch.params.id);
-                
                 if (project) {
                     setActiveContextData({ type: 'PROJECT', data: project });
-                    
-                    // Generate Quick Chips based on missing data
-                    const chips = [];
-                    if (!project.industry) chips.push({ label: "Definir Rubro", prompt: `Ayúdame a definir el rubro para ${project.name}` });
-                    if (!project.contacts || project.contacts.length === 0) chips.push({ label: "Agregar Contacto", prompt: `Quiero agregar un contacto a ${project.name}` });
-                    if (project.status === 'ONBOARDING') chips.push({ label: "Iniciar Onboarding", prompt: `Genera una lista de tareas de onboarding para ${project.name}` });
-                    chips.push({ label: "¿Resumen?", prompt: `¿Qué es lo último que pasó con ${project.name}?` });
-                    
-                    setQuickChips(chips);
-                    setPlaceholder(`Pregunta sobre ${project.name}...`);
+                    setQuickChips([
+                        { label: "Crear Tarea", prompt: `Crear tarea para ${project.name}: ` },
+                        { label: "Analizar Estado", prompt: `Analiza el estado de ${project.name}` }
+                    ]);
+                    setPlaceholder(`Ordenes sobre ${project.name}...`);
                 }
             } else {
                 setActiveContextData(null);
                 setQuickChips([
-                    { label: "Nuevo Cliente", prompt: "Nuevo Cliente" },
-                    { label: "Agendar Tarea", prompt: "Agendar Tarea" }
+                    { label: "Auditoría General", prompt: "¿Cómo vamos hoy? Haz una auditoría." },
+                    { label: "Agendar Reunión", prompt: "Agendar reunión mañana a las 10 con..." },
+                    { label: "Resumen Financiero", prompt: "¿Cuánto facturamos este mes?" }
                 ]);
-                setPlaceholder("¿Qué hacemos hoy?");
+                setPlaceholder("¿Qué hacemos hoy, Jefe?");
             }
         };
         checkContext();
@@ -89,7 +83,6 @@ export const AIActionCenter = () => {
         else setMessages([]);
     }, [currentSessionId]);
 
-    // Auto scroll
     useEffect(() => {
         if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }, [messages, isThinking, viewMode, confirmationMessage, decisionOptions]);
@@ -130,20 +123,28 @@ export const AIActionCenter = () => {
             console.log("Executing Action:", actionType, payload);
             
             if (actionType === 'CREATE_TASK') {
-                // ROBUST FALLBACKS: Ensure title is never null
-                const taskTitle = payload.title || payload.description || payload.name || "Nueva Tarea (Sin título)";
-                const taskDesc = payload.description || (payload.title ? '' : 'Generado por voz');
+                // FALLBACK DE SEGURIDAD: Nunca enviar title null
+                const safeTitle = payload.title || payload.description?.slice(0, 30) || "Tarea sin título";
                 
                 const newTask = await db.tasks.create({
-                    title: taskTitle,
+                    title: safeTitle,
                     status: TaskStatus.TODO,
                     priority: payload.priority || 'MEDIUM',
                     dueDate: payload.dueDate || payload.due || null, 
-                    description: taskDesc,
+                    description: payload.description || '',
                     projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
                 });
                 window.dispatchEvent(new Event('task-created'));
-                return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea' } };
+                return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' } };
+            }
+            if (actionType === 'CREATE_CONTRACTOR') {
+                 await db.contractors.create({
+                     name: payload.name || "Nuevo Socio",
+                     role: payload.role || "Colaborador",
+                     monthlyRate: payload.monthlyRate || 0,
+                     status: 'ACTIVE'
+                 });
+                 return { success: true };
             }
             if (actionType === 'UPDATE_PROJECT') {
                 const targetId = payload.id || (activeContextData?.type === 'PROJECT' ? activeContextData.data.id : null);
@@ -155,9 +156,10 @@ export const AIActionCenter = () => {
             if (actionType === 'UPDATE_TASK') {
                 if (!payload.id) return { success: false };
                 if (payload.status) await db.tasks.updateStatus(payload.id, payload.status);
-                // Also support updating other fields if provided
-                if (payload.title || payload.dueDate) {
-                     // Since updateStatus only does status, we might want to extend this later, but for now this is fine for "Complete Task" commands.
+                // Support generic updates
+                if (payload.dueDate || payload.title) {
+                    // Assuming updateStatus only does status, create full update logic later if needed
+                    // For now, simple re-create or ignore complex updates on tasks via voice
                 }
                 window.dispatchEvent(new Event('task-created')); 
                 return { success: true };
@@ -169,12 +171,11 @@ export const AIActionCenter = () => {
                 return { success: true };
             }
             if (actionType === 'CREATE_PROJECT') {
-                const projectName = payload.name || payload.title || "Nuevo Proyecto";
                 const newProject = await db.projects.create({
-                    name: projectName,
+                    name: payload.name || "Nuevo Proyecto",
                     monthlyRevenue: payload.monthlyRevenue || 0,
                     industry: payload.industry || '',
-                    notes: payload.notes || '',
+                    notes: '',
                     billingDay: 1,
                     status: ProjectStatus.ONBOARDING
                 });
@@ -205,15 +206,9 @@ export const AIActionCenter = () => {
     const startRecording = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            // Feature detect supported mime types
             let mimeType = 'audio/webm';
-            if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                mimeType = 'audio/mp4'; // Safari
-            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-                mimeType = 'audio/ogg'; // Firefox sometimes prefers this
-            }
-            // else default to webm (Chrome/Edge)
+            if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4'; 
+            else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
 
             const mediaRecorder = new MediaRecorder(stream, { mimeType });
             mediaRecorderRef.current = mediaRecorder;
@@ -226,7 +221,6 @@ export const AIActionCenter = () => {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 
-                // NEW FLOW: Transcribe ONLY
                 setIsTranscribing(true);
                 try {
                     const base64Audio = await blobToBase64(audioBlob);
@@ -235,22 +229,19 @@ export const AIActionCenter = () => {
                         setInput(text.trim());
                         setIsOpen(true);
                         setTimeout(() => inputRef.current?.focus(), 100);
+                        // Auto-send if it was a voice command? For now, let user review.
                     }
-                } catch (e) {
-                    console.error("Transcription error", e);
-                } finally {
-                    setIsTranscribing(false);
-                    setIsRecording(false);
-                }
+                } catch (e) { console.error("Transcription error", e); } 
+                finally { setIsTranscribing(false); setIsRecording(false); }
                 
-                stream.getTracks().forEach(track => track.stop()); // Stop mic
+                stream.getTracks().forEach(track => track.stop());
             };
 
             mediaRecorder.start();
             setIsRecording(true);
             setIsOpen(true);
         } catch (err) {
-            console.error("Error accessing microphone:", err);
+            console.error(err);
             alert("No se pudo acceder al micrófono.");
         }
     };
@@ -258,7 +249,6 @@ export const AIActionCenter = () => {
     const stopRecording = () => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
-            // isRecording state is cleared in onstop after transcription
         }
     };
 
@@ -267,9 +257,7 @@ export const AIActionCenter = () => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const base64String = reader.result as string;
-                // Remove data url prefix (e.g. "data:audio/mp3;base64,")
-                const base64Data = base64String.split(',')[1];
-                resolve(base64Data);
+                resolve(base64String.split(',')[1]);
             };
             reader.onerror = reject;
             reader.readAsDataURL(blob);
@@ -290,7 +278,7 @@ export const AIActionCenter = () => {
         let sessionId = currentSessionId;
         if (!sessionId) {
             try {
-                const title = userText;
+                const title = userText.slice(0, 30);
                 const newSession = await db.chat.createSession(title);
                 sessionId = newSession.id;
                 setCurrentSessionId(sessionId);
@@ -298,8 +286,7 @@ export const AIActionCenter = () => {
             } catch (e) { setIsThinking(false); return; }
         }
 
-        const displayMessage = userText;
-        await db.chat.addMessage(sessionId, 'user', displayMessage);
+        await db.chat.addMessage(sessionId, 'user', userText);
         await loadMessages(sessionId);
 
         try {
@@ -307,11 +294,8 @@ export const AIActionCenter = () => {
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
             
-            // PREPARE INPUT: TEXT (Audio is already transcribed to text at this point)
-            let agentInput: string = userText;
-
             const response = await ai.agent(
-                agentInput, 
+                userText, 
                 await db.chat.getMessages(sessionId), 
                 { tasks, projects, services, contractors }
             );
@@ -327,7 +311,7 @@ export const AIActionCenter = () => {
             if (response.type === 'BATCH' && response.actions) {
                 let successCount = 0;
                 for (const act of response.actions) { await executeAction(act.action, act.payload); successCount++; }
-                finalMessage = `✅ Ejecuté ${successCount} acciones.`;
+                finalMessage = `✅ Ejecuté ${successCount} acciones múltiples.`;
                 await db.chat.addMessage(sessionId, 'assistant', finalMessage);
             }
             else if (response.type === 'DECISION') {
@@ -344,7 +328,7 @@ export const AIActionCenter = () => {
             await loadMessages(sessionId);
         } catch (error) {
             console.error(error);
-            await db.chat.addMessage(sessionId, 'assistant', "Error de conexión o procesamiento.");
+            await db.chat.addMessage(sessionId, 'assistant', "Tuve un problema técnico. ¿Me lo repites?");
             await loadMessages(sessionId);
         } finally {
             setIsThinking(false);
@@ -392,7 +376,7 @@ export const AIActionCenter = () => {
                     </div>
                     {activeContextData && (
                         <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
-                            <Lightbulb className="w-3 h-3" /> Contexto: {activeContextData.data.name}
+                            <Lightbulb className="w-3 h-3" /> {activeContextData.data.name}
                         </div>
                     )}
                     <button onClick={startNewChat} className="text-[10px] bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-gray-800"><Plus className="w-3 h-3"/> Nuevo</button>
@@ -414,7 +398,7 @@ export const AIActionCenter = () => {
                         {messages.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2 opacity-50">
                                 <Sparkles className="w-10 h-10" />
-                                <p className="text-xs">Soy tu Segundo Cerebro. {activeContextData ? `Hablemos de ${activeContextData.data.name}.` : "¿Qué hacemos hoy?"}</p>
+                                <p className="text-xs">Soy tu Segundo Cerebro. {activeContextData ? `Hablemos de ${activeContextData.data.name}.` : "¿Qué ordenamos hoy?"}</p>
                             </div>
                         )}
                         {messages.map((msg, idx) => (
@@ -439,15 +423,10 @@ export const AIActionCenter = () => {
                                 ))}
                             </div>
                         )}
-                        {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Procesando...</span></div>}
-                        {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Grabando audio...</span></div>}
+                        {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Ejecutando...</span></div>}
+                        {isRecording && <div className="self-end bg-red-50 border border-red-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2 animate-pulse"><div className="w-2 h-2 rounded-full bg-red-500"></div><span className="text-xs text-red-600 font-bold">Escuchando...</span></div>}
                         {isTranscribing && <div className="self-end bg-blue-50 border border-blue-100 p-3 rounded-2xl rounded-br-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-blue-500" /><span className="text-xs text-blue-600 font-bold">Transcribiendo...</span></div>}
                         <div className="h-1"></div>
-                     </div>
-                 )}
-                 {pendingAction && (
-                     <div className="p-3 bg-yellow-50/50 border-t border-yellow-100 animate-in slide-in-from-bottom-5 flex-shrink-0 backdrop-blur-sm">
-                         <div className="flex items-center gap-3"><AlertTriangle className="w-5 h-5 text-yellow-600" /><div className="flex-1"><p className="text-xs text-gray-600 line-clamp-1">{confirmationMessage}</p></div><div className="flex gap-2"><button onClick={confirmAction} className="bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-800">Sí, Borrar</button><button onClick={cancelAction} className="bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-50">Cancelar</button></div></div>
                      </div>
                  )}
             </div>

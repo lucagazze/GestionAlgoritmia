@@ -1,9 +1,9 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { db } from './db';
 
-// 'gemini-2.0-flash-exp' has been deprecated/removed.
-// Switching to 'gemini-2.0-flash' (Stable) which fully supports Multimodal inputs (Audio/Video).
+// Usamos la versión estable de Gemini 2.0 Flash que es rápida y multimodal.
 const MODEL_NAME = 'gemini-2.0-flash';
 
 // Helper to get an initialized client dynamically
@@ -50,7 +50,6 @@ export const ai = {
       try {
           const client = await getClient();
           
-          // Adapt simple message format to Gemini format
           let systemInstruction = undefined;
           let contents = messages.map(m => {
               if (m.role === 'system') {
@@ -66,9 +65,7 @@ export const ai = {
           const response = await client.models.generateContent({
               model: MODEL_NAME,
               contents: contents,
-              config: {
-                  systemInstruction: systemInstruction
-              }
+              config: { systemInstruction }
           });
 
           return response.text || "No pude generar una respuesta.";
@@ -101,114 +98,91 @@ export const ai = {
   },
 
   /**
-   * The Agency OS Agent - Handles Text AND Audio inputs
+   * THE MASTER AGENT - Agency OS Brain (Enhanced with RAG)
    */
   agent: async (
-      userInput: string | { mimeType: string, data: string }, // Can be text or Audio Base64
+      userInput: string | { mimeType: string, data: string }, 
       contextHistory: any[] = [], 
       currentData: any
   ) => {
       const now = new Date();
       const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
       const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      const isoDate = now.toISOString();
 
-      // Prepare context data for the prompt
+      // --- RAG: FETCH SOPs ---
+      let sopsContext = "";
+      try {
+          const sops = await db.sops.getAll();
+          if (sops.length > 0) {
+              sopsContext = sops.map(s => `[MANUAL: ${s.category}] "${s.title}":\n${s.content.slice(0, 500)}...`).join('\n\n');
+          }
+      } catch (e) { console.error("Failed to fetch SOPs for RAG", e); }
+
+      // Preparar contexto digerible para la IA
       const activeTasks = currentData.tasks
           .filter((t: any) => t.status !== 'DONE')
-          .slice(0, 40)
-          .map((t: any) => `ID:${t.id} | "${t.title}" | Due:${t.dueDate?.slice(0,10) || 'N/A'}`)
+          .slice(0, 50)
+          .map((t: any) => `[TAREA] ID:${t.id} | Título:${t.title} | Vence:${t.dueDate?.slice(0,10) || 'Sin fecha'}`)
           .join('\n');
 
       const activeProjects = currentData.projects
-          .map((p: any) => `ID:${p.id} | "${p.name}" | Status:${p.status}`)
+          .map((p: any) => `[CLIENTE] ID:${p.id} | Nombre:${p.name} | Fee:$${p.monthlyRevenue} | DíaCobro:${p.billingDay} | Estado:${p.status}`)
           .join('\n');
       
       const contractors = currentData.contractors
-          .map((c: any) => `ID:${c.id} | "${c.name}" | Role:${c.role}`)
+          .map((c: any) => `[EQUIPO] ID:${c.id} | Nombre:${c.name} | Rol:${c.role} | Costo:$${c.monthlyRate}`)
           .join('\n');
 
       const systemInstruction = `
-      Eres "Algoritmia OS", el CEO Operativo (IA) de la agencia. Tienes control total.
-      DATOS REALES DE HOY:
-      - Fecha: ${localDate}
+      Eres "Algoritmia OS", el MAESTRO y CEO Operativo de esta agencia. Tienes control total sobre la base de datos.
+      
+      DATOS TEMPORALES:
+      - Hoy es: ${localDate}
       - Hora: ${localTime}
-      - ISO Date (Para cálculos): ${isoDate}
 
-      TU MISIÓN:
-      Escuchar al usuario, interpretar su intención y EJECUTAR acciones en la base de datos mediante JSON estructurado.
-      Si el usuario dice "Agendar reunión mañana", TU DEBES calcular la fecha exacta de mañana y crear la tarea.
+      TU BIBLIOTECA DE CONOCIMIENTO (SOPs & POLÍTICAS INTERNAS):
+      Usa esta información para responder preguntas sobre "cómo hacemos las cosas aquí".
+      ${sopsContext || "No hay SOPs cargados aún."}
 
-      BASE DE DATOS ACTUAL (CONTEXTO):
-      [PROYECTOS]
+      BASE DE DATOS EN VIVO:
       ${activeProjects}
-      [TAREAS PENDIENTES]
       ${activeTasks}
-      [EQUIPO]
       ${contractors}
 
-      --- REGLAS DE RESPUESTA (IMPORTANTE) ---
-      Devuelve SOLO un JSON válido. Sin markdown, sin explicaciones previas.
+      TU MISIÓN:
+      Escuchar, Pensar y EJECUTAR. No preguntes "qué hago", hazlo.
+      Si te pregunto "¿Cómo se hace X?", consulta los SOPs arriba y responde citando el manual.
 
-      1. ACCIÓN: CREAR TAREA
-      Si el usuario quiere agendar, recordar o hacer algo.
+      REGLAS DE INTERPRETACIÓN:
+      1. **AGENDAR/TAREAS**: Si pide agendar, crear recordatorio o tarea.
+         - Título: OBLIGATORIO. Si no lo dice, invéntalo basado en el contexto.
+         - Fecha: Calcula "mañana", "el viernes" basado en hoy.
+      2. **AUDITORÍA**: Si pregunta "¿Cómo vamos?", revisa los clientes activos.
+      3. **SOP/CONSULTA**: Si pregunto sobre un proceso, busca en la sección "TU BIBLIOTECA DE CONOCIMIENTO".
+
+      FORMATO DE RESPUESTA JSON (ESTRICTO):
       {
-          "type": "ACTION",
-          "action": "CREATE_TASK",
-          "payload": {
-              "title": "Título CORTO y claro de la acción",
-              "description": "Detalles adicionales si los hay",
-              "priority": "HIGH" | "MEDIUM" | "LOW",
-              "dueDate": "YYYY-MM-DDTHH:mm:ss" (Calcula la fecha futura basada en 'hoy')
-          },
-          "message": "Confirmación hablada (ej: 'Listo, agendado para mañana a las 10')."
+          "type": "ACTION" | "BATCH" | "CHAT" | "DECISION",
+          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "CREATE_CONTRACTOR",
+          "payload": { ...campos según acción... },
+          "message": "Texto que dirás al usuario."
       }
-      * IMPORTANTE: 'title' es OBLIGATORIO. Si no es obvio, invéntalo basado en la descripción.
-
-      2. ACCIÓN: CREAR CLIENTE / PROYECTO
-      {
-          "type": "ACTION",
-          "action": "CREATE_PROJECT",
-          "payload": {
-              "name": "Nombre Empresa",
-              "industry": "Rubro (opcional)"
-          },
-          "message": "Confirmación."
-      }
-
-      3. ACCIÓN: MODIFICAR / COMPLETAR
-      Si el usuario dice "Ya hice la tarea X" o "Cambia la fecha".
-      {
-          "type": "ACTION",
-          "action": "UPDATE_TASK",
-          "payload": { "id": "UUID_EXACTO_DE_LA_LISTA", "status": "DONE" },
-          "message": "Tarea completada."
-      }
-
-      4. RESPUESTA SIMPLE (CHAT)
-      { "type": "CHAT", "message": "Tu respuesta..." }
-
-      5. DECISIÓN (AMBIGÜEDAD)
-      { "type": "DECISION", "message": "¿A cuál te refieres?", "options": [...] }
       `;
 
       try {
           const client = await getClient();
           
-          // Construct the user message part
           let userPart;
           if (typeof userInput === 'string') {
               userPart = { text: userInput };
           } else {
-              // Audio Input - Gemini Flash supports audio directly via inlineData
               userPart = { inlineData: { mimeType: userInput.mimeType, data: userInput.data } };
           }
 
-          // Build history for context (last 6 messages to save context window)
-          const historyParts = contextHistory.slice(-6).map(m => {
+          const historyParts = contextHistory.slice(-4).map(m => {
               return {
                   role: m.role === 'assistant' ? 'model' : 'user',
-                  parts: [{ text: typeof m.content === 'string' ? m.content : '[Interacción Compleja]' }]
+                  parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
               };
           });
 
@@ -220,19 +194,18 @@ export const ai = {
               ],
               config: {
                   systemInstruction: systemInstruction,
-                  responseMimeType: "application/json", // Force JSON output for reliability
-                  temperature: 0.1 // VERY LOW temperature for strict JSON adherence
+                  responseMimeType: "application/json",
+                  temperature: 0.1 
               }
           });
 
           const responseText = response.text;
-          if (!responseText) return { type: "CHAT", message: "No entendí, ¿puedes repetir?" };
-
+          if (!responseText) return { type: "CHAT", message: "No procesé la orden, intenta ser más claro." };
           return JSON.parse(responseText);
 
       } catch (error) {
           console.error("Agent Error:", error);
-          return { type: "CHAT", message: "Tuve un problema procesando eso. Intenta de nuevo." };
+          return { type: "CHAT", message: "Error interno del Agente. Revisa la consola." };
       }
   }
 };
