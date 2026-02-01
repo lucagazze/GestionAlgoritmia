@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Modal } from './UIComponents';
-import { Trash2, Edit2, Plus, CheckCircle2, X } from 'lucide-react';
+import { Trash2, Edit2, Plus, CheckCircle2, X, RotateCcw } from 'lucide-react';
 
 interface ActionDetail {
     id: string;
@@ -17,6 +17,7 @@ interface ActionDetailsModalProps {
     actionType: 'DELETE' | 'CREATE' | 'UPDATE';
     items: ActionDetail[];
     onUndo?: () => void;
+    onUndoItem?: (id: string) => void;
 }
 
 export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
@@ -24,7 +25,8 @@ export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
     onClose,
     actionType,
     items,
-    onUndo
+    onUndo,
+    onUndoItem
 }) => {
     const getIcon = () => {
         switch (actionType) {
@@ -95,9 +97,20 @@ export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                {actionType === 'DELETE' && (
-                                    <CheckCircle2 className="w-5 h-5 text-red-500 flex-shrink-0" />
-                                )}
+                                <div className="flex flex-col gap-1 items-end">
+                                    {actionType === 'DELETE' && (
+                                        <CheckCircle2 className="w-5 h-5 text-red-500 flex-shrink-0" />
+                                    )}
+                                    {onUndoItem && (
+                                        <button 
+                                            onClick={() => onUndoItem(item.id)}
+                                            className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-md transition-colors text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                            title="Deshacer esta acción individualmente"
+                                        >
+                                            <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))}

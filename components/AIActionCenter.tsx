@@ -397,7 +397,77 @@ export const AIActionCenter = () => {
             if (e.message?.includes("policy") || e.message?.includes("permission") || e.code === '42501') {
                 return { success: false, error: "⚠️ Error de Permisos: Ve a 'Ajustes' y ejecuta el script de reparación." };
             }
-            return { success: false, error: "Error en base de datos." }; 
+                return { success: false, error: "Error en base de datos." }; 
+        }
+    };
+
+    // --- INDIVIDUAL UNDO ---
+    const handleUndoItem = async (itemId: string) => {
+        if (!detailsModal.messageId) return;
+        const msg = messages.find(m => m.id === detailsModal.messageId);
+        if (!msg || !msg.action_payload) return;
+
+        const undoPayload = msg.action_payload; // ENTIRE actionData object
+        // The undo details are in undoPayload.payload (which is the result.undo object)
+        const undoData = undoPayload.payload;
+
+        if (!undoData) {
+            console.error("No undo data found");
+            return;
+        }
+
+        try {
+            if (detailsModal.actionType === 'CREATE') {
+                // Determine Undo Type: DELETE
+                // Check if original action was CREATE_TASK or CREATE_TASKS
+                await db.tasks.delete(itemId);
+                console.log(`🗑️ Undid creation of ${itemId} (Deleted)`);
+            }
+            else if (detailsModal.actionType === 'DELETE') {
+                 // Determine Undo Type: RESTORE
+                 // Find the tasks to restore from undoData.data
+                 let taskToRestore;
+                 if (Array.isArray(undoData.data)) {
+                     taskToRestore = undoData.data.find((t: any) => t.id === itemId);
+                 } else if (undoData.data && undoData.data.id === itemId) {
+                     taskToRestore = undoData.data;
+                 }
+                 
+                 if (taskToRestore) {
+                      const { id, assignee, ...rest } = taskToRestore;
+                      await db.tasks.create(rest); // Re-create with same data (generating new ID usually, or we can force ID if DB allows)
+                      console.log(`♻️ Undid deletion of ${itemId} (Restored)`);
+                 } else {
+                     console.warn("Could not find task data to restore for", itemId);
+                 }
+            }
+            else if (detailsModal.actionType === 'UPDATE') {
+                 // Undo Update = Revert to old state
+                 // undoData.data should hold the old state
+                 if (undoData.data && undoData.data.id === itemId) {
+                     const { id, updated_at, ...revertData } = undoData.data;
+                     await db.tasks.update(itemId, revertData);
+                     console.log(`↩️ Undid update of ${itemId} (Reverted)`);
+                 }
+            }
+
+            // Remove item from modal
+            setDetailsModal(prev => ({
+                ...prev,
+                items: prev.items.filter(i => i.id !== itemId)
+            }));
+            
+            // Dispatch event to refresh lists
+            window.dispatchEvent(new Event('task-created'));
+            
+            // Optional: If modal becomes empty, close it?
+            if (detailsModal.items.length <= 1) {
+                 setDetailsModal(prev => ({ ...prev, isOpen: false }));
+            }
+
+        } catch (e) {
+            console.error("Failed to undo item", e);
+            alert("Error al deshacer este item individualmente.");
         }
     };
 
@@ -839,6 +909,7 @@ export const AIActionCenter = () => {
                     onClose={() => setDetailsModal(prev => ({ ...prev, isOpen: false }))}
                     actionType={detailsModal.actionType}
                     items={detailsModal.items}
+                    onUndoItem={handleUndoItem}
                     onUndo={detailsModal.messageId ? async () => {
                         const msg = messages.find(m => m.id === detailsModal.messageId);
                         if (msg) await handleUndoMessage(msg);
