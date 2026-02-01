@@ -401,7 +401,7 @@ export default function TasksPage() {
                                       <span className="text-[10px] text-gray-500">Asignado</span>
                                   </div>
                               )}
-                              {task.sopId && <Book className="w-3 h-3 text-emerald-500" title="Tiene SOP"/>}
+                              {task.sopId && <div title="Tiene SOP"><Book className="w-3 h-3 text-emerald-500" /></div>}
                           </div>
                       </div>
                   ))}
