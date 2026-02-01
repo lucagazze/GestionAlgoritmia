@@ -502,7 +502,10 @@ export default function TasksPage() {
                               const newDate = new Date(date);
                               newDate.setHours(hour, minute, 0, 0);
                               
-                              setFormData(prev => ({ ...prev, dueDate: newDate.toISOString(), title: '' }));
+                              // Local ISO format for input
+                              const iso = newDate.toLocaleString('sv').replace(' ', 'T').slice(0, 16);
+                              
+                              setFormData(prev => ({ ...prev, dueDate: iso, title: '' }));
                               setIsModalOpen(true);
                           };
 
@@ -624,11 +627,11 @@ export default function TasksPage() {
                               onDragLeave={() => setDragOverSlot(null)}
                               onDrop={(e) => handleDrop(e, date)}
                           >
-                              <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-black dark:bg-white text-white dark:text-black' : 'text-gray-400'}`}>
+                              <span className={`text-xs font-bold mb-0.5 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-black dark:bg-white text-white dark:text-black' : 'text-gray-400'}`}>
                                   {date.getDate()}
                               </span>
                               
-                              <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+                              <div className="flex-1 overflow-y-auto space-y-0.5 custom-scrollbar">
                                   {/* APP TASKS */}
                                   {dayTasks.map(t => (
                                       <div 
@@ -638,7 +641,7 @@ export default function TasksPage() {
                                           onContextMenu={(e) => handleContextMenu(e, t)}
                                           onClick={() => handleEdit(t)}
                                           className={`
-                                              text-xs px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 font-medium
+                                              text-[10px] px-1.5 py-0.5 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1 font-medium leading-none
                                               ${t.status === TaskStatus.DONE 
                                                   ? 'bg-green-100 text-green-800 border-green-200' 
                                                   : t.priority === 'HIGH' 
@@ -666,7 +669,7 @@ export default function TasksPage() {
                                         <div 
                                             key={ev.id}
                                             title="Evento de Google Calendar (Externo)"
-                                            className="text-xs px-2 py-1.5 rounded-md border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1.5 opacity-90 hover:opacity-100 font-medium"
+                                            className="text-[10px] px-1.5 py-0.5 rounded-sm border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-90 hover:opacity-100 font-medium leading-none"
                                         >
                                            <img src="https://www.google.com/favicon.ico" className="w-2 h-2 opacity-50" alt="G" />
                                            <span className="truncate">{ev.summary}</span>
