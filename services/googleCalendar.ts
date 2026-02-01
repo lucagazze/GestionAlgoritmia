@@ -4,7 +4,7 @@ import { db } from './db';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
-// ID Proporcionado por el usuario (Público/Seguro para frontend)
+// ID Proporcionado por el usuario (Prioridad Alta)
 const DEFAULT_CLIENT_ID = "461911891249-m1dahst7hd2nlm2tj8iigitm70d6lpia.apps.googleusercontent.com";
 
 let tokenClient: any;
@@ -41,10 +41,13 @@ export const googleCalendarService = {
         script2.async = true;
         script2.defer = true;
         script2.onload = async () => {
-            // Intentar inicializar con el ID por defecto para agilizar
+            // Inicializar con el ID por defecto si existe
             try {
-                let clientId = await db.settings.getApiKey('google_oauth_client_id');
-                if (!clientId) clientId = DEFAULT_CLIENT_ID;
+                // Prioridad: Hardcoded > DB
+                let clientId = DEFAULT_CLIENT_ID;
+                if (!clientId) {
+                    clientId = await db.settings.getApiKey('google_oauth_client_id');
+                }
 
                 if (clientId) {
                     tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
@@ -69,10 +72,12 @@ export const googleCalendarService = {
    * Inicia el flujo de login (Popup de Google)
    */
   authenticate: async (): Promise<boolean> => {
-      // Re-check ID in case it was just saved or needed initialization
+      // Re-check ID logic
       if (!tokenClient) {
-          let clientId = await db.settings.getApiKey('google_oauth_client_id');
-          if (!clientId) clientId = DEFAULT_CLIENT_ID;
+          let clientId = DEFAULT_CLIENT_ID;
+          if (!clientId) {
+              clientId = await db.settings.getApiKey('google_oauth_client_id');
+          }
           
           if (!clientId) throw new Error("Falta configurar el 'OAuth Client ID' en Ajustes.");
           
@@ -92,7 +97,6 @@ export const googleCalendarService = {
           };
           
           // Trigger the popup
-          // Check if we already have a valid token to skip popup if possible (though explicit flow usually requires popup first time)
           const existingToken = (window as any).gapi.client.getToken();
           if (existingToken === null) {
               tokenClient.requestAccessToken({ prompt: 'consent' });
