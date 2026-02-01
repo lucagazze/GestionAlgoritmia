@@ -314,7 +314,8 @@ export default function TasksPage() {
   };
 
   const deleteFromGoogle = async (googleEventId: string) => {
-      if (!googleCalendarService.getIsAuthenticated()) return;
+      const isAuth = await googleCalendarService.getIsAuthenticated();
+      if (!isAuth) return;
       try {
           await googleCalendarService.deleteEvent(googleEventId);
       } catch (e) {
@@ -340,11 +341,13 @@ export default function TasksPage() {
 
       // Google Sync Logic
       let gEventId = formData.googleEventId;
-      if (googleCalendarService.getIsAuthenticated() && formData.dueDate) {
+      const isAuth = await googleCalendarService.getIsAuthenticated();
+      
+      if (isAuth && formData.dueDate) {
           gEventId = await syncTaskToGoogle({ ...payload, googleEventId: formData.googleEventId }, !!formData.id);
       } else {
-          console.warn("Skipping Google Sync. Auth:", googleCalendarService.getIsAuthenticated(), "Date:", formData.dueDate);
-          if (!googleCalendarService.getIsAuthenticated()) {
+          console.warn("Skipping Google Sync. Auth:", isAuth, "Date:", formData.dueDate);
+          if (!isAuth) {
               alert("⚠️ NO SE SINCRONIZÓ: No estás autenticado en Google. Haz click en 'Conectar' arriba.");
           } else if (!formData.dueDate) {
               alert("⚠️ NO SE SINCRONIZÓ: La tarea no tiene fecha/hora.");
@@ -420,7 +423,8 @@ export default function TasksPage() {
       } else {
           const task = tasks.find(t => t.id === taskId);
           if (task) {
-              if (task.googleEventId && googleCalendarService.getIsAuthenticated()) {
+              const isAuth = await googleCalendarService.getIsAuthenticated();
+              if (task.googleEventId && isAuth) {
                   await syncTaskToGoogle({ ...task, dueDate: newIso }, true);
               }
               await db.tasks.update(taskId, { dueDate: newIso });
