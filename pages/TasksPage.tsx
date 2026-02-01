@@ -189,15 +189,328 @@ export default function TasksPage() {
           }
           alert(`¡Éxito! Se han sincronizado ${count} tareas a tu Google Calendar.`);
       } catch (e: any) {
-          console.error(e);
-          if (e.error === 'access_denied') {
-              alert("⚠️ Acceso denegado por Google.\n\nEs probable que tu proyecto esté en modo 'Testing' y tu email no esté en la lista de 'Test Users'.\n\nSolución: Ve a Google Cloud Console > OAuth Consent Screen > Test Users y agrega tu email.");
+          console.error("Google Sync Error", e);
+          
+          if (e.error === 'access_denied' || e.error === 'popup_closed_by_user') {
+              alert(
+                "⚠️ ACCESO DENEGADO (Modo Testing)\n\n" +
+                "Tu app en Google Cloud está en modo 'Testing' y tu email no está autorizado.\n\n" +
+                "SOLUCIÓN RÁPIDA:\n" +
+                "1. Ve a Google Cloud Console > APIs & Services > OAuth Consent Screen\n" +
+                "2. Busca 'Test users' (Usuarios de prueba)\n" +
+                "3. Agrega tu email: lucagazze1@gmail.com\n" +
+                "4. Guarda e intenta de nuevo."
+              );
           } else if (e.message?.includes("client_id")) {
-              alert("Falta configurar el 'OAuth Client ID' en la página de Ajustes.");
+              alert("Error: Falta configurar el 'OAuth Client ID' en Ajustes.");
           } else {
-              alert("Error al sincronizar. Revisa que las ventanas emergentes estén permitidas.");
+              alert("Error al sincronizar. Si estás en Vercel, asegúrate de haber agregado la URL a 'Authorized Javascript Origins' en Google Cloud Console.");
           }
       } finally {
           setIsSyncing(false);
       }
   };
+  
+  // --- FORM HANDLERS ---
+  const handleCreateTask = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formData.title) return;
+      
+      const payload: any = {
+          title: formData.title,
+          description: formData.description,
+          priority: formData.priority,
+          status: formData.status,
+          dueDate: formData.dueDate || null,
+          sopId: formData.sopId || null
+      };
+      
+      if (formData.assigneeId) payload.assigneeId = formData.assigneeId;
+
+      if (formData.id) {
+          await db.tasks.update(formData.id, payload);
+      } else {
+          await db.tasks.create(payload);
+      }
+      setIsModalOpen(false);
+      setFormData({ title: '', description: '', assigneeId: '', dueDate: '', priority: 'MEDIUM', status: TaskStatus.TODO, sopId: '' });
+      loadData();
+  };
+
+  const handleEdit = (task: Task) => {
+      setFormData({
+          id: task.id,
+          title: task.title,
+          description: task.description || '',
+          assigneeId: task.assigneeId || '',
+          dueDate: task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : '',
+          priority: task.priority || 'MEDIUM',
+          status: task.status,
+          sopId: task.sopId || ''
+      });
+      setIsModalOpen(true);
+      handleCloseContextMenu();
+  };
+
+  const handleDelete = async (id: string) => {
+      if(confirm('¿Borrar tarea?')) {
+          await db.tasks.delete(id);
+          loadData();
+      }
+      handleCloseContextMenu();
+  };
+  
+  const handleDrop = async (e: React.DragEvent, slotDate: Date) => {
+      e.preventDefault();
+      const taskId = e.dataTransfer.getData('taskId');
+      setDragOverSlot(null);
+      if (taskId) {
+          // Set time to noon to avoid timezone shifts for now, or keep existing time
+          const newDate = new Date(slotDate);
+          newDate.setHours(12, 0, 0, 0); 
+          await db.tasks.update(taskId, { dueDate: newDate.toISOString() });
+          loadData();
+      }
+  };
+
+  // --- RENDERING HELPERS ---
+  const filteredTasks = tasks.filter(t => t.title.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // Calendar Logic
+  const renderCalendar = () => {
+      const year = referenceDate.getFullYear();
+      const month = referenceDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sunday
+      
+      const daysArray = Array.from({ length: 42 }, (_, i) => {
+          const dayNumber = i - firstDayIndex + 1;
+          if (dayNumber > 0 && dayNumber <= daysInMonth) return new Date(year, month, dayNumber);
+          return null; 
+      });
+
+      return (
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-0">
+              {/* Calendar Header */}
+              <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-slate-800">
+                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronLeft className="w-5 h-5"/></button>
+                  <h2 className="text-lg font-bold capitalize text-gray-900 dark:text-white">{referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
+                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronRight className="w-5 h-5"/></button>
+              </div>
+              
+              {/* Days Header */}
+              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
+                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+                      <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>
+                  ))}
+              </div>
+
+              {/* Grid */}
+              <div className="grid grid-cols-7 grid-rows-6 flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto">
+                  {daysArray.map((date, i) => {
+                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50"></div>;
+                      
+                      const dayTasks = filteredTasks.filter(t => {
+                          if (!t.dueDate) return false;
+                          const tDate = new Date(t.dueDate);
+                          return tDate.getDate() === date.getDate() && tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
+                      });
+                      
+                      const isToday = new Date().toDateString() === date.toDateString();
+                      const isDragOver = dragOverSlot === date.toISOString();
+
+                      return (
+                          <div 
+                              key={i} 
+                              className={`bg-white dark:bg-slate-900 p-2 flex flex-col gap-1 relative transition-colors ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''} ${isDragOver ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
+                              onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }}
+                              onDragLeave={() => setDragOverSlot(null)}
+                              onDrop={(e) => handleDrop(e, date)}
+                          >
+                              <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-black dark:bg-white text-white dark:text-black' : 'text-gray-400'}`}>
+                                  {date.getDate()}
+                              </span>
+                              
+                              <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+                                  {dayTasks.map(t => (
+                                      <div 
+                                          key={t.id} 
+                                          draggable
+                                          onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
+                                          onContextMenu={(e) => handleContextMenu(e, t)}
+                                          onClick={() => handleEdit(t)}
+                                          className={`
+                                              text-[10px] px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all
+                                              ${t.status === TaskStatus.DONE 
+                                                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 border-gray-200 line-through' 
+                                                  : t.priority === 'HIGH' 
+                                                      ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
+                                                      : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
+                                              }
+                                          `}
+                                      >
+                                          {t.title}
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      );
+                  })}
+              </div>
+          </div>
+      );
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col pb-6">
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-shrink-0">
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Gestión de Tareas</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">Organiza el trabajo del equipo.</p>
+        </div>
+        
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-xl flex self-start md:self-auto">
+                 <button onClick={() => setViewMode('CALENDAR')} className={`p-2 rounded-lg transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><CalendarIcon className="w-4 h-4"/></button>
+                 <button onClick={() => setViewMode('WEEK')} className={`p-2 rounded-lg transition-all ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
+             </div>
+             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar tarea..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+             <Button onClick={handleGoogleSync} variant="secondary" className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-100">
+                 {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <CalendarCheck className="w-4 h-4 mr-2" />} Sync Calendar
+             </Button>
+             <Button onClick={() => { setIsModalOpen(true); setFormData({title:'', description:'', assigneeId:'', dueDate:'', priority:'MEDIUM', status:TaskStatus.TODO, sopId: ''}); }} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Nueva Tarea</Button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {viewMode === 'CALENDAR' ? renderCalendar() : (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm overflow-auto flex-1 custom-scrollbar">
+              <div className="space-y-2">
+                   {filteredTasks.length === 0 && <p className="text-center text-gray-400 py-10">No hay tareas encontradas.</p>}
+                   {filteredTasks.map(t => (
+                       <div key={t.id} onContextMenu={(e) => handleContextMenu(e, t)} onClick={() => handleEdit(t)} className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-800 cursor-pointer group transition-all">
+                           <div className="flex items-center gap-4">
+                               <button 
+                                onClick={(e) => { e.stopPropagation(); db.tasks.updateStatus(t.id, t.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(loadData); }}
+                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${t.status === TaskStatus.DONE ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500'}`}
+                               >
+                                   {t.status === TaskStatus.DONE && <CheckCircle2 className="w-4 h-4" />}
+                               </button>
+                               <div>
+                                   <h4 className={`font-bold text-sm ${t.status === TaskStatus.DONE ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{t.title}</h4>
+                                   <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                       {t.dueDate && <span className={`flex items-center gap-1 ${new Date(t.dueDate) < new Date() && t.status !== TaskStatus.DONE ? 'text-red-500 font-bold' : ''}`}><Clock className="w-3 h-3"/> {new Date(t.dueDate).toLocaleDateString()}</span>}
+                                       {t.assignee && <span className="flex items-center gap-1"><User className="w-3 h-3"/> {t.assignee.name}</span>}
+                                       {t.sopId && <span className="flex items-center gap-1 text-purple-500"><Book className="w-3 h-3"/> Con SOP</span>}
+                                   </div>
+                               </div>
+                           </div>
+                           <div className="flex items-center gap-3">
+                               <Badge variant={t.priority === 'HIGH' ? 'red' : t.priority === 'MEDIUM' ? 'yellow' : 'blue'}>{t.priority}</Badge>
+                               <button onClick={(e) => {e.stopPropagation(); handleEdit(t)}} className="p-2 text-gray-300 hover:text-black dark:hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><Edit2 className="w-4 h-4"/></button>
+                           </div>
+                       </div>
+                   ))}
+              </div>
+          </div>
+      )}
+
+      {/* Edit/Create Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={formData.id ? 'Editar Tarea' : 'Nueva Tarea'}>
+          <form onSubmit={handleCreateTask} className="space-y-4">
+              <div>
+                  <Label>Título</Label>
+                  <div className="flex gap-2">
+                      <Input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="Ej: Enviar reporte mensual..." autoFocus />
+                      <Button type="button" variant="outline" onClick={handleAiAssist} disabled={isAiGenerating} title="Sugerir descripción con IA">
+                          {isAiGenerating ? <Loader2 className="w-4 h-4 animate-spin"/> : <Sparkles className="w-4 h-4 text-purple-600"/>}
+                      </Button>
+                  </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <Label>Prioridad</Label>
+                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}>
+                          <option value="HIGH">Alta</option>
+                          <option value="MEDIUM">Media</option>
+                          <option value="LOW">Baja</option>
+                      </select>
+                  </div>
+                  <div>
+                      <Label>Estado</Label>
+                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
+                          <option value={TaskStatus.TODO}>Pendiente</option>
+                          <option value={TaskStatus.DONE}>Completada</option>
+                      </select>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                      <Label>Asignar a</Label>
+                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}>
+                          <option value="">(Sin asignar)</option>
+                          {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                  </div>
+                  <div>
+                      <Label>Fecha Vencimiento</Label>
+                      <Input type="datetime-local" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} />
+                  </div>
+              </div>
+
+              <div>
+                  <Label>Vincular SOP (Procedimiento)</Label>
+                  <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.sopId} onChange={e => setFormData({...formData, sopId: e.target.value})}>
+                      <option value="">(Ninguno)</option>
+                      {sops.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                  </select>
+              </div>
+
+              <div>
+                  <Label>Descripción</Label>
+                  <Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Detalles adicionales..." className="min-h-[100px]" />
+              </div>
+              
+              <div className="flex gap-2 pt-4">
+                  {formData.id && (
+                      <Button type="button" variant="destructive" onClick={() => handleDelete(formData.id!)} className="mr-auto">
+                          <Trash2 className="w-4 h-4"/>
+                      </Button>
+                  )}
+                  <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                  <Button type="submit">{formData.id ? 'Guardar Cambios' : 'Crear Tarea'}</Button>
+              </div>
+          </form>
+      </Modal>
+
+      {/* SOP Viewer Modal */}
+      <Modal isOpen={sopModalOpen} onClose={() => setSopModalOpen(false)} title={`SOP: ${selectedSop?.title}`}>
+          <div className="space-y-4">
+              <Badge>{selectedSop?.category}</Badge>
+              <div className="bg-gray-50 p-4 rounded-xl text-sm whitespace-pre-wrap font-mono">
+                  {selectedSop?.content}
+              </div>
+              <div className="flex justify-end">
+                  <Button onClick={() => setSopModalOpen(false)}>Cerrar</Button>
+              </div>
+          </div>
+      </Modal>
+
+      {/* Context Menu */}
+      <ContextMenu 
+        x={contextMenu.x} y={contextMenu.y} isOpen={!!contextMenu.task} onClose={handleCloseContextMenu}
+        items={[
+            { label: contextMenu.task?.status === TaskStatus.DONE ? 'Marcar Pendiente' : 'Completar Tarea', icon: CheckCircle2, onClick: () => { if(contextMenu.task) db.tasks.updateStatus(contextMenu.task.id, contextMenu.task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(loadData); handleCloseContextMenu(); } },
+            { label: 'Editar', icon: Edit2, onClick: () => { if(contextMenu.task) handleEdit(contextMenu.task); } },
+            { label: 'Ver SOP Asociado', icon: Book, onClick: () => { if(contextMenu.task?.sopId) handleViewSOP(contextMenu.task.sopId); else alert("Esta tarea no tiene SOP vinculado."); handleCloseContextMenu(); } },
+            { label: 'Recordar por WhatsApp', icon: MessageCircle, onClick: () => { if(contextMenu.task) sendPartnerReminder(contextMenu.task); handleCloseContextMenu(); } },
+            { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => { if(contextMenu.task) handleDelete(contextMenu.task.id); } }
+        ]}
+      />
+    </div>
+  );
+}

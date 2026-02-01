@@ -143,13 +143,14 @@ export const Slider = ({ value, min, max, label, suffix, className, ...props }: 
 };
 
 // --- Badge ---
-export const Badge = ({ children, className, variant = 'default' }: { children?: React.ReactNode; className?: string, variant?: 'default' | 'outline' | 'green' | 'blue' | 'yellow' }) => {
+export const Badge = ({ children, className, variant = 'default' }: { children?: React.ReactNode; className?: string, variant?: 'default' | 'outline' | 'green' | 'blue' | 'yellow' | 'red' }) => {
     const variants = {
         default: "bg-gray-900 dark:bg-white text-white dark:text-black border-transparent",
         outline: "text-gray-600 dark:text-gray-300 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900",
         green: "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800",
         blue: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-800",
-        yellow: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800"
+        yellow: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-800",
+        red: "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-100 dark:border-red-800"
     }
     return (
         <div className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors whitespace-nowrap", variants[variant], className)}>

@@ -4,7 +4,7 @@ import { db } from './db';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
-// ID Proporcionado por el usuario (Prioridad Alta)
+// ID Proporcionado por el usuario (Fijo y Prioritario)
 const DEFAULT_CLIENT_ID = "461911891249-m1dahst7hd2nlm2tj8iigitm70d6lpia.apps.googleusercontent.com";
 
 let tokenClient: any;
@@ -41,9 +41,8 @@ export const googleCalendarService = {
         script2.async = true;
         script2.defer = true;
         script2.onload = async () => {
-            // Inicializar con el ID por defecto si existe
             try {
-                // Prioridad: Hardcoded > DB
+                // Usar siempre el ID por defecto si existe, o buscar en DB como fallback
                 let clientId = DEFAULT_CLIENT_ID;
                 if (!clientId) {
                     clientId = await db.settings.getApiKey('google_oauth_client_id');
@@ -53,7 +52,7 @@ export const googleCalendarService = {
                     tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
                         client_id: clientId,
                         scope: SCOPES,
-                        callback: '', // Defined later
+                        callback: '', // Se define al autenticar
                     });
                 }
             } catch (e) {
@@ -72,14 +71,14 @@ export const googleCalendarService = {
    * Inicia el flujo de login (Popup de Google)
    */
   authenticate: async (): Promise<boolean> => {
-      // Re-check ID logic
+      // Re-check ID logic por si no se inicializó al cargar
       if (!tokenClient) {
           let clientId = DEFAULT_CLIENT_ID;
           if (!clientId) {
               clientId = await db.settings.getApiKey('google_oauth_client_id');
           }
           
-          if (!clientId) throw new Error("Falta configurar el 'OAuth Client ID' en Ajustes.");
+          if (!clientId) throw new Error("Falta configurar el 'OAuth Client ID' en Ajustes o en el código.");
           
           tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
               client_id: clientId,
