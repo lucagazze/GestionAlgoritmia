@@ -232,6 +232,9 @@ export default function TasksPage() {
 
   // --- SYNC CRUD LOGIC ---
   const syncTaskToGoogle = async (task: any, isUpdate: boolean = false) => {
+      // Debug Alert
+      // alert(`Intentando sincronizar: Auth=${googleCalendarService.getIsAuthenticated()}, Date=${task.dueDate}`);
+
       // Only sync if auth is done and date is present
       if (!googleCalendarService.getIsAuthenticated() || !task.dueDate) return null;
 
@@ -294,6 +297,11 @@ export default function TasksPage() {
           gEventId = await syncTaskToGoogle({ ...payload, googleEventId: formData.googleEventId }, !!formData.id);
       } else {
           console.warn("Skipping Google Sync. Auth:", googleCalendarService.getIsAuthenticated(), "Date:", formData.dueDate);
+          if (!googleCalendarService.getIsAuthenticated()) {
+              alert("⚠️ NO SE SINCRONIZÓ: No estás autenticado en Google. Haz click en 'Conectar' arriba.");
+          } else if (!formData.dueDate) {
+              alert("⚠️ NO SE SINCRONIZÓ: La tarea no tiene fecha/hora.");
+          }
       }
       if (gEventId) payload.googleEventId = gEventId;
 
@@ -481,12 +489,30 @@ export default function TasksPage() {
                           const { dayTasks, dayGoogle } = getEventsForDate(date);
                           const isToday = new Date().toDateString() === date.toDateString();
 
+                          const handleColumnClick = (e: React.MouseEvent) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const y = e.clientY - rect.top; // Relative Y
+                              const scrollY = e.currentTarget.scrollTop; // If individual scroll (unlikely here since parent scrolls)
+                              
+                              // Logic: 28px = 60 mins
+                              const totalMinutes = (y / 28) * 60;
+                              const hour = Math.floor(totalMinutes / 60);
+                              const minute = Math.floor(totalMinutes % 60);
+                              
+                              const newDate = new Date(date);
+                              newDate.setHours(hour, minute, 0, 0);
+                              
+                              setFormData(prev => ({ ...prev, dueDate: newDate.toISOString(), title: '' }));
+                              setIsModalOpen(true);
+                          };
+
                           return (
                               <div 
                                 key={i} 
                                 className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors h-[672px] group ${isToday ? 'bg-blue-50/10' : ''}`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} 
                                 onDrop={(e) => handleDrop(e, date)}
+                                onDoubleClick={handleColumnClick}
                               >
                                   {/* Vertical Hour Lines (Subtle) */}
                                    <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
@@ -570,23 +596,16 @@ export default function TasksPage() {
       return (
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-0">
               {/* Calendar Header */}
-              <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-slate-800">
-                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronLeft className="w-5 h-5"/></button>
-                  <h2 className="text-lg font-bold capitalize text-gray-900 dark:text-white">{referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
-                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronRight className="w-5 h-5"/></button>
-              </div>
-              
               {/* Days Header */}
               <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
                   {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                      <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>
+                      <div key={d} className="py-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">{d}</div>
                   ))}
               </div>
 
-              {/* Grid */}
-              <div className="grid grid-cols-7 auto-rows-fr flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto">
+              <div className="grid grid-cols-7 grid-rows-6 flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto min-h-0">
                   {daysArray.map((date, i) => {
-                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50 min-h-[80px]"></div>;
+                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50"></div>;
                       
                       const dayTasks = filteredTasks.filter(t => {
                           if (!t.dueDate) return false;
@@ -619,9 +638,9 @@ export default function TasksPage() {
                                           onContextMenu={(e) => handleContextMenu(e, t)}
                                           onClick={() => handleEdit(t)}
                                           className={`
-                                              text-[10px] px-2 py-1 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1
+                                              text-xs px-2 py-1.5 rounded-md border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1.5 font-medium
                                               ${t.status === TaskStatus.DONE 
-                                                  ? 'bg-green-100 text-green-700 border-green-200 opacity-90' 
+                                                  ? 'bg-green-100 text-green-800 border-green-200' 
                                                   : t.priority === 'HIGH' 
                                                       ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
                                                       : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
@@ -647,7 +666,7 @@ export default function TasksPage() {
                                         <div 
                                             key={ev.id}
                                             title="Evento de Google Calendar (Externo)"
-                                            className="text-[10px] px-2 py-1.5 rounded-md border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-80 hover:opacity-100"
+                                            className="text-xs px-2 py-1.5 rounded-md border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1.5 opacity-90 hover:opacity-100 font-medium"
                                         >
                                            <img src="https://www.google.com/favicon.ico" className="w-2 h-2 opacity-50" alt="G" />
                                            <span className="truncate">{ev.summary}</span>
