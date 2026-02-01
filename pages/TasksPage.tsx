@@ -118,15 +118,16 @@ export default function TasksPage() {
   useEffect(() => {
       let interval: NodeJS.Timeout;
 
-      const runSync = () => {
-        if (googleCalendarService.getIsAuthenticated()) {
+      const runSync = async () => { 
+        const isAuth = await googleCalendarService.getIsAuthenticated();
+        if (isAuth) {
             fetchGoogleEvents();
         }
       };
 
-      runSync();
+      runSync(); 
 
-      interval = setInterval(runSync, 15000); // Poll every 15 seconds
+      interval = setInterval(runSync, 15000); 
 
       return () => clearInterval(interval);
   }, [referenceDate, googleAuthDone]);
