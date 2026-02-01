@@ -163,7 +163,7 @@ export default function TasksPage() {
           assigneeId: '', 
           dueDate: localISOTime, 
           priority: 'MEDIUM', 
-          status: TaskStatus.TODO,
+          status: TaskStatus.TODO, 
           sopId: ''
       });
       setIsModalOpen(true);
@@ -421,15 +421,15 @@ export default function TasksPage() {
                 <div className="font-bold text-gray-900 dark:text-white text-sm">{startOfWeek.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</div>
                 <button onClick={() => {const d=new Date(referenceDate); d.setDate(d.getDate()+7); setReferenceDate(d)}} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded"><ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-300"/></button>
             </div>
-            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto"> 
-                <div className="flex min-h-[600px]">
-                    <div className="w-12 flex-shrink-0 border-r border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30">
-                         <div className="h-8 border-b border-gray-300 dark:border-slate-700"></div>
-                        {hours.map(h => <div key={h} className="h-20 border-b border-gray-200 dark:border-slate-800 text-[10px] text-gray-400 flex justify-center pt-1">{h}:00</div>)}
+            <div className="flex-1 flex flex-col min-h-0 overflow-auto"> 
+                <div className="flex min-h-[600px] min-w-[800px]">
+                    <div className="w-12 flex-shrink-0 border-r border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30 sticky left-0 z-20">
+                         <div className="h-8 border-b border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30"></div>
+                        {hours.map(h => <div key={h} className="h-20 border-b border-gray-200 dark:border-slate-800 text-[10px] text-gray-400 flex justify-center pt-1 bg-white dark:bg-slate-900">{h}:00</div>)}
                     </div>
                     {weekDays.map((date, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 dark:border-slate-700 last:border-r-0 min-w-[100px]">
-                            <div className={`h-8 flex items-center justify-center border-b border-gray-300 dark:border-slate-700 text-xs font-bold ${date.toDateString() === new Date().toDateString() ? 'bg-black text-white' : 'bg-gray-50/30 dark:bg-slate-800/30 text-gray-600 dark:text-gray-300'}`}>
+                        <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 dark:border-slate-700 last:border-r-0 min-w-[120px]">
+                            <div className={`h-8 flex items-center justify-center border-b border-gray-300 dark:border-slate-700 text-xs font-bold sticky top-0 z-10 ${date.toDateString() === new Date().toDateString() ? 'bg-black text-white' : 'bg-gray-50/90 dark:bg-slate-800/90 text-gray-600 dark:text-gray-300'}`}>
                                 {date.getDate()} {date.toLocaleDateString('es-ES', { weekday: 'short' })}
                             </div>
                             <div className="flex-1 relative bg-white dark:bg-slate-900">
@@ -502,7 +502,7 @@ export default function TasksPage() {
                 {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => <div key={d} className="py-2 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{d}</div>)}
             </div>
             
-            <div className="grid grid-cols-7 flex-1 bg-gray-200 dark:bg-slate-700 gap-px border-b border-gray-200 dark:border-slate-800">
+            <div className="grid grid-cols-7 flex-1 bg-gray-200 dark:bg-slate-700 gap-px border-b border-gray-200 dark:border-slate-800 overflow-y-auto min-h-[400px]">
                 {days.map((date, idx) => {
                     const isCurrentMonth = date.getMonth() === month;
                     const slotId = date.toISOString();
@@ -521,7 +521,7 @@ export default function TasksPage() {
                           onDrop={(e) => handleDrop(e, date)}
                           onDoubleClick={() => handleDoubleClickDate(date)}
                           className={`
-                            relative flex flex-col gap-1 p-1 transition-all group
+                            relative flex flex-col gap-1 p-1 transition-all group min-h-[80px]
                             ${isCurrentMonth ? 'bg-white dark:bg-slate-900' : 'bg-gray-50/60 dark:bg-slate-800/60'}
                             ${isToday ? 'bg-blue-50/40 dark:bg-blue-900/20' : ''}
                             ${isDragTarget ? '!bg-indigo-100 dark:!bg-indigo-900 ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-gray-50 dark:hover:bg-slate-800'}
@@ -531,7 +531,7 @@ export default function TasksPage() {
                                 {date.getDate()}
                             </div>
                             
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 mt-1">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 mt-1 max-h-[120px]">
                                 {dayTasks.map(t => (
                                     <div 
                                       key={t.id} 
@@ -562,15 +562,15 @@ export default function TasksPage() {
   return (
     <div className="space-y-4 animate-in fade-in duration-500 h-[calc(100vh-2rem)] flex flex-col pt-2">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 px-1 flex-shrink-0">
-        <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
             <div><h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Tareas</h1></div>
-            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1">
-                <button onClick={() => setViewMode('TODAY')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'TODAY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Sun className="w-3 h-3" /> Hoy</button>
-                <button onClick={() => setViewMode('WEEK')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Columns className="w-3 h-3" /> Semana</button>
-                <button onClick={() => setViewMode('CALENDAR')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><CalendarIcon className="w-3 h-3" /> Mes</button>
+            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1 w-full md:w-auto overflow-x-auto">
+                <button onClick={() => setViewMode('TODAY')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all whitespace-nowrap ${viewMode === 'TODAY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Sun className="w-3 h-3" /> Hoy</button>
+                <button onClick={() => setViewMode('WEEK')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all whitespace-nowrap ${viewMode === 'WEEK' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><Columns className="w-3 h-3" /> Semana</button>
+                <button onClick={() => setViewMode('CALENDAR')} className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold uppercase transition-all whitespace-nowrap ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white'}`}><CalendarIcon className="w-3 h-3" /> Mes</button>
             </div>
         </div>
-        <div className="flex gap-2 w-full xl:w-auto">
+        <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto">
              <div className="relative flex-1 xl:w-64"><Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400 dark:text-gray-500" /><Input placeholder="Buscar..." className="pl-9 h-9 text-sm bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             <Button onClick={openCreateModal} className="h-9 shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-3.5 h-3.5 mr-2" /> Nueva</Button>
         </div>
@@ -612,7 +612,7 @@ export default function TasksPage() {
           </div>
           <div className="space-y-6">
               <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full text-xl font-bold border-none outline-none bg-transparent p-0 text-gray-900 dark:text-white placeholder:text-gray-400" placeholder="Título..." autoFocus />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="space-y-1.5"><Label><User className="w-3 h-3"/> Responsable</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 dark:bg-slate-800 dark:border-slate-700 dark:text-white px-3 text-sm" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}><option value="">Sin Asignar</option>{contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                  <div className="space-y-1.5"><Label><Flag className="w-3 h-3"/> Prioridad</Label><select className="flex h-10 w-full rounded-lg border bg-gray-50/50 dark:bg-slate-800 dark:border-slate-700 dark:text-white px-3 text-sm" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}><option value="LOW">Baja</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option></select></div>
                  <div className="space-y-1.5"><Label><CalendarIcon className="w-3 h-3"/> Fecha</Label><Input type="datetime-local" className="bg-white dark:bg-slate-800" value={formData.dueDate} onChange={e => setFormData({...formData, dueDate: e.target.value})} /></div>

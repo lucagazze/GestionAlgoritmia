@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus } from '../types';
@@ -240,7 +239,7 @@ export default function PaymentsPage() {
                         <h3 className="font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2 shrink-0">
                             <BarChart3 className="w-5 h-5"/> Tendencia de Liquidez (3 Meses)
                         </h3>
-                        <div className="w-full flex-1 min-h-0">
+                        <div className="w-full flex-1 min-h-0 min-w-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={forecastData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                                     <CartesianGrid stroke="#f5f5f5" vertical={false} />

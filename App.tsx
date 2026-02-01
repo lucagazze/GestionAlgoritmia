@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays, Moon, Sun, Activity, Workflow } from 'lucide-react';
@@ -79,13 +78,13 @@ const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: bool
     <>
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden" 
           onClick={() => setIsOpen(false)}
         />
       )}
       
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-gray-50/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-72 bg-gray-50/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
         md:translate-x-0 md:static md:h-screen flex flex-col
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
@@ -95,12 +94,12 @@ const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: bool
             <span className="font-bold text-lg tracking-tight block leading-none text-gray-900 dark:text-white">Algoritmia</span>
             <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Agency OS 3.1</span>
           </div>
-          <button className="ml-auto md:hidden text-gray-500 dark:text-gray-400" onClick={() => setIsOpen(false)}>
+          <button className="ml-auto md:hidden text-gray-500 dark:text-gray-400 p-1 hover:bg-gray-200 rounded-md" onClick={() => setIsOpen(false)}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <nav className="p-6 space-y-8 flex-1 overflow-y-auto">
+        <nav className="p-6 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
           {sections.map((section, idx) => (
               <div key={idx}>
                   <p className="px-4 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">{section.title}</p>
@@ -186,14 +185,14 @@ const MainLayout = () => {
           {/* Mobile Header (Hidden in Portal) */}
           {!isPortal && (
               <div className="md:hidden h-16 border-b border-gray-200 dark:border-slate-800 flex items-center px-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
-                <button onClick={() => setSidebarOpen(true)} className="text-gray-900 dark:text-white">
+                <button onClick={() => setSidebarOpen(true)} className="text-gray-900 dark:text-white p-2 -ml-2">
                   <Menu className="w-6 h-6" />
                 </button>
-                <span className="ml-4 font-bold text-lg text-gray-900 dark:text-white">Algoritmia OS</span>
+                <span className="ml-3 font-bold text-lg text-gray-900 dark:text-white">Algoritmia OS</span>
               </div>
           )}
 
-          <div className={`flex-1 overflow-auto ${isPortal ? '' : 'p-4 md:p-8 lg:p-10'} max-w-[1600px] mx-auto w-full`}>
+          <div className={`flex-1 overflow-auto ${isPortal ? '' : 'p-3 md:p-8 lg:p-10'} max-w-[1600px] mx-auto w-full custom-scrollbar pb-24 md:pb-8`}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/calculator" element={<CalculatorPage />} />

@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
@@ -233,7 +232,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600"><TrendingUp className="w-5 h-5"/></div>
               </div>
-              <div className="h-64 w-full">
+              <div className="h-64 w-full min-w-0 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={mrrData}>
                           <defs>
@@ -259,7 +258,7 @@ export default function DashboardPage() {
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Funnel de Ventas</p>
                       <BarChartIcon className="w-4 h-4 text-gray-400" />
                   </div>
-                  <div className="flex-1 w-full text-xs">
+                  <div className="flex-1 w-full text-xs min-h-0 min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={funnelData} layout="vertical" margin={{top: 0, right: 30, left: 0, bottom: 0}}>
                               <XAxis type="number" hide />
@@ -281,7 +280,7 @@ export default function DashboardPage() {
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Carga de Equipo</p>
                       <PieChart className="w-4 h-4 text-gray-400" />
                   </div>
-                  <div className="flex-1 w-full text-xs flex items-center justify-center">
+                  <div className="flex-1 w-full text-xs flex items-center justify-center min-h-0 min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                           <RePieChart>
                               <Pie 

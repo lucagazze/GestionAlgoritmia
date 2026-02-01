@@ -80,8 +80,8 @@ export default function PartnersPage() {
             <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Equipo & Finanzas</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-1">Gestión de socios y costos fijos mensuales.</p>
         </div>
-        <div className="flex gap-2">
-            <div className="relative w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar socio..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar socio..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
             <Button onClick={() => setIsModalOpen(true)} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Agregar</Button>
         </div>
       </div>
@@ -98,62 +98,64 @@ export default function PartnersPage() {
           </Card>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full text-sm text-left">
-              <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-700 uppercase text-xs tracking-wider">
-                  <tr>
-                      <th className="px-6 py-4">Socio / Freelancer</th>
-                      <th className="px-6 py-4">Carga de Trabajo (Tareas)</th>
-                      <th className="px-6 py-4 text-right">Pago Mensual (Estimado)</th>
-                      <th className="px-6 py-4 text-center">Estado</th>
-                      <th className="px-6 py-4 text-center">Acciones</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
-                  {filtered.length === 0 ? (<tr><td colSpan={5} className="text-center py-12 text-gray-400">No hay socios registrados.</td></tr>) : 
-                      filtered.map(c => {
-                          const partnerProjects = projects.filter(p => p.assignedPartnerId === c.id && p.status === ProjectStatus.ACTIVE);
-                          const monthlyPayout = partnerProjects.reduce((sum, p) => sum + (p.outsourcingCost || 0), 0);
-                          
-                          // WORKLOAD LOGIC
-                          const activeTasks = tasks.filter(t => t.assigneeId === c.id && t.status !== TaskStatus.DONE).length;
-                          const loadPercentage = Math.min(100, (activeTasks / 10) * 100); // Assume 10 tasks is full cap
-                          const loadColor = loadPercentage > 80 ? 'bg-red-500' : loadPercentage > 50 ? 'bg-yellow-500' : 'bg-green-500';
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
+          <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-sm text-left min-w-[800px]">
+                  <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-700 uppercase text-xs tracking-wider">
+                      <tr>
+                          <th className="px-6 py-4">Socio / Freelancer</th>
+                          <th className="px-6 py-4">Carga de Trabajo (Tareas)</th>
+                          <th className="px-6 py-4 text-right">Pago Mensual (Estimado)</th>
+                          <th className="px-6 py-4 text-center">Estado</th>
+                          <th className="px-6 py-4 text-center">Acciones</th>
+                      </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
+                      {filtered.length === 0 ? (<tr><td colSpan={5} className="text-center py-12 text-gray-400">No hay socios registrados.</td></tr>) : 
+                          filtered.map(c => {
+                              const partnerProjects = projects.filter(p => p.assignedPartnerId === c.id && p.status === ProjectStatus.ACTIVE);
+                              const monthlyPayout = partnerProjects.reduce((sum, p) => sum + (p.outsourcingCost || 0), 0);
+                              
+                              // WORKLOAD LOGIC
+                              const activeTasks = tasks.filter(t => t.assigneeId === c.id && t.status !== TaskStatus.DONE).length;
+                              const loadPercentage = Math.min(100, (activeTasks / 10) * 100); // Assume 10 tasks is full cap
+                              const loadColor = loadPercentage > 80 ? 'bg-red-500' : loadPercentage > 50 ? 'bg-yellow-500' : 'bg-green-500';
 
-                          return (
-                              <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer">
-                                  <td className="px-6 py-4">
-                                      <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 flex items-center justify-center font-bold text-sm">{c.name.charAt(0)}</div>
-                                          <div>
-                                              <div className="font-bold text-gray-900 dark:text-white">{c.name}</div>
-                                              <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">{c.role} <span className="text-gray-300">|</span> {c.email || '-'}</div>
+                              return (
+                                  <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer">
+                                      <td className="px-6 py-4">
+                                          <div className="flex items-center gap-3">
+                                              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 flex items-center justify-center font-bold text-sm">{c.name.charAt(0)}</div>
+                                              <div>
+                                                  <div className="font-bold text-gray-900 dark:text-white">{c.name}</div>
+                                                  <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">{c.role} <span className="text-gray-300">|</span> {c.email || '-'}</div>
+                                              </div>
                                           </div>
-                                      </div>
-                                  </td>
-                                  <td className="px-6 py-4 w-64">
-                                      <div className="flex justify-between text-xs mb-1 text-gray-600 dark:text-gray-400">
-                                          <span>{activeTasks} tareas activas</span>
-                                          <span>{loadPercentage > 80 ? 'Saturado' : 'Disponible'}</span>
-                                      </div>
-                                      <div className="h-2 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                          <div className={`h-full rounded-full ${loadColor} transition-all duration-500`} style={{width: `${loadPercentage}%`}}></div>
-                                      </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                      <span className={`font-mono font-bold ${monthlyPayout > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
-                                          ${monthlyPayout.toLocaleString()}
-                                      </span>
-                                      <div className="text-[10px] text-gray-400 mt-0.5">Tarifa ref: ${c.monthlyRate}/mes</div>
-                                  </td>
-                                  <td className="px-6 py-4 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
-                                  <td className="px-6 py-4 text-center"><button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
-                              </tr>
-                          )
-                      })
-                  }
-              </tbody>
-          </table>
+                                      </td>
+                                      <td className="px-6 py-4 w-64">
+                                          <div className="flex justify-between text-xs mb-1 text-gray-600 dark:text-gray-400">
+                                              <span>{activeTasks} tareas activas</span>
+                                              <span>{loadPercentage > 80 ? 'Saturado' : 'Disponible'}</span>
+                                          </div>
+                                          <div className="h-2 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                              <div className={`h-full rounded-full ${loadColor} transition-all duration-500`} style={{width: `${loadPercentage}%`}}></div>
+                                          </div>
+                                      </td>
+                                      <td className="px-6 py-4 text-right">
+                                          <span className={`font-mono font-bold ${monthlyPayout > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
+                                              ${monthlyPayout.toLocaleString()}
+                                          </span>
+                                          <div className="text-[10px] text-gray-400 mt-0.5">Tarifa ref: ${c.monthlyRate}/mes</div>
+                                      </td>
+                                      <td className="px-6 py-4 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
+                                      <td className="px-6 py-4 text-center"><button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                                  </tr>
+                              )
+                          })
+                      }
+                  </tbody>
+              </table>
+          </div>
       </div>
 
       <ContextMenu 
@@ -164,7 +166,7 @@ export default function PartnersPage() {
         ]}
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Socio / Freelancer">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Socio">
         <form onSubmit={handleCreate} className="space-y-4">
           <div><Label>Nombre Completo</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Juan Pérez" autoFocus /></div>
           <div className="grid grid-cols-2 gap-4"><div><Label>Rol</Label><Input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} /></div><div><Label>Fee Mensual Referencia</Label><Input type="number" value={formData.monthlyRate} onChange={e => setFormData({...formData, monthlyRate: e.target.value})} placeholder="$ Fijo" /></div></div>

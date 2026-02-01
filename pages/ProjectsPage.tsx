@@ -140,14 +140,14 @@ export default function ProjectsPage() {
       };
 
       return (
-          <div className="flex h-full gap-4 overflow-x-auto pb-4 px-2">
+          <div className="flex h-full gap-4 overflow-x-auto pb-4 px-2 snap-x snap-mandatory">
               {columns.map(col => {
                   const colProjects = filteredProjects.filter(p => p.status === col.id);
                   
                   return (
                       <div 
                         key={col.id} 
-                        className={`flex-1 min-w-[280px] flex flex-col rounded-2xl bg-gray-50/50 backdrop-blur-sm border border-gray-200/60 ${col.color}`}
+                        className={`flex-1 min-w-[280px] md:min-w-[320px] snap-center flex flex-col rounded-2xl bg-gray-50/50 backdrop-blur-sm border border-gray-200/60 ${col.color}`}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => handleDrop(e, col.id as ProjectStatus)}
                       >
@@ -200,55 +200,55 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-4 h-[calc(100vh-100px)] flex flex-col">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2 flex-shrink-0">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 px-2 flex-shrink-0">
         <div>
-            <h1 className="text-2xl font-bold text-gray-900">Clientes & Operaciones</h1>
-            <p className="text-sm text-gray-500">Gestión de proyectos activos y entregables.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Clientes & Operaciones</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Gestión de proyectos activos y entregables.</p>
         </div>
         
-        <div className="flex gap-2 w-full md:w-auto items-center">
-             <div className="bg-gray-100 p-1 rounded-lg flex mr-2">
-                 <button onClick={() => setViewMode('LIST')} className={`p-1.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white shadow text-black' : 'text-gray-400'}`}><TableIcon className="w-4 h-4"/></button>
-                 <button onClick={() => setViewMode('KANBAN')} className={`p-1.5 rounded-md transition-all ${viewMode === 'KANBAN' ? 'bg-white shadow text-black' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
+        <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-stretch md:items-center">
+             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex self-start md:self-auto">
+                 <button onClick={() => setViewMode('LIST')} className={`p-1.5 rounded-md transition-all ${viewMode === 'LIST' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><TableIcon className="w-4 h-4"/></button>
+                 <button onClick={() => setViewMode('KANBAN')} className={`p-1.5 rounded-md transition-all ${viewMode === 'KANBAN' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
              </div>
-             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar cliente..." className="pl-9 h-10 bg-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="shadow-lg shadow-black/10"><Plus className="w-4 h-4 mr-2" /> Nuevo Cliente</Button>
+             <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar cliente..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
+            <Button onClick={() => setIsCreateModalOpen(true)} className="shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-4 h-4 mr-2" /> Nuevo Cliente</Button>
         </div>
       </div>
 
       {/* --- CONTENT AREA --- */}
       {viewMode === 'KANBAN' ? <KanbanBoard /> : (
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
-              <div className="overflow-auto flex-1">
-                  <table className="w-full text-sm text-left">
-                      <thead className="bg-gray-50/50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs tracking-wider sticky top-0 z-10 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
+              <div className="overflow-auto flex-1 custom-scrollbar">
+                  <table className="w-full text-sm text-left min-w-[800px]">
+                      <thead className="bg-gray-50/50 dark:bg-slate-800/50 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-800 uppercase text-xs tracking-wider sticky top-0 z-10 backdrop-blur-sm">
                           <tr><th className="px-6 py-4">Cliente</th><th className="px-6 py-4">Estado</th><th className="px-6 py-4 text-right">Fee (Mes)</th><th className="px-6 py-4 text-center">Salud</th><th className="px-6 py-4 text-center">Pago</th><th className="px-6 py-4 text-center"></th></tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-50">
+                      <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                           {isLoading ? (<tr><td colSpan={6} className="text-center py-20 text-gray-400"><div className="animate-pulse">Cargando...</div></td></tr>) : 
                               filteredProjects.map((p) => {
                                   const paid = isPaymentCurrent(p);
                                   const ghostStatus = getGhostingStatus(p.lastContactDate);
                                   return (
-                                      <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} onContextMenu={(e) => handleContextMenu(e, p)} className="hover:bg-gray-50 transition-colors cursor-pointer group">
+                                      <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} onContextMenu={(e) => handleContextMenu(e, p)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group">
                                           <td className="px-6 py-4">
                                               <div className="flex flex-col">
                                                   <div className="flex items-center gap-2">
-                                                      <span className="font-bold text-gray-900 text-base">{p.name}</span>
-                                                      {ghostStatus === 'GHOSTING' && <span title="Ghosting Alert: +7 días sin contacto" className="text-red-500 bg-red-50 p-0.5 rounded"><Ghost className="w-3 h-3"/></span>}
+                                                      <span className="font-bold text-gray-900 dark:text-white text-base">{p.name}</span>
+                                                      {ghostStatus === 'GHOSTING' && <span title="Ghosting Alert: +7 días sin contacto" className="text-red-500 bg-red-50 dark:bg-red-900/30 p-0.5 rounded"><Ghost className="w-3 h-3"/></span>}
                                                   </div>
                                                   <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5"><User className="w-3 h-3"/> {p.partnerName || 'In-house'}</span>
                                               </div>
                                           </td>
                                           <td className="px-6 py-4"><Badge variant={p.status === ProjectStatus.ACTIVE ? 'green' : 'outline'}>{p.status}</Badge></td>
-                                          <td className="px-6 py-4 text-right font-mono font-medium text-gray-700">${p.monthlyRevenue.toLocaleString()}</td>
+                                          <td className="px-6 py-4 text-right font-mono font-medium text-gray-700 dark:text-gray-300">${p.monthlyRevenue.toLocaleString()}</td>
                                           <td className="px-6 py-4 text-center flex justify-center">{renderHealthBadge(p.healthScore || 'GOOD')}</td>
                                           <td className="px-6 py-4 text-center">
-                                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${paid ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${paid ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border-red-100 dark:border-red-800'}`}>
                                                   {paid ? 'PAGADO' : 'PENDIENTE'}
                                               </span>
                                           </td>
-                                          <td className="px-6 py-4 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-black transition-all"><Edit2 className="w-4 h-4" /></button></td>
+                                          <td className="px-6 py-4 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-black dark:hover:text-white transition-all"><Edit2 className="w-4 h-4" /></button></td>
                                       </tr>
                                   );
                               })

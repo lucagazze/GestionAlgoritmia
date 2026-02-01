@@ -404,7 +404,7 @@ export const AIActionCenter = () => {
 
     return (
         <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[600px] bottom-6`}>
-            <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[65vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
+            <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[75vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
                  <div className="flex justify-between items-center p-3 border-b border-gray-100 bg-gray-50/80 flex-shrink-0">
                     <div className="flex items-center gap-2">
                         {viewMode === 'CHAT' && <button onClick={() => setViewMode('HISTORY')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><History className="w-4 h-4" /></button>}
@@ -412,7 +412,7 @@ export const AIActionCenter = () => {
                         <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">{viewMode === 'HISTORY' ? 'Historial' : sessions.find(s => s.id === currentSessionId)?.title || 'Nueva Conversación'}</span>
                     </div>
                     {activeContextData && (
-                        <div className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
+                        <div className="hidden md:flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
                             <Lightbulb className="w-3 h-3" /> {activeContextData.data.name}
                         </div>
                     )}
@@ -431,7 +431,7 @@ export const AIActionCenter = () => {
                  )}
 
                  {viewMode === 'CHAT' && (
-                     <div ref={chatContainerRef} className="p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1">
+                     <div ref={chatContainerRef} className="p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1 pb-20">
                         {messages.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2 opacity-50">
                                 <Sparkles className="w-10 h-10" />
@@ -439,7 +439,7 @@ export const AIActionCenter = () => {
                             </div>
                         )}
                         {messages.map((msg, idx) => (
-                            <div key={msg.id || idx} className={`flex flex-col max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                            <div key={msg.id || idx} className={`flex flex-col max-w-[95%] md:max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
                                     <MessageRenderer content={msg.content} role={msg.role} />
                                 </div>
@@ -452,7 +452,7 @@ export const AIActionCenter = () => {
                             </div>
                         ))}
                         {decisionOptions && (
-                            <div className="self-start w-[85%] grid gap-2 animate-in slide-in-from-left-4">
+                            <div className="self-start w-[95%] md:w-[85%] grid gap-2 animate-in slide-in-from-left-4">
                                 <p className="text-xs text-gray-400 font-bold ml-1 uppercase">Opciones:</p>
                                 {decisionOptions.map((opt, idx) => (
                                     <button key={idx} onClick={() => handleDecisionClick(opt)} className="text-left bg-white border-2 border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50 p-3 rounded-xl transition-all shadow-sm flex items-center gap-3 group">
@@ -485,14 +485,14 @@ export const AIActionCenter = () => {
                 {/* Main Dynamic Button */}
                 <div 
                     onClick={(e) => { e.stopPropagation(); if (isRecording) stopRecording(); else startRecording(); }}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer flex-shrink-0 ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
                 >
                     {isThinking || isTranscribing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
                 </div>
                 
-                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-base text-gray-800 placeholder:text-gray-500 font-medium px-4 h-full" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
+                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-sm md:text-base text-gray-800 placeholder:text-gray-500 font-medium px-2 md:px-4 h-full min-w-0" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
                 
-                <div className="flex items-center gap-2 pr-2">
+                <div className="flex items-center gap-2 pr-2 flex-shrink-0">
                      {isThinking || isTranscribing ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>

@@ -265,49 +265,50 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
     <div className="pb-20 animate-in fade-in duration-500 max-w-5xl mx-auto">
       
       {/* HEADER */}
-      <div className="mb-8 mt-4 flex items-center justify-between">
+      <div className="mb-6 mt-2 flex items-center justify-between px-2">
           <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900">Cotizador</h1>
-              <p className="text-gray-500">Generador de presupuestos High-Ticket.</p>
+              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Cotizador</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Generador de presupuestos High-Ticket.</p>
           </div>
       </div>
 
       {/* STEPS HEADER */}
-      <div className="flex justify-between items-center mb-8 px-6 py-4 bg-white/80 backdrop-blur-md rounded-full border border-gray-100 shadow-lg sticky top-4 z-20 mx-4">
+      <div className="flex justify-between items-center mb-8 px-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-full border border-gray-100 dark:border-slate-800 shadow-lg sticky top-2 z-20 mx-2 md:mx-4">
          {STEPS.map((step, idx) => {
              const Icon = step.icon;
              const isActive = currentStep === step.number;
              const isCompleted = currentStep > step.number;
              
              return (
-                 <div key={step.number} onClick={() => setCurrentStep(step.number)} className={`flex items-center gap-3 cursor-pointer group`}>
-                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${isActive ? 'bg-black text-white shadow-md scale-110' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'}`}>
-                         {isCompleted ? <Check className="w-5 h-5"/> : step.number}
+                 <div key={step.number} onClick={() => setCurrentStep(step.number)} className={`flex items-center gap-2 md:gap-3 cursor-pointer group`}>
+                     <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-all duration-300 ${isActive ? 'bg-black dark:bg-white text-white dark:text-black shadow-md scale-110' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 group-hover:bg-gray-200'}`}>
+                         {isCompleted ? <Check className="w-4 h-4 md:w-5 md:h-5"/> : step.number}
                      </div>
-                     <div className={`${isActive ? 'opacity-100' : 'opacity-40'} hidden md:block transition-opacity`}>
-                         <div className="text-xs font-bold uppercase tracking-wider">{step.title}</div>
+                     <div className={`${isActive ? 'opacity-100' : 'opacity-40'} hidden sm:block transition-opacity`}>
+                         <div className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">{step.title}</div>
                      </div>
-                     {idx < STEPS.length - 1 && <div className="w-8 lg:w-12 h-[1px] bg-gray-200 mx-2 hidden md:block"></div>}
+                     {idx < STEPS.length - 1 && <div className="w-4 md:w-12 h-[1px] bg-gray-200 dark:bg-slate-800 mx-1 md:mx-2"></div>}
                  </div>
              )
          })}
          <div className="flex gap-2">
-             <Button variant="outline" size="sm" onClick={() => setIsChatOpen(!isChatOpen)} className="rounded-full">
-                 <Bot className="w-4 h-4 mr-2" /> Ayuda
+             <Button variant="outline" size="sm" onClick={() => setIsChatOpen(!isChatOpen)} className="rounded-full w-8 h-8 md:w-auto p-0 md:px-3">
+                 <Bot className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Ayuda</span>
              </Button>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 px-4">
+      <div className="grid grid-cols-1 gap-6 px-2 md:px-4">
           {/* STEP 1: DISCOVERY FORM */}
           {currentStep === 1 && (
              <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <Card className="overflow-visible">
                     <CardHeader className="flex flex-row justify-between items-center">
                         <CardTitle className="flex items-center gap-2"><User className="w-5 h-5"/> Información del Cliente</CardTitle>
-                        <Button variant="ghost" size="sm" onClick={handleAiAutoFill} disabled={isGeneratingContext} className="text-blue-600 hover:bg-blue-50">
-                             {isGeneratingContext ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                             Autocompletar con IA
+                        <Button variant="ghost" size="sm" onClick={handleAiAutoFill} disabled={isGeneratingContext} className="text-blue-600 hover:bg-blue-50 text-xs md:text-sm">
+                             {isGeneratingContext ? <Loader2 className="animate-spin w-4 h-4 md:mr-2" /> : <Sparkles className="w-4 h-4 md:mr-2" />}
+                             <span className="hidden md:inline">Autocompletar con IA</span>
+                             <span className="md:hidden">IA</span>
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-6">
@@ -351,8 +352,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
           {/* STEP 2: STRATEGY (SERVICES) */}
           {currentStep === 2 && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                  <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                    <h2 className="text-xl font-bold">Selecciona Servicios</h2>
+                  <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm">
+                    <h2 className="text-xl font-bold dark:text-white">Selecciona Servicios</h2>
                     <Badge variant="blue" className="bg-black text-white px-3 py-1 rounded-full">{selectedServiceIds.length} Seleccionados</Badge>
                   </div>
                   
@@ -365,21 +366,21 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                   const assignedId = assignedContractors[s.id];
                                   return (
                                       <div key={s.id} onClick={() => toggleService(s.id)} 
-                                           className={`cursor-pointer border rounded-2xl p-4 transition-all duration-200 ${isSelected ? 'border-black bg-white ring-2 ring-black/5 shadow-lg scale-[1.02]' : 'border-gray-100 bg-white hover:border-gray-300 hover:shadow-md'}`}>
+                                           className={`cursor-pointer border rounded-2xl p-4 transition-all duration-200 ${isSelected ? 'border-black dark:border-white bg-white dark:bg-slate-800 ring-2 ring-black/5 dark:ring-white/5 shadow-lg scale-[1.02]' : 'border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-gray-300 dark:hover:border-slate-600 hover:shadow-md'}`}>
                                           <div className="flex justify-between items-start mb-2">
-                                              <span className="font-semibold text-sm leading-tight">{s.name}</span>
-                                              {isSelected && <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center"><Check className="w-3 h-3 text-white" /></div>}
+                                              <span className="font-semibold text-sm leading-tight dark:text-white">{s.name}</span>
+                                              {isSelected && <div className="w-5 h-5 bg-black dark:bg-white rounded-full flex items-center justify-center"><Check className="w-3 h-3 text-white dark:text-black" /></div>}
                                           </div>
                                           {isSelected && (
-                                              <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 animate-in fade-in" onClick={e => e.stopPropagation()}>
+                                              <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 animate-in fade-in" onClick={e => e.stopPropagation()}>
                                                   <div className="flex justify-between items-center">
                                                       <label className="text-[10px] text-gray-500 font-bold uppercase">Precio de Venta</label>
-                                                      <input type="number" className="w-20 text-right text-xs bg-gray-50 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black" 
+                                                      <input type="number" className="w-20 text-right text-xs bg-gray-50 dark:bg-slate-900 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white" 
                                                              value={getSellingPrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
                                                   </div>
-                                                  <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded-lg">
+                                                  <div className="flex justify-between items-center bg-gray-50 dark:bg-slate-800 p-1.5 rounded-lg">
                                                       <select 
-                                                        className="text-[10px] bg-transparent outline-none w-24 font-medium" 
+                                                        className="text-[10px] bg-transparent outline-none w-24 font-medium dark:text-white" 
                                                         value={assignedId || ''} 
                                                         onChange={e => {
                                                             const pid = e.target.value;
@@ -395,7 +396,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                           {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                       </select>
                                                       {assignedId && (
-                                                          <input type="number" placeholder="$ Costo" className="w-12 text-right text-[10px] bg-white rounded px-1 border border-gray-200"
+                                                          <input type="number" placeholder="$ Costo" className="w-12 text-right text-[10px] bg-white dark:bg-slate-900 rounded px-1 border border-gray-200 dark:border-slate-700 dark:text-white"
                                                                  value={outsourcingCosts[s.id] || ''} onChange={e => setOutsourcingCosts({...outsourcingCosts, [s.id]: parseFloat(e.target.value)})} />
                                                       )}
                                                   </div>
@@ -425,8 +426,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                   {/* LEFT COLUMN: Variables & Actions */}
                   <div className="lg:col-span-5 space-y-6">
                       {/* Financial Variables Control Panel */}
-                      <Card className="border-2 border-black/5 shadow-xl bg-white/80 backdrop-blur-sm">
-                          <CardHeader className="bg-gray-50/50 border-b border-gray-100">
+                      <Card className="border-2 border-black/5 dark:border-white/5 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+                          <CardHeader className="bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
                               <CardTitle className="flex items-center gap-2 text-base"><RefreshCw className="w-4 h-4"/> Variables del Contrato</CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-6 pt-6">
@@ -437,7 +438,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                             <button 
                                                 key={m}
                                                 onClick={() => setContractVars({...contractVars, duration: m})}
-                                                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${contractVars.duration === m ? 'bg-black text-white border-black' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                                                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${contractVars.duration === m ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
                                             >
                                                 {m} Meses
                                             </button>
@@ -461,7 +462,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                           </CardContent>
                       </Card>
 
-                      <Card className="bg-gray-900 text-white">
+                      <Card className="bg-gray-900 dark:bg-slate-800 text-white border-0">
                           <CardHeader>
                               <CardTitle className="text-white flex items-center gap-2"><Wand2 className="w-5 h-5"/> Generador de Propuesta</CardTitle>
                           </CardHeader>
@@ -484,30 +485,30 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
 
                   {/* RIGHT COLUMN: Final Pricing Display */}
                   <div className="lg:col-span-7 space-y-6">
-                      <Card className="h-full border-0 shadow-2xl shadow-black/5 bg-gradient-to-br from-white to-gray-50 flex flex-col justify-between">
+                      <Card className="h-full border-0 shadow-2xl shadow-black/5 bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-950 flex flex-col justify-between">
                           <div className="p-8">
                               <h3 className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-8">Resumen Económico</h3>
                               
                               <div className="space-y-8">
-                                  <div className="flex justify-between items-end border-b border-gray-100 pb-4">
+                                  <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
                                       <div>
                                           <p className="text-sm font-medium text-gray-500 mb-1">Fee Mensual (Recurrente)</p>
                                           <p className="text-xs text-gray-400">Durante {contractVars.duration} meses</p>
                                       </div>
-                                      <div className="text-4xl font-bold tracking-tighter">${calculations.monthlyFee.toLocaleString()}</div>
+                                      <div className="text-4xl font-bold tracking-tighter dark:text-white">${calculations.monthlyFee.toLocaleString()}</div>
                                   </div>
 
-                                  <div className="flex justify-between items-end border-b border-gray-100 pb-4">
+                                  <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
                                       <div>
                                           <p className="text-sm font-medium text-gray-500 mb-1">Setup / Onboarding</p>
                                           <p className="text-xs text-gray-400">Pago Único</p>
                                       </div>
-                                      <div className="text-3xl font-bold tracking-tighter text-gray-700">${calculations.setupFee.toLocaleString()}</div>
+                                      <div className="text-3xl font-bold tracking-tighter text-gray-700 dark:text-gray-300">${calculations.setupFee.toLocaleString()}</div>
                                   </div>
 
-                                  <div className="bg-black text-white p-6 rounded-2xl flex justify-between items-center shadow-lg">
+                                  <div className="bg-black dark:bg-white text-white dark:text-black p-6 rounded-2xl flex justify-between items-center shadow-lg">
                                       <div>
-                                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Valor Total Contrato</p>
+                                          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Valor Total Contrato</p>
                                           <p className="text-xs opacity-50 mt-1">LTV (Life Time Value)</p>
                                       </div>
                                       <div className="text-3xl font-bold tracking-tight">${calculations.contractValue.toLocaleString()}</div>
@@ -515,20 +516,20 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
 
                                   {/* Internal Profit Stats */}
                                   <div className="grid grid-cols-2 gap-4">
-                                      <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center">
-                                          <p className="text-xs text-green-800 font-bold uppercase mb-1">Ganancia Estimada</p>
-                                          <p className="text-xl font-bold text-green-700">${calculations.profit.toLocaleString()}</p>
+                                      <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-900 text-center">
+                                          <p className="text-xs text-green-800 dark:text-green-300 font-bold uppercase mb-1">Ganancia Estimada</p>
+                                          <p className="text-xl font-bold text-green-700 dark:text-green-400">${calculations.profit.toLocaleString()}</p>
                                       </div>
-                                      <div className="p-4 bg-red-50 rounded-xl border border-red-100 text-center">
-                                          <p className="text-xs text-red-800 font-bold uppercase mb-1">Costos Externos</p>
-                                          <p className="text-xl font-bold text-red-700">${calculations.totalOutsourcingCost.toLocaleString()}</p>
+                                      <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900 text-center">
+                                          <p className="text-xs text-red-800 dark:text-red-300 font-bold uppercase mb-1">Costos Externos</p>
+                                          <p className="text-xl font-bold text-red-700 dark:text-red-400">${calculations.totalOutsourcingCost.toLocaleString()}</p>
                                       </div>
                                   </div>
                               </div>
                           </div>
 
-                          <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
-                              <Button variant="outline" className="flex-1 bg-white" onClick={generatePDF}>
+                          <div className="p-6 bg-gray-50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex gap-3">
+                              <Button variant="outline" className="flex-1 bg-white dark:bg-slate-800" onClick={generatePDF}>
                                   <FileDown className="w-4 h-4 mr-2" /> PDF
                               </Button>
                               <Button onClick={saveProposal} disabled={isSaving} className="flex-[2] text-base shadow-xl shadow-black/10 hover:scale-[1.02] transition-transform">
@@ -542,24 +543,24 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
 
           {/* AI CHAT OVERLAY */}
           {isChatOpen && (
-            <div className="fixed bottom-6 right-6 w-80 h-[500px] bg-white rounded-3xl shadow-2xl border border-gray-200 flex flex-col z-50 animate-in slide-in-from-bottom-10 overflow-hidden">
-                <div className="p-4 bg-black text-white flex justify-between items-center">
+            <div className="fixed bottom-6 right-6 w-80 h-[500px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-slate-700 flex flex-col z-50 animate-in slide-in-from-bottom-10 overflow-hidden">
+                <div className="p-4 bg-black dark:bg-white text-white dark:text-black flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                         <span className="font-bold text-sm">Asistente IA</span>
                     </div>
                     <button onClick={() => setIsChatOpen(false)}><X className="w-4 h-4"/></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-slate-950">
                     {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
-                        <div key={idx} className={`p-3 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-black text-white ml-auto rounded-tr-none' : 'bg-white border text-gray-700 rounded-tl-none shadow-sm'} max-w-[90%]`}>
+                        <div key={idx} className={`p-3 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-black dark:bg-white text-white dark:text-black ml-auto rounded-tr-none' : 'bg-white dark:bg-slate-800 border dark:border-slate-700 text-gray-700 dark:text-gray-300 rounded-tl-none shadow-sm'} max-w-[90%]`}>
                             {msg.content}
                         </div>
                     ))}
                     {isAiThinking && <div className="flex gap-1 items-center text-gray-400 text-xs ml-2"><Loader2 className="w-3 h-3 animate-spin"/> Escribiendo...</div>}
                     <div ref={chatEndRef} />
                 </div>
-                <div className="p-3 border-t bg-white">
+                <div className="p-3 border-t dark:border-slate-700 bg-white dark:bg-slate-900">
                     <form onSubmit={(e) => {e.preventDefault(); handleAiChat();}} className="flex gap-2">
                         <Input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregunta algo..." className="h-10 text-xs rounded-full pl-4" />
                         <Button type="submit" size="sm" className="h-10 w-10 rounded-full p-0 flex-shrink-0"><TrendingUp className="w-4 h-4" /></Button>
