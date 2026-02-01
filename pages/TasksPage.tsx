@@ -168,7 +168,18 @@ export default function TasksPage() {
       } catch (e: any) {
           console.error("Auth error", e);
           if (e.error === 'access_denied') {
-              alert("Acceso denegado. Asegúrate de añadir tu usuario en 'Test Users' en Google Cloud si la app está en modo prueba.");
+              alert(
+                  "⚠️ ACCESO DENEGADO POR GOOGLE\n\n" +
+                  "Tu app está en modo 'Testing' en Google Cloud Console.\n" +
+                  "Para poder entrar, debes AGREGAR tu email a la lista de 'Test Users' (Usuarios de prueba).\n\n" +
+                  "PASOS:\n" +
+                  "1. Ve a console.cloud.google.com > APIs & Services > OAuth consent screen.\n" +
+                  "2. Baja a la sección 'Test users'.\n" +
+                  "3. Agrega tu email (lucagazze1@gmail.com).\n" +
+                  "4. Guarda y vuelve a intentar."
+              );
+          } else {
+              alert("Error de autenticación: " + JSON.stringify(e));
           }
           return false;
       }
@@ -445,7 +456,7 @@ export default function TasksPage() {
                                <button 
                                 onClick={(e) => { e.stopPropagation(); db.tasks.updateStatus(t.id, t.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE).then(loadData); }}
                                 className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${t.status === TaskStatus.DONE ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-green-500'}`}
-                               >
+                                >
                                    {t.status === TaskStatus.DONE && <CheckCircle2 className="w-4 h-4" />}
                                </button>
                                <div>

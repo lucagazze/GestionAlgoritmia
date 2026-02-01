@@ -6,7 +6,7 @@ const SCOPES = 'https://www.googleapis.com/auth/calendar';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
 // ID Proporcionado por el usuario (Fijo y Prioritario)
-const DEFAULT_CLIENT_ID = "461911891249-m1dahst7hd2nlm2tj8iigitm70d6lpia.apps.googleusercontent.com";
+const DEFAULT_CLIENT_ID = "387887542434-d3tonvcgldeoj84np78b1e895t9fi57r.apps.googleusercontent.com";
 
 let tokenClient: any;
 let gapiInited = false;
