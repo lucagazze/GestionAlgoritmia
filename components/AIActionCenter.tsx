@@ -417,23 +417,53 @@ export const AIActionCenter = () => {
             );
             
             if (!response) { 
-                await db.chat.addMessage(sessionId, 'assistant', "No pude procesar eso. Intenta de nuevo.");
+                await db.chat.addMessage(sessionId, 'assistant', "❌ No pude procesar eso. Intenta de nuevo.");
                 setIsThinking(false); 
                 return; 
             }
             
-            let finalMessage = response.message || "Entendido.";
+            // Validate response - NEVER allow passive responses
+            if (response.type === 'CHAT' && (!response.message || response.message.toLowerCase().includes('entendido'))) {
+                await db.chat.addMessage(sessionId, 'assistant', "⚠️ Error interno: Respuesta inválida. Por favor reformula tu solicitud.");
+                setIsThinking(false);
+                return;
+            }
+            
+            let finalMessage = response.message || "✅ Acción completada.";
             
             if (response.type === 'BATCH' && response.actions) {
                 let successCount = 0;
                 let failError = '';
+                const createdTasks: any[] = [];
+                
                 for (const act of response.actions) { 
                     const res = await executeAction(act.action, act.payload); 
-                    if(res.success) successCount++;
+                    if(res.success) {
+                        successCount++;
+                        // Collect created task details
+                        if (act.action === 'CREATE_TASK') {
+                            createdTasks.push({
+                                id: act.payload.id || 'new',
+                                title: act.payload.title,
+                                dueDate: act.payload.dueDate,
+                                endTime: act.payload.endTime
+                            });
+                        }
+                    }
                     else failError = res.error || 'Error desconocido';
                 }
-                finalMessage = successCount > 0 ? `✅ Ejecuté **${successCount} acciones**.` : `❌ Falló: ${failError}`;
-                await db.chat.addMessage(sessionId, 'assistant', finalMessage);
+                
+                if (successCount > 0) {
+                    finalMessage = `✅ Ejecuté **${successCount} acciones** exitosamente.`;
+                    // Store details for modal
+                    await db.chat.addMessage(sessionId, 'assistant', finalMessage + ' [Ver Detalles]', {
+                        type: 'BATCH_CREATE',
+                        details: createdTasks
+                    });
+                } else {
+                    finalMessage = `❌ Falló: ${failError}`;
+                    await db.chat.addMessage(sessionId, 'assistant', finalMessage);
+                }
             }
             else if (response.type === 'DECISION') {
                 setDecisionOptions(response.options || []);

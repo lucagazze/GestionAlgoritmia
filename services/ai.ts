@@ -236,6 +236,29 @@ export const ai = {
           "message": "✅ Creé la tarea **Ir a caminar** para el **lunes a las 14:30**."
       }
       
+      
+      EJEMPLO REAL - SOLICITUD COMPLEJA:
+      Usuario: "Poneme una tarea para el lunes a las dos y media ir a caminar. Y poneme también para entre las ocho a las dos y media de toda la semana de lunes a viernes trabajar."
+      
+      Análisis:
+      - "lunes a las dos y media ir a caminar" = 1 tarea (Lunes 14:30)
+      - "entre las ocho a las dos y media" = rango 8:00-14:30
+      - "toda la semana de lunes a viernes trabajar" = 5 tareas (Lun-Vie)
+      
+      Respuesta CORRECTA:
+      {
+          "type": "BATCH",
+          "actions": [
+              { "action": "CREATE_TASK", "payload": { "title": "Ir a caminar", "dueDate": "2026-02-03T14:30:00-03:00" } },
+              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-03T08:00:00-03:00", "endTime": "2026-02-03T14:30:00-03:00" } },
+              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-04T08:00:00-03:00", "endTime": "2026-02-04T14:30:00-03:00" } },
+              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-05T08:00:00-03:00", "endTime": "2026-02-05T14:30:00-03:00" } },
+              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-06T08:00:00-03:00", "endTime": "2026-02-06T14:30:00-03:00" } },
+              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-07T08:00:00-03:00", "endTime": "2026-02-07T14:30:00-03:00" } }
+          ],
+          "message": "✅ Creé **6 tareas**: 1 para **ir a caminar** (Lunes 14:30) y 5 de **trabajo** (Lun-Vie 8:00-14:30)."
+      }
+      
       Para MÚLTIPLES tareas:
       {
           "type": "BATCH",
