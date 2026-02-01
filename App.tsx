@@ -17,6 +17,8 @@ import ClientPortalPage from './pages/ClientPortalPage';
 import PaymentsPage from './pages/PaymentsPage';
 import AuditPage from './pages/AuditPage';
 import AutomationsPage from './pages/AutomationsPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
 import { AIActionCenter } from './components/AIActionCenter';
 import { CommandPalette } from './components/CommandPalette';
 import { db } from './services/db';
@@ -208,7 +210,10 @@ const MainLayout = () => {
               <Route path="/playbooks" element={<PlaybooksPage />} />
               <Route path="/automations" element={<AutomationsPage />} />
               <Route path="/portal/:token" element={<ClientPortalPage />} />
+              <Route path="/portal/:token" element={<ClientPortalPage />} />
               <Route path="/audit" element={<AuditPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
             </Routes>
           </div>
 
