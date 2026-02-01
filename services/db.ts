@@ -1,5 +1,4 @@
 
-
 import { supabase } from './supabase';
 import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage } from '../types';
 
@@ -373,6 +372,10 @@ export const db = {
     updateStatus: async (id: string, status: TaskStatus): Promise<void> => {
       const { error } = await supabase.from('Task').update({ status }).eq('id', id);
       if (error) throw error;
+    },
+    update: async (id: string, data: Partial<Task>): Promise<void> => {
+        const { error } = await supabase.from('Task').update(data).eq('id', id);
+        if (error) throw error;
     },
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from('Task').delete().eq('id', id);

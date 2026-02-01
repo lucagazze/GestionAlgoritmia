@@ -1,10 +1,8 @@
-
-
 import { GoogleGenAI } from "@google/genai";
 import { db } from './db';
 
-// Usamos la versión estable de Gemini 2.0 Flash que es rápida y multimodal.
-const MODEL_NAME = 'gemini-2.0-flash';
+// Using Gemini 3 Flash Preview as per guidelines for basic/complex text tasks
+const MODEL_NAME = 'gemini-3-flash-preview';
 
 // Helper to get an initialized client dynamically
 const getClient = async () => {
@@ -104,9 +102,11 @@ export const ai = {
       userInput: string | { mimeType: string, data: string }, 
       contextHistory: any[] = [], 
       currentData: any
-  ) => {
+  ): Promise<any> => {
       const now = new Date();
-      const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+      // Provide full ISO string for accurate calculation
+      const isoNow = now.toISOString();
+      const localDate = now.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       const localTime = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
       // --- RAG: FETCH SOPs ---
@@ -122,26 +122,26 @@ export const ai = {
       const activeTasks = currentData.tasks
           .filter((t: any) => t.status !== 'DONE')
           .slice(0, 50)
-          .map((t: any) => `[TAREA] ID:${t.id} | Título:${t.title} | Vence:${t.dueDate?.slice(0,10) || 'Sin fecha'}`)
+          .map((t: any) => `[TAREA] ID:${t.id} | Título:"${t.title}" | Vence:${t.dueDate || 'Sin fecha'}`)
           .join('\n');
 
       const activeProjects = currentData.projects
-          .map((p: any) => `[CLIENTE] ID:${p.id} | Nombre:${p.name} | Fee:$${p.monthlyRevenue} | DíaCobro:${p.billingDay} | Estado:${p.status}`)
+          .map((p: any) => `[CLIENTE] ID:${p.id} | Nombre:"${p.name}" | Fee:$${p.monthlyRevenue} | DíaCobro:${p.billingDay} | Estado:${p.status}`)
           .join('\n');
       
       const contractors = currentData.contractors
-          .map((c: any) => `[EQUIPO] ID:${c.id} | Nombre:${c.name} | Rol:${c.role} | Costo:$${c.monthlyRate}`)
+          .map((c: any) => `[EQUIPO] ID:${c.id} | Nombre:"${c.name}" | Rol:${c.role} | Costo:$${c.monthlyRate}`)
           .join('\n');
 
       const systemInstruction = `
       Eres "Algoritmia OS", el MAESTRO y CEO Operativo de esta agencia. Tienes control total sobre la base de datos.
       
-      DATOS TEMPORALES:
-      - Hoy es: ${localDate}
-      - Hora: ${localTime}
+      DATOS TEMPORALES (CRÍTICO):
+      - Fecha/Hora ISO Actual: ${isoNow}
+      - Formato Humano: ${localDate}, ${localTime}
+      - IMPORTANTE: Cuando calcules fechas relativas (mañana, el viernes), usa la fecha ISO actual como base exacta.
 
       TU BIBLIOTECA DE CONOCIMIENTO (SOPs & POLÍTICAS INTERNAS):
-      Usa esta información para responder preguntas sobre "cómo hacemos las cosas aquí".
       ${sopsContext || "No hay SOPs cargados aún."}
 
       BASE DE DATOS EN VIVO:
@@ -150,22 +150,41 @@ export const ai = {
       ${contractors}
 
       TU MISIÓN:
-      Escuchar, Pensar y EJECUTAR. No preguntes "qué hago", hazlo.
-      Si te pregunto "¿Cómo se hace X?", consulta los SOPs arriba y responde citando el manual.
+      Escuchar, Pensar y EJECUTAR acciones. 
+      Si el usuario pide crear, modificar o eliminar algo, DEBES generar una acción JSON.
 
-      REGLAS DE INTERPRETACIÓN:
-      1. **AGENDAR/TAREAS**: Si pide agendar, crear recordatorio o tarea.
+      REGLAS DE ACCIÓN:
+      1. **AGENDAR/CREAR TAREAS**:
+         - Si dice "Agendar reunión mañana a las 10am", calcula la fecha ISO exacta (YYYY-MM-DDTHH:MM:SS) sumando días a la fecha actual.
          - Título: OBLIGATORIO. Si no lo dice, invéntalo basado en el contexto.
-         - Fecha: Calcula "mañana", "el viernes" basado en hoy.
-      2. **AUDITORÍA**: Si pregunta "¿Cómo vamos?", revisa los clientes activos.
-      3. **SOP/CONSULTA**: Si pregunto sobre un proceso, busca en la sección "TU BIBLIOTECA DE CONOCIMIENTO".
+         - Action: "CREATE_TASK"
+      
+      2. **MODIFICAR TAREAS**:
+         - Si dice "Cambiar la fecha de la tarea X para el lunes", busca el ID en la lista [TAREA] y genera un "UPDATE_TASK".
+         - Si dice "Marcar como lista la tarea X", genera "UPDATE_TASK" con status: "DONE".
+         
+      3. **BORRAR**:
+         - Action: "DELETE_TASK" o "DELETE_PROJECT" con el ID correspondiente.
 
       FORMATO DE RESPUESTA JSON (ESTRICTO):
+      Responde SIEMPRE con un objeto JSON. No uses markdown.
       {
-          "type": "ACTION" | "BATCH" | "CHAT" | "DECISION",
-          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT" | "CREATE_CONTRACTOR",
-          "payload": { ...campos según acción... },
-          "message": "Texto que dirás al usuario."
+          "type": "ACTION", 
+          "action": "CREATE_TASK" | "UPDATE_TASK" | "DELETE_TASK" | "CREATE_PROJECT" | "UPDATE_PROJECT",
+          "payload": {
+              "id": "uuid (solo para update/delete)",
+              "title": "Titulo Tarea",
+              "dueDate": "ISO_DATE_STRING (Crucial para agenda)",
+              "priority": "HIGH" | "MEDIUM" | "LOW",
+              "status": "TODO" | "DONE"
+          },
+          "message": "Texto breve confirmando lo que hiciste (ej: 'Agendado para mañana a las 10:00')."
+      }
+
+      Si es solo charla o consulta:
+      {
+          "type": "CHAT",
+          "message": "Respuesta conversacional..."
       }
       `;
 
@@ -186,26 +205,30 @@ export const ai = {
               };
           });
 
-          const response = await client.models.generateContent({
-              model: MODEL_NAME,
-              contents: [
-                  ...historyParts,
-                  { role: 'user', parts: [userPart] }
-              ],
-              config: {
-                  systemInstruction: systemInstruction,
-                  responseMimeType: "application/json",
-                  temperature: 0.1 
-              }
+          // Add user input to history parts for the call
+          historyParts.push({
+              role: 'user',
+              parts: [userPart]
           });
 
-          const responseText = response.text;
-          if (!responseText) return { type: "CHAT", message: "No procesé la orden, intenta ser más claro." };
-          return JSON.parse(responseText);
-
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: historyParts,
+              config: { systemInstruction, responseMimeType: 'application/json' }
+          });
+          
+          const textResponse = response.text;
+          if (!textResponse) return null;
+          
+          try {
+              return JSON.parse(textResponse);
+          } catch (e) {
+              console.error("JSON Parse Error in Agent", e);
+              return { type: 'CHAT', message: textResponse };
+          }
       } catch (error) {
-          console.error("Agent Error:", error);
-          return { type: "CHAT", message: "Error interno del Agente. Revisa la consola." };
+          console.error("AI Agent Error:", error);
+          return null;
       }
   }
 };

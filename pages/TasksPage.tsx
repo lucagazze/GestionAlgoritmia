@@ -226,8 +226,7 @@ export default function TasksPage() {
         };
 
         if (formData.id) {
-             await db.tasks.delete(formData.id);
-             await db.tasks.create(payload);
+             await db.tasks.update(formData.id, payload);
         } else {
             await db.tasks.create(payload);
         }
@@ -299,8 +298,7 @@ export default function TasksPage() {
       const updatedTasks = tasks.map(t => t.id === id ? { ...t, dueDate: newDate.toISOString() } : t);
       setTasks(updatedTasks);
       
-      await db.tasks.delete(id);
-      await db.tasks.create({ ...task, dueDate: newDate.toISOString(), status: task.status }); 
+      await db.tasks.update(id, { dueDate: newDate.toISOString() });
       loadData();
   };
 
@@ -317,23 +315,70 @@ export default function TasksPage() {
 
   const TodayView = () => {
       const today = new Date();
+      // Reset hours to compare only dates reliably
+      today.setHours(0,0,0,0);
+
       const todayTasks = tasks.filter(t => {
           if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
           if (!t.dueDate) return false;
-          const d = new Date(t.dueDate);
-          return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+          
+          const tDate = new Date(t.dueDate);
+          tDate.setHours(0,0,0,0);
+          
+          return tDate.getTime() === today.getTime();
       }).sort((a,b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
 
+      // Also get overdue
+      const overdueTasks = tasks.filter(t => {
+          if (!t.dueDate || t.status === TaskStatus.DONE) return false;
+          const tDate = new Date(t.dueDate);
+          tDate.setHours(0,0,0,0);
+          return tDate.getTime() < today.getTime();
+      });
+
       return (
-          <div className="flex-1 overflow-y-auto">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-                  <div className="flex flex-col gap-4">
-                      {todayTasks.length === 0 ? <p className="text-gray-400 dark:text-slate-600">Sin tareas para hoy.</p> : todayTasks.map(t => (
-                          <div key={t.id} onClick={() => openEditModal(t)} className={`p-4 rounded-xl border ${getTaskStyles(t.status)} cursor-pointer`}>
-                              <div className="font-bold">{t.title}</div>
-                              <div className="text-xs">{new Date(t.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+          <div className="flex-1 overflow-y-auto px-1">
+             <div className="max-w-2xl mx-auto space-y-8 pb-10">
+                  {overdueTasks.length > 0 && (
+                      <div className="space-y-3">
+                          <h3 className="font-bold text-red-600 flex items-center gap-2"><AlertCircle className="w-4 h-4"/> Atrasadas ({overdueTasks.length})</h3>
+                          {overdueTasks.map(t => (
+                              <div key={t.id} onClick={() => openEditModal(t)} className={`p-4 rounded-xl border border-red-100 bg-red-50/50 dark:bg-red-900/10 cursor-pointer flex justify-between items-center group`}>
+                                  <div>
+                                      <div className="font-bold text-gray-800 dark:text-red-200">{t.title}</div>
+                                      <div className="text-xs text-red-500 font-medium">Vencía: {new Date(t.dueDate!).toLocaleDateString()}</div>
+                                  </div>
+                                  <button onClick={(e) => { e.stopPropagation(); handleContextMenu(e, t); }} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-100 rounded-full text-red-500"><Edit2 className="w-4 h-4"/></button>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+
+                  <div className="space-y-3">
+                      <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Sun className="w-4 h-4 text-orange-500"/> Para Hoy</h3>
+                      {todayTasks.length === 0 ? (
+                          <div className="text-center py-10 border-2 border-dashed border-gray-100 dark:border-slate-800 rounded-xl text-gray-400">
+                              <p>¡Todo limpio! No hay tareas programadas para hoy.</p>
+                              <Button variant="ghost" onClick={openCreateModal} className="mt-2 text-indigo-600">Crear una tarea</Button>
                           </div>
-                      ))}
+                      ) : (
+                          todayTasks.map(t => (
+                              <div key={t.id} onClick={() => openEditModal(t)} onContextMenu={(e)=>handleContextMenu(e,t)} className={`p-4 rounded-xl border ${getTaskStyles(t.status)} cursor-pointer flex justify-between items-center group transition-all hover:translate-x-1`}>
+                                  <div className="flex items-center gap-3">
+                                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${t.status === TaskStatus.DONE ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
+                                          {t.status === TaskStatus.DONE && <CheckCircle2 className="w-3 h-3 text-white" />}
+                                      </div>
+                                      <div>
+                                          <div className="font-bold">{t.title}</div>
+                                          <div className="text-xs opacity-70 flex items-center gap-2">
+                                              <Clock className="w-3 h-3"/> {new Date(t.dueDate!).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                              {t.priority === 'HIGH' && <span className="text-red-500 font-bold">• Prioridad Alta</span>}
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          ))
+                      )}
                   </div>
              </div>
           </div>
@@ -365,7 +410,7 @@ export default function TasksPage() {
                     </div>
                     {weekDays.map((date, idx) => (
                         <div key={idx} className="flex-1 flex flex-col border-r border-gray-300 dark:border-slate-700 last:border-r-0 min-w-[100px]">
-                            <div className="h-8 flex items-center justify-center border-b border-gray-300 dark:border-slate-700 bg-gray-50/30 dark:bg-slate-800/30 text-xs font-bold text-gray-600 dark:text-gray-300">
+                            <div className={`h-8 flex items-center justify-center border-b border-gray-300 dark:border-slate-700 text-xs font-bold ${date.toDateString() === new Date().toDateString() ? 'bg-black text-white' : 'bg-gray-50/30 dark:bg-slate-800/30 text-gray-600 dark:text-gray-300'}`}>
                                 {date.getDate()} {date.toLocaleDateString('es-ES', { weekday: 'short' })}
                             </div>
                             <div className="flex-1 relative bg-white dark:bg-slate-900">
@@ -373,12 +418,16 @@ export default function TasksPage() {
                                     <div key={h} className="h-20 border-b border-gray-100 dark:border-slate-800" onDrop={(e)=>handleDrop(e, date, h)} onDragOver={(e)=>handleDragOver(e, `${date.toISOString()}-${h}`)}></div>
                                 ))}
                                 {tasks.filter(t => t.dueDate && new Date(t.dueDate).toDateString() === date.toDateString()).map(t => {
-                                    const h = new Date(t.dueDate!).getHours();
+                                    const d = new Date(t.dueDate!);
+                                    let h = d.getHours();
+                                    // Clamp hours to visible range (8-20) roughly for display
+                                    if (h < 8) h = 8;
                                     const top = (h - 8) * 80; 
-                                    if(top < 0) return null;
+                                    
                                     return (
-                                        <div key={t.id} onClick={()=>openEditModal(t)} className={`absolute left-1 right-1 p-1 rounded text-[10px] shadow-sm cursor-pointer ${getTaskStyles(t.status)}`} style={{top: top + 5, height: '70px'}}>
-                                            {t.title}
+                                        <div key={t.id} onClick={()=>openEditModal(t)} onContextMenu={(e)=>handleContextMenu(e,t)} className={`absolute left-1 right-1 p-1.5 rounded-lg text-[10px] shadow-sm cursor-pointer hover:scale-105 transition-transform z-10 flex flex-col justify-center ${getTaskStyles(t.status)}`} style={{top: top + 5, height: '70px'}}>
+                                            <div className="font-bold line-clamp-2">{t.title}</div>
+                                            <div className="text-[9px] opacity-70 mt-auto">{d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
                                         </div>
                                     )
                                 })}

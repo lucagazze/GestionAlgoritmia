@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
@@ -134,6 +133,7 @@ export const AIActionCenter = () => {
                     description: payload.description || '',
                     projectId: activeContextData?.type === 'PROJECT' ? activeContextData.data.id : payload.projectId
                 });
+                // Force UI update
                 window.dispatchEvent(new Event('task-created'));
                 return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' } };
             }
@@ -155,12 +155,9 @@ export const AIActionCenter = () => {
             }
             if (actionType === 'UPDATE_TASK') {
                 if (!payload.id) return { success: false };
-                if (payload.status) await db.tasks.updateStatus(payload.id, payload.status);
-                // Support generic updates
-                if (payload.dueDate || payload.title) {
-                    // Assuming updateStatus only does status, create full update logic later if needed
-                    // For now, simple re-create or ignore complex updates on tasks via voice
-                }
+                // Call generic update
+                await db.tasks.update(payload.id, payload);
+                
                 window.dispatchEvent(new Event('task-created')); 
                 return { success: true };
             }
@@ -294,7 +291,7 @@ export const AIActionCenter = () => {
                 db.tasks.getAll(), db.projects.getAll(), db.services.getAll(), db.contractors.getAll()
             ]);
             
-            const response = await ai.agent(
+            const response: any = await ai.agent(
                 userText, 
                 await db.chat.getMessages(sessionId), 
                 { tasks, projects, services, contractors }
