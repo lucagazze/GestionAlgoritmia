@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Card, CardContent, CardHeader, CardTitle, Input, Button, Label } from '../components/UIComponents';
-import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow, CalendarCheck, ArrowUpRight } from 'lucide-react';
+import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow, CalendarCheck } from 'lucide-react';
 
 export default function SettingsPage() {
     const navigate = useNavigate();
@@ -221,27 +221,7 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
                 </Card>
             </div>
 
-            {/* Legal / Compliance */}
-            <Card className="border-gray-200 dark:border-slate-800 shadow-sm mt-6">
-                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-gray-500" /> Legal & Cumplimiento
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <p className="text-sm text-gray-500">Enlaces públicos de conformidad para verificación de Google.</p>
-                    <div className="flex gap-4">
-                        <a href="/#/privacy" target="_blank" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                            Política de Privacidad <ArrowUpRight className="w-3 h-3"/>
-                        </a>
-                        <a href="/#/terms" target="_blank" className="text-sm font-medium text-blue-600 hover:underline flex items-center gap-1">
-                            Condiciones del Servicio <ArrowUpRight className="w-3 h-3"/>
-                        </a>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <div className="flex justify-end pt-6">
+            <div className="flex justify-end">
                 <Button onClick={handleSave} disabled={saving || loading} className="min-w-[150px] shadow-xl">
                     {saving ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : success ? <CheckCircle className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                     {success ? "Configuración Guardada" : "Guardar Todo"}

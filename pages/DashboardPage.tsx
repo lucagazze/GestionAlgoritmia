@@ -67,75 +67,6 @@ export default function DashboardPage() {
 
   const handleScan = () => navigate('/audit');
 
-  // --- MORNING BRIEFING LOGIC ---
-  const [isBriefingLoading, setIsBriefingLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  const handleMorningBriefing = async () => {
-    // 1. Stop if playing
-    if (isSpeaking) {
-        window.speechSynthesis.cancel();
-        setIsSpeaking(false);
-        return;
-    }
-
-    setIsBriefingLoading(true);
-    try {
-        // 2. Gather Context
-        const todayStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-        const overdueCount = overdueTasksList.length;
-        const todayTasks = tasks.filter(t => {
-            if (!t.dueDate) return false;
-            const d = new Date(t.dueDate);
-            const now = new Date();
-            return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && t.status !== TaskStatus.DONE;
-        });
-        const upcomingBillings = activeProjects
-            .filter(p => p.billingDay && p.billingDay >= new Date().getDate() && p.billingDay <= new Date().getDate() + 5)
-            .map(p => p.name);
-
-        // 3. Prompt AI
-        const prompt = `
-            Actúa como mi Jefe de Gabinete Personal (Chief of Staff).
-            Genera un "Morning Briefing" breve (máximo 100 palabras) para ser leído en voz alta.
-            Usa un tono profesional, energético y motivador.
-            
-            DATOS DE HOY (${todayStr}):
-            - Tareas Vencidas (URGENTE): ${overdueCount}
-            - Agenda de Hoy: ${todayTasks.length} tareas. (Principales: ${todayTasks.slice(0, 3).map(t => t.title).join(', ')}).
-            - Finanzas: MRR actual $${mrr}.
-            - Cobros próximos (5 días): ${upcomingBillings.length > 0 ? upcomingBillings.join(', ') : 'Ninguno'}.
-
-            ESTRUCTURA:
-            1. Saludo ("Buenos días Luca").
-            2. Alerta de vencidos (si hay).
-            3. Resumen del día.
-            4. Frase final de cierre (motivadora).
-            
-            IMPORTANTE: No uses markdown. No uses listas con guiones. Escribe como si fuera un guión de radio.
-        `;
-
-        const response = await ai.chat([{ role: 'user', content: prompt }]);
-        
-        // 4. TTS Playback
-        const utterance = new SpeechSynthesisUtterance(response);
-        utterance.lang = 'es-ES'; // Spanish
-        utterance.rate = 1.1; // Slightly faster
-        utterance.pitch = 1.0;
-        
-        utterance.onend = () => setIsSpeaking(false);
-        
-        window.speechSynthesis.speak(utterance);
-        setIsSpeaking(true);
-
-    } catch (e) {
-        console.error("Briefing Error", e);
-        alert("No se pudo generar el briefing.");
-    } finally {
-        setIsBriefingLoading(false);
-    }
-  };
-
   // --- CHART DATA PREPARATION ---
   
   // 1. MRR Trend (Last 6 Months)
@@ -215,14 +146,6 @@ export default function DashboardPage() {
               <p className="text-gray-500 dark:text-gray-400 mt-2">Tablero de Control Ejecutivo.</p>
           </div>
           <div className="flex gap-3">
-              <Button 
-                onClick={handleMorningBriefing} 
-                className={`bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 shadow-sm hover:shadow-md transition-all ${isSpeaking ? 'animate-pulse ring-2 ring-indigo-500' : ''}`}
-              >
-                  {isBriefingLoading ? <Clock className="w-4 h-4 animate-spin mr-2" /> : isSpeaking ? <MessageCircle className="w-4 h-4 mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
-                  {isBriefingLoading ? 'Generando...' : isSpeaking ? 'Detener Resumen' : 'Morning Briefing'}
-              </Button>
-
               {(riskClients.length > 0 || overdueTasksList.length > 0) && (
                   <div 
                     onClick={handleScan}
