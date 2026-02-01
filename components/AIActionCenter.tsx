@@ -4,13 +4,71 @@ import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
 import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
-import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform } from 'lucide-react';
+import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform, ExternalLink } from 'lucide-react';
 
 interface UndoPayload {
     undoType: 'RESTORE_TASK' | 'DELETE_TASK' | 'DELETE_PROJECT';
     data: any;
     description: string;
 }
+
+// --- MESSAGE RENDERER COMPONENT ---
+const MessageRenderer = ({ content, role }: { content: string, role: 'user' | 'assistant' }) => {
+    // 1. Split by new lines to handle paragraphs and lists
+    const lines = content.split('\n');
+
+    return (
+        <div className={`space-y-1 ${role === 'user' ? 'text-right' : 'text-left'}`}>
+            {lines.map((line, lineIdx) => {
+                if (!line.trim()) return <div key={lineIdx} className="h-2" />; // Spacer for empty lines
+
+                // 2. Check for bullet points
+                const isBullet = line.trim().startsWith('-');
+                const cleanLine = isBullet ? line.trim().substring(1).trim() : line;
+
+                // 3. Parse Bold (**) and Links [text](url)
+                // We split by a regex that captures both bold and link patterns
+                const parts = cleanLine.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\))/g);
+
+                return (
+                    <div key={lineIdx} className={`${isBullet ? 'flex gap-2 ml-1' : ''}`}>
+                        {isBullet && <div className="min-w-[4px] h-[4px] bg-indigo-400 rounded-full mt-2.5" />}
+                        <p className={`leading-relaxed ${isBullet ? 'flex-1' : ''}`}>
+                            {parts.map((part, partIdx) => {
+                                // Handle Bold
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <strong key={partIdx} className="font-bold">{part.slice(2, -2)}</strong>;
+                                }
+                                // Handle Links/Buttons [Label](url)
+                                const linkMatch = part.match(/^\[(.*?)\]\((.*?)\)$/);
+                                if (linkMatch) {
+                                    const [, label, url] = linkMatch;
+                                    return (
+                                        <a 
+                                            key={partIdx} 
+                                            href={url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className={`
+                                                inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold transition-colors mx-1 no-underline
+                                                ${role === 'assistant' 
+                                                    ? 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200' 
+                                                    : 'bg-white/20 text-white hover:bg-white/30'}
+                                            `}
+                                        >
+                                            {label} <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    );
+                                }
+                                return <span key={partIdx}>{part}</span>;
+                            })}
+                        </p>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
 
 export const AIActionCenter = () => {
     const navigate = useNavigate();
@@ -344,25 +402,6 @@ export const AIActionCenter = () => {
         setIsThinking(false);
     };
 
-    const confirmAction = async () => {
-        if (!pendingAction || !currentSessionId) return;
-        setIsThinking(true);
-        const result = await executeAction(pendingAction.type, pendingAction.payload);
-        await db.chat.addMessage(currentSessionId, 'assistant', "✅ Acción ejecutada.", result.success ? { type: pendingAction.type, payload: result.undo } : undefined);
-        await loadMessages(currentSessionId);
-        setPendingAction(null);
-        setConfirmationMessage(null);
-        setIsThinking(false);
-    };
-
-    const cancelAction = async () => {
-        if (!currentSessionId) return;
-        await db.chat.addMessage(currentSessionId, 'assistant', "🚫 Cancelado.");
-        await loadMessages(currentSessionId);
-        setPendingAction(null);
-        setConfirmationMessage(null);
-    };
-
     return (
         <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[600px] bottom-6`}>
             <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[65vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
@@ -400,8 +439,10 @@ export const AIActionCenter = () => {
                             </div>
                         )}
                         {messages.map((msg, idx) => (
-                            <div key={msg.id || idx} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
-                                <div className={`p-3 rounded-2xl text-sm shadow-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>{msg.content}</div>
+                            <div key={msg.id || idx} className={`flex flex-col max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
+                                    <MessageRenderer content={msg.content} role={msg.role} />
+                                </div>
                                 <div className="flex items-center gap-2 mt-1 px-1">
                                     <span className="text-[10px] text-gray-300">{formatTime(msg.created_at)}</span>
                                     {msg.role === 'assistant' && msg.action_payload && !msg.is_undone && (
