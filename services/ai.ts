@@ -32,7 +32,7 @@ export const ai = {
                   role: 'user',
                   parts: [
                       { inlineData: audioData },
-                      { text: "Transcribe el siguiente audio textualmente. Solo devuelve el texto plano, sin formatos, sin markdown, y sin responder a la pregunta. Solo lo que se escucha." }
+                      { text: "Transcribe este audio." }
                   ]
               }]
           });

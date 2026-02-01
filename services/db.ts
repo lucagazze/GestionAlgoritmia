@@ -323,6 +323,32 @@ export const db = {
             growthStrategy: data.growthStrategy || ''
          };
     },
+    getById: async (id: string): Promise<Project | null> => {
+         const { data, error } = await supabase.from('Client').select('*').eq('id', id).maybeSingle();
+         if (error || !data) return null;
+         return {
+            ...data,
+            status: data.status || ProjectStatus.ACTIVE,
+            monthlyRevenue: data.monthlyRevenue || 0,
+            billingDay: data.billingDay || 1,
+            notes: data.notes || '',
+            phone: data.phone || '',
+            outsourcingCost: data.outsourcingCost || 0,
+            healthScore: data.healthScore || 'GOOD',
+            resources: data.resources || [],
+            contacts: data.contacts || [],
+            brandColors: data.brandColors || [],
+            brandFonts: data.brandFonts || [],
+            internalCost: data.internalCost || 0,
+            publicToken: data.publicToken || '',
+            progress: data.progress || 0,
+            growthStrategy: data.growthStrategy || '',
+            assignedPartnerId: data.assignedPartnerId || null,
+            proposalUrl: data.proposalUrl || '',
+            lastPaymentDate: data.lastPaymentDate || null,
+            lastContactDate: data.lastContactDate || null
+         };
+    },
     create: async (data: Partial<Project>): Promise<Project> => {
       const { data: created, error } = await supabase.from('Project').insert(data).select().single();
       if (error) throw error;
@@ -385,6 +411,11 @@ export const db = {
       const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').order('created_at', { ascending: false });
       if (error) { console.error('Supabase Error (Task):', error); return []; }
       return data as Task[];
+    },
+    getById: async (id: string): Promise<Task | null> => {
+      const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').eq('id', id).maybeSingle();
+      if (error) { console.error('Supabase Error (Task getById):', error); return null; }
+      return data as Task | null;
     },
     create: async (data: Partial<Task>): Promise<Task> => {
       const { data: created, error } = await supabase.from('Task').insert(data).select().single();

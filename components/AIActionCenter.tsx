@@ -257,19 +257,31 @@ export const AIActionCenter = () => {
                     sopId: payload.sopId
                 });
                 window.dispatchEvent(new Event('task-created'));
-                return { success: true, undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' } };
+                return { 
+                    success: true, 
+                    undo: { undoType: 'DELETE_TASK', data: { id: newTask.id }, description: 'Borrar tarea creada' },
+                    details: [{ id: newTask.id, title: newTask.title, dueDate: newTask.dueDate, priority: newTask.priority, status: newTask.status }]
+                };
             }
             if (actionType === 'UPDATE_TASK') {
                 if (!payload.id) return { success: false, error: 'Falta ID' };
                 await db.tasks.update(payload.id, payload);
+                const updatedTask = await db.tasks.getById(payload.id);
                 window.dispatchEvent(new Event('task-created')); 
-                return { success: true };
+                return { 
+                    success: true,
+                    details: updatedTask ? [{ id: updatedTask.id, title: updatedTask.title, dueDate: updatedTask.dueDate, priority: updatedTask.priority, status: updatedTask.status }] : undefined
+                };
             }
             if (actionType === 'DELETE_TASK') {
                 if (!payload.id) return { success: false, error: 'Falta ID' };
+                const taskToDelete = await db.tasks.getById(payload.id);
                 await db.tasks.delete(payload.id);
                 window.dispatchEvent(new Event('task-created'));
-                return { success: true };
+                return { 
+                    success: true,
+                    details: taskToDelete ? [{ id: taskToDelete.id, title: taskToDelete.title, dueDate: taskToDelete.dueDate, priority: taskToDelete.priority, status: taskToDelete.status }] : undefined
+                };
             }
             if (actionType === 'DELETE_PROJECT') {
                 if (!payload.id) return { success: false, error: 'Falta ID del proyecto' };
@@ -288,7 +300,8 @@ export const AIActionCenter = () => {
                         undoType: 'RESTORE_TASKS', 
                         data: tasksToRestore, 
                         description: `Restaurar ${payload.ids.length} tareas` 
-                    } 
+                    },
+                    details: tasksToRestore.map(t => ({ id: t.id, title: t.title, dueDate: t.dueDate, priority: t.priority, status: t.status }))
                 };
             }
             if (actionType === 'CREATE_PROJECT') {
@@ -420,7 +433,11 @@ export const AIActionCenter = () => {
             if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4'; 
             else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
 
-            const mediaRecorder = new MediaRecorder(stream, { mimeType });
+            // Optimize audio quality for faster transcription
+            const mediaRecorder = new MediaRecorder(stream, { 
+                mimeType,
+                audioBitsPerSecond: 64000 // Compress audio for faster upload/processing
+            });
             mediaRecorderRef.current = mediaRecorder;
             audioChunksRef.current = [];
 
@@ -431,18 +448,27 @@ export const AIActionCenter = () => {
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                 
+                // Update state immediately for faster perceived response
+                setIsRecording(false);
                 setIsTranscribing(true);
+                
                 try {
+                    console.time('🎤 Transcription');
                     const base64Audio = await blobToBase64(audioBlob);
                     const text = await ai.transcribe({ mimeType, data: base64Audio });
+                    console.timeEnd('🎤 Transcription');
+                    
                     if (text) {
                         setInput(text.trim());
                         setIsOpen(true);
                         setTimeout(() => inputRef.current?.focus(), 100);
-                        // Auto-send if it was a voice command? For now, let user review.
                     }
-                } catch (e) { console.error("Transcription error", e); } 
-                finally { setIsTranscribing(false); setIsRecording(false); }
+                } catch (e) { 
+                    console.error("Transcription error", e);
+                    alert("Error al transcribir. Intenta de nuevo.");
+                } finally { 
+                    setIsTranscribing(false);
+                }
                 
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -603,7 +629,7 @@ export const AIActionCenter = () => {
                 const result = await executeAction(parsedResponse.action, parsedResponse.payload);
                 if (result.success) {
                     // Store details and entities in message metadata
-                    const metadata: any = { type: response.action, payload: result.undo };
+                    const metadata: any = { type: parsedResponse.action, payload: result.undo };
                     
                     // Use details from executeAction if available, otherwise from AI response
                     const actionDetails = result.details || response.details;
