@@ -139,6 +139,8 @@ export interface ProposalItem {
   id: string;
   serviceId: string;
   serviceSnapshotName: string;
+  serviceSnapshotDescription?: string;
+  serviceSnapshotType?: 'ONE_TIME' | 'RECURRING';
   serviceSnapshotCost: number;
 }
 
@@ -148,6 +150,8 @@ export interface Proposal {
   client?: Client;
   status: ProposalStatus;
   objective: string;
+  targetAudience?: string;
+  currentSituation?: string;
   durationMonths: number;
   totalOneTimePrice: number;
   totalRecurringPrice: number;

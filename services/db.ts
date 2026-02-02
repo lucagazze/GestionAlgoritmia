@@ -511,6 +511,8 @@ export const db = {
             clientId,
             status: data.status,
             objective: data.objective,
+            targetAudience: data.targetAudience, // Saved
+            currentSituation: data.currentSituation, // Saved
             durationMonths: data.durationMonths,
             totalOneTimePrice: data.totalOneTimePrice,
             totalRecurringPrice: data.totalRecurringPrice,
@@ -527,6 +529,8 @@ export const db = {
                 proposalId: newProposal.id,
                 serviceId: item.serviceId,
                 serviceSnapshotName: item.serviceSnapshotName,
+                serviceSnapshotDescription: item.serviceSnapshotDescription,
+                serviceSnapshotType: item.serviceSnapshotType,
                 serviceSnapshotCost: item.serviceSnapshotCost
             }));
             const { error: itemsError } = await supabase.from('ProposalItem').insert(itemsPayload);
@@ -554,6 +558,36 @@ export const db = {
     },
     getItems: async (proposalId: string): Promise<ProposalItem[]> => {
         return handleResponse<ProposalItem>(supabase.from('ProposalItem').select('*').eq('proposalId', proposalId));
+    },
+    update: async (id: string, data: Partial<Proposal>, newItems?: any[]): Promise<void> => {
+        const { error } = await supabase.from('Proposal').update(data).eq('id', id);
+        if (error) throw error;
+        
+        if (newItems) {
+             // 1. Delete existing items
+             const { error: deleteError } = await supabase.from('ProposalItem').delete().eq('proposalId', id);
+             if (deleteError) throw deleteError;
+
+             // 2. Insert new items
+             const itemsPayload = newItems.map(item => ({
+                 proposalId: id,
+                 serviceId: item.serviceId,
+                 serviceSnapshotName: item.serviceSnapshotName,
+                 serviceSnapshotDescription: item.serviceSnapshotDescription,
+                 serviceSnapshotType: item.serviceSnapshotType,
+                 serviceSnapshotCost: item.serviceSnapshotCost
+             }));
+             
+             const { error: insertError } = await supabase.from('ProposalItem').insert(itemsPayload);
+             if (insertError) throw insertError;
+        }
+    },
+    delete: async (id: string): Promise<void> => {
+        // Delete items first (cascade usually handles this but explicit is safer if no cascade)
+        await supabase.from('ProposalItem').delete().eq('proposalId', id);
+        
+        const { error } = await supabase.from('Proposal').delete().eq('id', id);
+        if (error) throw error;
     }
   },
 
