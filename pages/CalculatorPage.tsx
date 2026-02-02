@@ -29,6 +29,7 @@ export default function CalculatorPage() {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [rewritingServiceId, setRewritingServiceId] = useState<string | null>(null);
 
   // --- STEP 1: CLIENT DISCOVERY ---
   const [clientInfo, setClientInfo] = useState({
@@ -350,19 +351,32 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
   };
 
   const handleAiRewrite = async (serviceId: string, currentDesc: string) => {
-      setIsAiThinking(true);
+      setRewritingServiceId(serviceId);
       try {
+          const serviceName = services.find(s => s.id === serviceId)?.name || 'este servicio';
           const prompt = `
-          Contexto Cliente: 
-          - Nombre: ${clientInfo.name}
-          - Rubro: ${clientInfo.industry}
-          - Situación: ${clientInfo.currentSituation}
+          Actúa como Copywriter de Agencia Experto.
+          
+          CONTEXTO DEL CLIENTE:
+          - Empresa: ${clientInfo.name}
+          - Industria: ${clientInfo.industry}
+          - Situación Actual: ${clientInfo.currentSituation}
           - Objetivo: ${clientInfo.objective}
           
-          Servicio Original: "${currentDesc}"
+          SERVICIO: ${serviceName}
+          Descripción Base: "${currentDesc}"
           
-          Tarea: Reescribe la descripción de este servicio para que sea ultra-persuasiva y conecte específicamente con el objetivo del cliente.
-          Requisitos: Max 30 palabras. Tono profesional y de alto valor. Sin emojis.
+          TAREA:
+          Reescribe la descripción enfocándote en:
+          1. QUÉ hacemos específicamente en este servicio
+          2. CÓMO lo enfocamos para resolver el problema del cliente
+          3. El VALOR tangible que entregamos
+          
+          REQUISITOS:
+          - Máximo 35 palabras
+          - Tono profesional y orientado a resultados
+          - Sin emojis ni jerga técnica innecesaria
+          - Enfócate en beneficios, no en características
           `;
           const res = await ai.chat([{ role: 'user', content: prompt }]);
           if (res) {
@@ -371,7 +385,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       } catch (e) {
           console.error(e);
       } finally {
-          setIsAiThinking(false);
+          setRewritingServiceId(null);
       }
   }
 
@@ -840,13 +854,23 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <label className="text-[10px] text-gray-500 font-bold uppercase">Descripción</label>
                                                                 <button 
-                                                                    className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full transition-colors"
+                                                                    className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         handleAiRewrite(s.id, getServiceDescription(s));
                                                                     }}
+                                                                    disabled={rewritingServiceId === s.id}
                                                                 >
-                                                                    <Sparkles className="w-3 h-3" /> <span className="hidden sm:inline">Reescribir</span>
+                                                                    {rewritingServiceId === s.id ? (
+                                                                        <>
+                                                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                                                            <span className="hidden sm:inline">Generando...</span>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Sparkles className="w-3 h-3" /> <span className="hidden sm:inline">Reescribir</span>
+                                                                        </>
+                                                                    )}
                                                                 </button>
                                                             </div>
                                                             <Textarea 

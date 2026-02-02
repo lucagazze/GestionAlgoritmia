@@ -1,26 +1,31 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
-import { db } from '../services/db';
-import { ai } from '../services/ai';
-import { sounds } from '../services/sounds';
-import { Project, Task, TaskStatus, ProjectStatus, Contractor } from '../types';
-import { Card, Button, Badge } from '../components/UIComponents';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  Cell, 
+  PieChart as RePieChart, 
+  Pie 
+} from 'recharts';
 import { 
   TrendingUp, 
-  Calendar, 
-  CheckCircle2, 
   Zap, 
-  ArrowRight,
-  Clock,
-  MessageCircle,
-  Activity,
-  AlertOctagon,
-  PieChart,
-  BarChart as BarChartIcon,
-  DollarSign
+  Activity, 
+  AlertOctagon, 
+  PieChart, 
+  BarChart as BarChartIcon, 
+  DollarSign 
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, PieChart as RePieChart, Pie, Legend } from 'recharts';
+
+import { db } from '../services/db';
+import { Project, Task, TaskStatus, ProjectStatus, Contractor } from '../types';
+import { Card, Button, Badge } from '../components/UIComponents';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -55,10 +60,20 @@ export default function DashboardPage() {
       const today = new Date();
       const risks = projList.filter(p => {
           if (p.status !== ProjectStatus.ACTIVE && p.status !== ProjectStatus.ONBOARDING) return false;
-          const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : new Date(p.createdAt);
+          // Manejo seguro de fechas (string o Date)
+          const created = new Date(p.createdAt);
+          const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : created;
+          
           const diffDays = Math.ceil(Math.abs(today.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
           return diffDays > 7;
-      }).map(p => ({...p, daysSinceContact: Math.ceil(Math.abs(today.getTime() - (p.lastContactDate ? new Date(p.lastContactDate).getTime() : new Date(p.createdAt).getTime())) / (1000 * 60 * 60 * 24))}));
+      }).map(p => {
+          const created = new Date(p.createdAt);
+          const lastContact = p.lastContactDate ? new Date(p.lastContactDate) : created;
+          return {
+              ...p, 
+              daysSinceContact: Math.ceil(Math.abs(today.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24))
+          };
+      });
       setRiskClients(risks);
 
       const overdue = taskList.filter(t => t.status !== TaskStatus.DONE && t.dueDate && new Date(t.dueDate) < today);
@@ -80,6 +95,8 @@ export default function DashboardPage() {
           const activeAtTime = projects.filter(p => {
               const created = new Date(p.createdAt);
               const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+              // Cliente activo si fue creado antes de fin de mes y está activo/onboarding hoy
+              // (Nota: Esto es una aprox. histórica simple basada en estado actual)
               return created <= endOfMonth && (p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.ONBOARDING);
           });
           
@@ -124,7 +141,7 @@ export default function DashboardPage() {
       if (active && payload && payload.length) {
           return (
               <div className="bg-white dark:bg-slate-800 p-3 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl">
-                  <p className="font-bold text-xs mb-1">{label}</p>
+                  <p className="font-bold text-xs mb-1 text-gray-700 dark:text-gray-300">{label}</p>
                   <p className="text-sm font-mono text-indigo-600 dark:text-indigo-400">
                       {payload[0].name === 'mrr' ? `$${payload[0].value.toLocaleString()}` : payload[0].value}
                   </p>
@@ -149,7 +166,7 @@ export default function DashboardPage() {
               {(riskClients.length > 0 || overdueTasksList.length > 0) && (
                   <div 
                     onClick={handleScan}
-                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 rounded-xl text-xs font-bold text-red-700 dark:text-red-300 shadow-sm animate-pulse cursor-pointer hover:bg-red-100"
+                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 rounded-xl text-xs font-bold text-red-700 dark:text-red-300 shadow-sm animate-pulse cursor-pointer hover:bg-red-100 transition-colors"
                   >
                       <AlertOctagon className="w-4 h-4" />
                       Atención Requerida
@@ -161,7 +178,7 @@ export default function DashboardPage() {
           </div>
       </div>
 
-      {/* 2. OPERATIONAL WIDGETS (MOVED TO TOP) */}
+      {/* 2. OPERATIONAL WIDGETS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Billing Alerts Widget */}
           <Card className="flex-1 flex flex-col border-emerald-100 dark:border-emerald-900/30">
