@@ -424,41 +424,56 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       }
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     try {
       console.log("Generating PDF...");
       const doc: any = new jsPDF();
       
-      // -- BRANDING --
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(22);
-      doc.setTextColor(0, 0, 0);
-      doc.text("ALGORITMIA", 14, 20);
-      console.log("PDF: Branding set");
+      // -- LOGO --
+      try {
+        // Load logo image
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+        });
+        
+        // Add logo to PDF (adjust size and position as needed)
+        doc.addImage(logoImg, 'PNG', 14, 10, 40, 15); // x, y, width, height
+        console.log("PDF: Logo added");
+      } catch (e) {
+        console.warn("Could not load logo, using text fallback:", e);
+        // Fallback to text if logo fails to load
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.setTextColor(0, 0, 0);
+        doc.text("ALGORITMIA", 14, 20);
+      }
       
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
-      doc.text("Desarrollo de Software & Growth", 14, 25);
+      doc.text("Desarrollo de Software & Growth", 14, 30);
 
       // -- CLIENT INFO --
       doc.setDrawColor(240);
       doc.setFillColor(250, 250, 250);
-      doc.roundedRect(14, 35, 180, 25, 3, 3, 'FD');
+      doc.roundedRect(14, 40, 180, 25, 3, 3, 'FD');
       
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text("PREPARADO PARA", 20, 42);
+      doc.text("PREPARADO PARA", 20, 47);
       
       doc.setFontSize(14);
       doc.setTextColor(0);
       doc.setFont("helvetica", "bold");
-      doc.text(clientInfo.name || "Cliente", 20, 50);
+      doc.text(clientInfo.name || "Cliente", 20, 55);
       
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
-      doc.text(clientInfo.industry || "", 20, 56);
+      doc.text(clientInfo.industry || "", 20, 61);
 
       doc.text(new Date().toLocaleDateString(), 180, 20, { align: 'right' });
       console.log("PDF: Client Info set");
@@ -616,8 +631,58 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.setFont("helvetica", "bold");
       doc.text(`$${calculations.contractValue.toLocaleString()}`, 190, finalY + 42, { align: 'right' });
 
-      // -- FOOTER --
+      // --- SECCIÓN LEGAL Y FIRMAS ---
+      let legalY = (doc as any).lastAutoTable.finalY + 60; // Espacio después de los totales
       const pageHeight = doc.internal.pageSize.height;
+
+      // Si nos quedamos sin espacio, nueva página
+      if (legalY > pageHeight - 80) {
+          doc.addPage();
+          legalY = 20;
+      }
+
+      // Términos
+      doc.setFontSize(9);
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
+      doc.text("Términos y Condiciones", 14, legalY);
+      
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.setFont("helvetica", "normal");
+      const terms = [
+          "1. Validez de la propuesta: 15 días hábiles desde la fecha de emisión.",
+          "2. Condiciones de Pago: 50% de anticipo para iniciar, saldo contra entrega (o mensual adelantado).",
+          "3. Los precios expresados no incluyen IVA.",
+          "4. Tiempos de entrega sujetos a la recepción de material por parte del cliente."
+      ];
+      
+      let termY = legalY + 6;
+      terms.forEach(t => {
+          doc.text(t, 14, termY);
+          termY += 5;
+      });
+
+      // Firmas
+      const sigY = termY + 25; // Espacio para garabatear
+      
+      // Línea Cliente
+      doc.setDrawColor(200);
+      doc.line(14, sigY, 90, sigY);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold"); 
+      doc.text("ACEPTADO POR CLIENTE", 14, sigY + 5);
+      doc.setFont("helvetica", "normal");
+      doc.text("Firma y Aclaración", 14, sigY + 9);
+
+      // Línea Agencia
+      doc.line(110, sigY, 196, sigY);
+      doc.setFont("helvetica", "bold");
+      doc.text("POR ALGORITMIA", 110, sigY + 5);
+      doc.setFont("helvetica", "normal");
+      doc.text("Autorizado", 110, sigY + 9);
+
+      // -- FOOTER --
       doc.setFontSize(8);
       doc.setTextColor(150);
       doc.text("Generado por Algoritmia para uso exclusivo.", 14, pageHeight - 10);
