@@ -143,6 +143,10 @@ export interface ProposalItem {
   serviceSnapshotDescription?: string;
   serviceSnapshotType?: 'ONE_TIME' | 'RECURRING';
   serviceSnapshotCost: number;
+  
+  // ✅ CONTRACTOR ASSIGNMENT FIELDS
+  assignedContractorId?: string; // Who will do the work
+  outsourcingCost?: number;      // How much we pay them (Cost)
 }
 
 export interface Proposal {

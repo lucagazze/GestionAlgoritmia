@@ -559,17 +559,22 @@ export const db = {
                 serviceSnapshotName: item.serviceSnapshotName,
                 serviceSnapshotDescription: item.serviceSnapshotDescription,
                 serviceSnapshotType: item.serviceSnapshotType,
-                serviceSnapshotCost: item.serviceSnapshotCost
+                serviceSnapshotCost: item.serviceSnapshotCost,
+                // ✅ SAVE CONTRACTOR ASSIGNMENT
+                assignedContractorId: item.assignedContractorId || null,
+                outsourcingCost: item.outsourcingCost || 0
             }));
             const { error: itemsError } = await supabase.from('ProposalItem').insert(itemsPayload);
             if (itemsError) console.error("Error creating items", itemsError);
 
             const tasksPayload = data.items.map(item => ({
                 title: `Implementar: ${item.serviceSnapshotName}`,
-                description: `Servicio vendido en propuesta. Cliente: ${clientName}. Objetivo: ${data.objective}`,
+                description: `Servicio vendido en propuesta.\n\n📝 Detalle: ${item.serviceSnapshotDescription || 'N/A'}\n💰 Presupuesto Asignado: $${item.outsourcingCost || 0}\n🎯 Cliente: ${clientName}\n📊 Objetivo: ${data.objective}`,
                 status: TaskStatus.TODO,
                 priority: 'HIGH', 
-                projectId: clientId 
+                projectId: clientId,
+                // ✅ AUTO-ASSIGN TASK TO CONTRACTOR
+                assigneeId: item.assignedContractorId || null
             }));
 
             for (const task of tasksPayload) {
