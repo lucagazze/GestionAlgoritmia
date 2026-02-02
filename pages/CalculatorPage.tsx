@@ -211,6 +211,8 @@ export default function CalculatorPage() {
       const newCustomPrices: Record<string, number> = {};
       const newCustomDescriptions: Record<string, string> = {};
       const newCustomTypes: Record<string, 'ONE_TIME' | 'RECURRING'> = {};
+      const newAssignedContractors: Record<string, string> = {};
+      const newOutsourcingCosts: Record<string, number> = {};
       
       loadProposalItems(p.id).then(items => {
           items.forEach((item: any) => {
@@ -222,11 +224,20 @@ export default function CalculatorPage() {
               if (item.serviceSnapshotType) {
                   newCustomTypes[item.serviceId] = item.serviceSnapshotType;
               }
+              // ✅ LOAD CONTRACTOR ASSIGNMENTS
+              if (item.assignedContractorId) {
+                  newAssignedContractors[item.serviceId] = item.assignedContractorId;
+              }
+              if (item.outsourcingCost) {
+                  newOutsourcingCosts[item.serviceId] = item.outsourcingCost;
+              }
           });
           setSelectedServiceIds(serviceIds);
           setCustomPrices(newCustomPrices);
           setCustomDescriptions(newCustomDescriptions);
           setCustomTypes(newCustomTypes);
+          setAssignedContractors(newAssignedContractors);
+          setOutsourcingCosts(newOutsourcingCosts);
           
           setContractVars({
               budget: '',
@@ -270,7 +281,11 @@ export default function CalculatorPage() {
           serviceSnapshotName: s.name,
           serviceSnapshotDescription: s.description, // Save description
           serviceSnapshotType: s.type, // Save type
-          serviceSnapshotCost: getSellingPrice(s)
+          serviceSnapshotCost: getSellingPrice(s),
+          
+          // ✅ NUEVO: Vinculamos los datos de los inputs del Paso 2
+          assignedContractorId: assignedContractors[s.id] || null,
+          outsourcingCost: outsourcingCosts[s.id] || 0
     }));
 
     try {
@@ -302,6 +317,9 @@ export default function CalculatorPage() {
       setSelectedServiceIds([]);
       setCustomPrices({});
       setCustomDescriptions({});
+      setCustomTypes({});
+      setAssignedContractors({});
+      setOutsourcingCosts({});
       setCurrentStep(1);
       setViewMode('CALCULATOR');
   };
@@ -646,6 +664,167 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
     }
   }
 
+  // Función para generar PDF exclusivo para el socio (Orden de Trabajo)
+  const generatePartnerPDF = async (contractorId: string) => {
+    try {
+      const partner = contractors.find(c => c.id === contractorId);
+      if (!partner) return;
+
+      // Filtramos solo los servicios asignados a ESTE socio
+      const partnerServices = calculations.selected.filter(s => assignedContractors[s.id] === contractorId);
+
+      if (partnerServices.length === 0) {
+          alert("Este socio no tiene servicios asignados en esta propuesta.");
+          return;
+      }
+
+      const doc: any = new jsPDF();
+      
+      // -- LOGO (igual que el PDF del cliente) --
+      try {
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+        });
+        
+        doc.addImage(logoImg, 'PNG', 14, 12, 30, 12);
+      } catch (e) {
+        console.warn("Could not load logo, using text fallback:", e);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.setTextColor(0, 0, 0);
+        doc.text("ALGORITMIA", 14, 20);
+      }
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100);
+      doc.text("Desarrollo de Software & Growth", 14, 27);
+
+      // -- PARTNER INFO BOX --
+      doc.setDrawColor(240);
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(14, 35, 180, 25, 3, 3, 'FD');
+      
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("ORDEN DE TRABAJO PARA", 20, 42);
+      
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
+      doc.text(partner.name, 20, 50);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.text(`Cliente Final: ${clientInfo.name}`, 20, 56);
+
+      doc.text(new Date().toLocaleDateString(), 180, 20, { align: 'right' });
+
+      // -- PLAN ESTRATÉGICO (igual que el PDF del cliente) --
+      let yPos = 70;
+      
+      if (clientInfo.objective || clientInfo.currentSituation) {
+           doc.setFontSize(10);
+           doc.setFont("helvetica", "bold");
+           doc.setTextColor(0);
+           doc.text("Plan Estratégico", 14, yPos);
+           yPos += 7;
+           
+           doc.setDrawColor(230);
+           doc.line(14, yPos, 194, yPos);
+           yPos += 5;
+
+           // Transformation Grid
+           if (clientInfo.currentSituation && clientInfo.objective) {
+                // Situation (Left)
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text("SITUACIÓN ACTUAL (Punto A)", 14, yPos);
+                
+                doc.setFontSize(9);
+                doc.setTextColor(80);
+                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", 80);
+                doc.text(splitSit, 14, yPos + 5);
+
+                // Objective (Right)
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text("OBJETIVO (Punto B)", 110, yPos);
+
+                doc.setFontSize(9);
+                doc.setTextColor(0);
+                doc.setFont("helvetica", "bold");
+                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", 80);
+                doc.text(splitObj, 110, yPos + 5);
+                
+                yPos += Math.max(splitSit.length, splitObj.length) * 5 + 10;
+           }
+      }
+
+      // -- SERVICES TABLE (mismo estilo que el PDF del cliente) --
+      doc.autoTable({
+          startY: yPos,
+          head: [['Servicio / Entregable', 'Tipo', 'Tu Presupuesto']],
+          body: partnerServices.map(s => [
+              s.name + (customDescriptions[s.id] ? `\n${customDescriptions[s.id]}` : ''),
+              customTypes[s.id] === 'ONE_TIME' ? 'Setup' : 'Mes',
+              `$${(outsourcingCosts[s.id] || 0).toLocaleString()}`
+          ]),
+          styles: { 
+              fontSize: 9, 
+              cellPadding: 4,
+              overflow: 'linebreak',
+              valign: 'top',
+              textColor: [100, 100, 100]
+          },
+          headStyles: { 
+              fillColor: [0, 0, 0], // Negro igual que el PDF del cliente
+              textColor: 255, 
+              fontStyle: 'bold',
+              cellPadding: 4
+          },
+          columnStyles: { 
+              0: { cellWidth: 110 },
+              2: { halign: 'right', fontStyle: 'bold', textColor: [0,0,0] } 
+          },
+          theme: 'grid'
+      });
+
+      // -- TOTAL --
+      const totalPay = partnerServices.reduce((sum, s) => sum + (outsourcingCosts[s.id] || 0), 0);
+      const finalY = (doc as any).lastAutoTable.finalY + 15;
+
+      // Summary Box (igual que el PDF del cliente)
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(200);
+      doc.roundedRect(120, finalY, 76, 30, 3, 3, 'FD');
+
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text("TOTAL A PERCIBIR", 125, finalY + 12);
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0, 102, 204); // Azul igual que el PDF del cliente
+      doc.setFont("helvetica", "bold");
+      doc.text(`$${totalPay.toLocaleString()}`, 190, finalY + 24, { align: 'right' });
+
+      // -- FOOTER --
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text("Generado por Algoritmia para uso exclusivo.", 14, pageHeight - 10);
+
+      doc.save(`WorkOrder_${partner.name}_${clientInfo.name}.pdf`);
+    } catch (e) {
+        console.error("Partner PDF GENERATION FAILED:", e);
+        alert("Error generando PDF. Revisa la consola.");
+    }
+  };
+
   if (isLoading) return <div className="flex h-screen items-center justify-center text-gray-400"><Loader2 className="animate-spin w-8 h-8 mr-2" /> Cargando Sistema...</div>;
 
   return (
@@ -952,6 +1131,39 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                           <Label>Presupuesto del Cliente ($)</Label>
                                           <Input value={contractVars.budget} onChange={e => setContractVars({...contractVars, budget: e.target.value})} placeholder="Opcional - solo referencia" />
                                       </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* GESTIÓN DE EQUIPO (NUEVO BLOQUE) */}
+                            <Card className="border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/50 dark:bg-indigo-900/10">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
+                                        <User className="w-4 h-4"/> Órdenes de Trabajo
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-gray-500 mb-3">Generar PDF individual con presupuesto de costo:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {/* Buscamos los socios únicos asignados en esta propuesta */}
+                                        {Array.from(new Set(Object.values(assignedContractors))).map(partnerId => {
+                                            const partner = contractors.find(c => c.id === partnerId);
+                                            if (!partner) return null;
+                                            return (
+                                                <Button 
+                                                    key={partnerId} 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => generatePartnerPDF(partnerId)}
+                                                    className="text-xs bg-white dark:bg-slate-800 hover:bg-indigo-50"
+                                                >
+                                                    📄 PDF para {partner.name.split(' ')[0]}
+                                                </Button>
+                                            );
+                                        })}
+                                        {Object.keys(assignedContractors).length === 0 && (
+                                            <span className="text-xs text-gray-400 italic">No hay socios asignados aún.</span>
+                                        )}
+                                    </div>
                                 </CardContent>
                             </Card>
       

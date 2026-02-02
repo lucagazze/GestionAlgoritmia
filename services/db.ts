@@ -608,7 +608,10 @@ export const db = {
                  serviceSnapshotName: item.serviceSnapshotName,
                  serviceSnapshotDescription: item.serviceSnapshotDescription,
                  serviceSnapshotType: item.serviceSnapshotType,
-                 serviceSnapshotCost: item.serviceSnapshotCost
+                 serviceSnapshotCost: item.serviceSnapshotCost,
+                 // ✅ SAVE CONTRACTOR ASSIGNMENT (FIXED)
+                 assignedContractorId: item.assignedContractorId || null,
+                 outsourcingCost: item.outsourcingCost || 0
              }));
              
              const { error: insertError } = await supabase.from('ProposalItem').insert(itemsPayload);
