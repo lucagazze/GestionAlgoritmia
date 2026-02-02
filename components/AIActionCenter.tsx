@@ -123,7 +123,7 @@ export const AIActionCenter = () => {
     // Audio Recording State
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
-    const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
+    const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
