@@ -199,7 +199,7 @@ Debes llamar manage_tasks con:
                 contents: historyParts,
                 tools: tools, // ✨ NATIVE FUNCTION CALLING
                 config: { systemInstruction }
-            });
+            } as any);
 
             console.log('🤖 RAW RESPONSE:', response);
 
@@ -211,7 +211,7 @@ Debes llamar manage_tasks con:
                 if (functionCall.name === 'manage_tasks') {
                     return {
                         type: 'BATCH',
-                        actions: functionCall.args.actions.map((a: any) => ({
+                        actions: (functionCall.args as any).actions.map((a: any) => ({
                             action: a.action === 'CREATE' ? 'CREATE_TASK' : 
                                     a.action === 'UPDATE' ? 'UPDATE_TASK' : 'DELETE_TASK',
                             payload: {
