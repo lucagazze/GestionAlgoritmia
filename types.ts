@@ -24,6 +24,7 @@ export enum ProjectStatus {
   ACTIVE = 'ACTIVE', // Pagando mensualmente
   COMPLETED = 'COMPLETED', // Terminado (One-time)
   PAUSED = 'PAUSED', // Pausado
+  ARCHIVED = 'ARCHIVED' // ✅ NUEVO
 }
 
 export enum TaskStatus {
@@ -105,7 +106,7 @@ export interface Contractor {
   id: string;
   name: string;
   role: string;
-  monthlyRate: number; // Changed from hourlyRate
+  hourlyRate: number; // ✅ FIXED: Coincide con la DB (antes 'monthlyRate')
   email?: string;
   phone?: string; 
   status: 'ACTIVE' | 'INACTIVE';

@@ -593,17 +593,16 @@ export const db = {
 
   contractors: {
     getAll: async (): Promise<Contractor[]> => {
-      return handleResponse<Contractor>(supabase.from('Contractor').select('*').then(res => ({
-          ...res,
-          data: res.data?.map((c: any) => ({ ...c, monthlyRate: c.hourlyRate || 0 }))
-      })));
+      // ✅ FIXED: Retornamos los datos tal cual vienen de Supabase
+      return handleResponse<Contractor>(supabase.from('Contractor').select('*'));
     },
     create: async (data: Omit<Contractor, 'id' | 'created_at'>): Promise<Contractor> => {
-      const payload = { ...data, hourlyRate: data.monthlyRate };
-      const { data: created, error } = await supabase.from('Contractor').insert(payload).select().single();
+      // ✅ FIXED: Inserción directa sin mapeos confusos
+      const { data: created, error } = await supabase.from('Contractor').insert(data).select().single();
       if (error) throw error;
-      return { ...created, monthlyRate: created.hourlyRate };
+      return created;
     },
+
     delete: async (id: string): Promise<void> => {
       const { error } = await supabase.from('Contractor').delete().eq('id', id);
       if (error) throw error;

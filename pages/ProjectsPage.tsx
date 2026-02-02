@@ -38,7 +38,9 @@ export default function ProjectsPage() {
         db.projects.getAll(),
         db.contractors.getAll()
     ]);
-    const mappedProjects = projData.map(p => {
+    const mappedProjects = projData
+        .filter(p => p.status !== ProjectStatus.ARCHIVED) // ✅ Filter archived (Soft Delete)
+        .map(p => {
         const partner = contData.find(c => c.id === p.assignedPartnerId);
         return { ...p, partnerName: partner ? partner.name : undefined };
     });
@@ -81,8 +83,12 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async (id: string) => {
-      if(confirm('¿Eliminar proyecto y cliente?')) {
-          await db.projects.delete(id);
+      // Cambiamos el mensaje para que sea claro que se archiva
+      if(confirm('¿Archivar este proyecto? Desaparecerá de la lista activa.')) {
+          // ✅ Soft Delete: Actualizamos estado en vez de borrar
+          await db.projects.update(id, { status: ProjectStatus.ARCHIVED });
+          
+          // Actualizamos la lista local filtrando el archivado
           setProjects(prev => prev.filter(p => p.id !== id));
       }
   }

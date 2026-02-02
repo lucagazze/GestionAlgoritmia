@@ -20,6 +20,7 @@ import AutomationsPage from './pages/AutomationsPage';
 import { AIActionCenter } from './components/AIActionCenter';
 import { CommandPalette } from './components/CommandPalette';
 import { db } from './services/db';
+import { ToastProvider } from './components/Toast';
 
 const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: boolean, setIsOpen: (v: boolean) => void, darkMode: boolean, toggleDarkMode: () => void }) => {
   const location = useLocation();
@@ -228,7 +229,9 @@ const MainLayout = () => {
 export default function App() {
   return (
     <Router>
-      <MainLayout />
+      <ToastProvider>
+        <MainLayout />
+      </ToastProvider>
     </Router>
   );
 }
