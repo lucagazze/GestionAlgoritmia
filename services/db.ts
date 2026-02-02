@@ -366,9 +366,10 @@ export const db = {
       return created;
     },
     update: async (id: string, data: Partial<Project>): Promise<void> => {
+      let current: Project | null = null;
       // 📸 Create snapshot before update
       try {
-        const current = await db.projects.getById(id);
+        current = await db.projects.getById(id);
         if (current) {
           await db.audit.createSnapshot('PROJECT', id, 'UPDATE', current, data);
         }
@@ -378,6 +379,28 @@ export const db = {
       
       const { error } = await supabase.from('Client').update(data).eq('id', id);
       if (error) throw error;
+      
+      // 🧠 CEREBRO DE LA AGENCIA (NUEVO): Detectar cierre de proyecto
+      if (current && data.status === ProjectStatus.COMPLETED && current.status !== ProjectStatus.COMPLETED) {
+          console.log("⚡ Proyecto completado. Generando memoria post-mortem...");
+          // Ejecutar en segundo plano (no await) para no bloquear la UI
+          (async () => {
+              const { ai } = await import('./ai'); // Import dinámico
+              const notes = await db.clientNotes.getByClient(id);
+              const tasks = await db.tasks.getByProjectId(id);
+              
+              const summary = await ai.summarizeProject(current, notes, tasks);
+              
+              if (summary) {
+                  await db.documents.create(
+                      `🏆 PROYECTO FINALIZADO (${current.name}): ${summary}`,
+                      'PROJECT_LEARNING', // Tipo especial de memoria
+                      id
+                  );
+                  console.log("✅ Memoria guardada en el Cerebro.");
+              }
+          })();
+      }
       
       // Trigger Automation Engine (STATUS_CHANGE)
       if (data.status) {
@@ -416,6 +439,11 @@ export const db = {
       const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').eq('id', id).maybeSingle();
       if (error) { console.error('Supabase Error (Task getById):', error); return null; }
       return data as Task | null;
+    },
+    getByProjectId: async (projectId: string): Promise<Task[]> => {
+        const { data, error } = await supabase.from('Task').select('*').eq('projectId', projectId);
+        if (error) { console.error('Tasks by Project Error', error); return []; }
+        return data as Task[];
     },
     create: async (data: Partial<Task>): Promise<Task> => {
       const { data: created, error } = await supabase.from('Task').insert(data).select().single();

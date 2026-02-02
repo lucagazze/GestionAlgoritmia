@@ -104,6 +104,117 @@ export const ai = {
       }
   },
 
+  /**
+   * Genera un análisis Post-Mortem de un proyecto cerrado para la Base de Conocimiento
+   */
+  summarizeProject: async (projectData: any, notes: any[], tasks: any[]) => {
+      try {
+          const client = await getClient();
+          const prompt = `
+            Actúa como un Consultor de Operaciones Senior. Analiza este proyecto finalizado de la agencia y genera un "Resumen de Aprendizaje" conciso para nuestra base de conocimiento.
+            
+            DATOS DEL PROYECTO:
+            - Cliente: ${projectData.name} (${projectData.industry})
+            - Revenue: $${projectData.monthlyRevenue}
+            - Duración: ${projectData.createdAt} a HOY
+            
+            HISTORIAL:
+            - Notas clave: ${notes.map(n => n.content).join(' | ').slice(0, 1000)}
+            - Tareas completadas: ${tasks.filter(t => t.status === 'DONE').map(t => t.title).join(', ').slice(0, 1000)}
+
+            SALIDA REQUERIDA (Texto plano, sin markdown excesivo):
+            Genera un párrafo denso que explique:
+            1. Qué hicimos (el servicio).
+            2. Qué desafío tenía el cliente.
+            3. Cómo lo resolvimos (estrategia).
+            4. Lecciones aprendidas o datos clave para futuros proyectos similares.
+          `;
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+
+          return response.text || null;
+      } catch (error) {
+          console.error("Project Summary Error:", error);
+          return null;
+      }
+  },
+
+  /**
+   * RAG Helper: Encuentra contexto relevante
+   */
+  retrieveContext: async (query: string) => {
+      try {
+          // 1. Convertimos la consulta del usuario a Vector
+          const vector = await ai.embed(query);
+          if (!vector) return "";
+
+          // 2. Buscamos en la DB (requiere que db.documents.search esté implementado como vimos antes)
+          // Importamos db dinámicamente para evitar ciclos si es necesario, o úsala directo si no da error.
+          const { db } = await import('./db'); 
+          const memories = await db.documents.search(vector, 0.6, 3); // Umbral 0.6, top 3 resultados
+
+          if (!memories || memories.length === 0) return "";
+
+          return memories.map((m: any) => `[CASO SIMILAR/MEMORIA]: ${m.content}`).join('\n\n');
+      } catch (error) {
+          console.error("RAG Retrieval Error:", error);
+          return "";
+      }
+  },
+
+  /**
+   * Sales Coach Agent
+   */
+  salesCoach: async (mode: 'SCRIPT' | 'ANALYSIS', payload: any) => {
+      try {
+          const client = await getClient();
+          let prompt = "";
+
+          if (mode === 'SCRIPT') {
+              prompt = `
+              ACTÚA COMO: Un Director Comercial de Elite y Copywriter Persuasivo (Estilo Alex Hormozi / Russell Brunson).
+              
+              OBJETIVO: Generar un guión de ventas para "${payload.clientName}" (${payload.industry}).
+              CONTEXTO: ${payload.context}
+              META: ${payload.goal}
+              
+              INSTRUCCIONES:
+              1. Escribe UN solo mensaje/guión listo para enviar.
+              2. Usa un tono profesional pero directo y persuasivo.
+              3. Si es un email, incluye "ASUNTO:".
+              4. Enfócate en el VALOR para el cliente, no en lo que vendemos.
+              `;
+          } else {
+              prompt = `
+              ACTÚA COMO: Un Experto en Negociación y Psicología de Ventas (Chris Voss).
+              
+              OBJETIVO: Analizar esta interacción y decirme qué responder.
+              CLIENTE: ${payload.clientName}
+              ÚLTIMO MENSAJE: "${payload.lastMessage}"
+              HISTORIAL: ${payload.history}
+              
+              TU TAREA:
+              1. Analiza la psicología detrás de lo que dijo el cliente (¿Es objeción real? ¿Es duda? ¿Es táctica?).
+              2. Dame los 'Bullet Points' de una respuesta ganadora.
+              3. Escribe la respuesta exacta sugerida.
+              `;
+          }
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+
+          return response.text;
+      } catch (error) {
+          console.error("Sales Coach Error:", error);
+          return null;
+      }
+  },
+
   agent: async (
       userInput: string | { mimeType: string; data: string },
       contextHistory: any[] = [],

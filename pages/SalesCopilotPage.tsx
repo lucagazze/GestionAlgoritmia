@@ -35,6 +35,7 @@ export default function SalesCopilotPage() {
   const [analysisResult, setAnalysisResult] = useState('');
   
   const [loading, setLoading] = useState(false);
+  const [useBrain, setUseBrain] = useState(true); // ✅ Nuevo Toggle
 
   useEffect(() => {
     const load = async () => {
@@ -57,12 +58,24 @@ export default function SalesCopilotPage() {
   const handleGenerate = async () => {
       setLoading(true);
       try {
+          let memoryContext = "";
+          
+          // 🧠 RAG: Consultar al Cerebro si está activo
+          if (useBrain && scriptGoal) {
+              // Buscamos memorias relacionadas con el objetivo (ej: "Vender web inmobiliaria")
+              const retrieved = await ai.retrieveContext(`${scriptGoal} ${getClientIndustry()}`);
+              if (retrieved) {
+                  memoryContext = `\n\nUSAR ESTAS LECCIONES APRENDIDAS DE LA AGENCIA:\n${retrieved}`;
+              }
+          }
+
           const result = await ai.salesCoach('SCRIPT', {
-              context: scriptContext,
+              context: scriptContext + memoryContext, // Inyectamos la memoria aquí
               goal: scriptGoal,
               clientName: getClientName(),
               industry: getClientIndustry()
           });
+          
           setGeneratedScript(result || "No se pudo generar.");
       } catch (e) {
           console.error(e);
@@ -173,6 +186,19 @@ export default function SalesCopilotPage() {
                                         onChange={(e) => setScriptGoal(e.target.value)}
                                       />
                                   </div>
+                              </div>
+                              <div className="flex items-center gap-2 mb-4">
+                                  <input 
+                                      type="checkbox" 
+                                      id="useBrain" 
+                                      checked={useBrain} 
+                                      onChange={e => setUseBrain(e.target.checked)}
+                                      className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                                  />
+                                  <label htmlFor="useBrain" className="text-sm text-gray-700 flex items-center gap-1 cursor-pointer select-none">
+                                      <BrainCircuit className="w-4 h-4 text-purple-600" /> 
+                                      Consultar "El Cerebro de la Agencia" (Casos pasados y Lecciones)
+                                  </label>
                               </div>
                               <Button onClick={handleGenerate} disabled={loading || !scriptContext} className="w-full h-12 text-base shadow-xl shadow-indigo-500/10 bg-indigo-600 hover:bg-indigo-700 text-white border-transparent">
                                   {loading ? <Loader2 className="animate-spin" /> : <><Sparkles className="w-5 h-5 mr-2" /> Generar Estrategia Maestra</>}
