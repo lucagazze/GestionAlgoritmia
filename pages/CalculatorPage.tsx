@@ -119,38 +119,12 @@ export default function CalculatorPage() {
     return grouped;
   }, [services]);
 
-  const calculations = useMemo(() => {
-    const selected = services.filter(s => selectedServiceIds.includes(s.id)).map(s => ({
-        ...s,
-        description: getServiceDescription(s) // Override description for calculation context
-    }));
-    
-    let totalOutsourcingOneTime = 0;
-    let totalOutsourcingRecurring = 0;
 
-    selected.forEach(s => {
-        const outCost = outsourcingCosts[s.id] || 0;
-        if (s.type === ServiceType.ONE_TIME) totalOutsourcingOneTime += outCost;
-        else totalOutsourcingRecurring += outCost;
-    });
-
-    const oneTimeTotal = selected.filter(s => s.type === ServiceType.ONE_TIME).reduce((acc, s) => acc + getSellingPrice(s), 0);
-    const recurringTotal = selected.filter(s => s.type === ServiceType.RECURRING).reduce((acc, s) => acc + getSellingPrice(s), 0);
-
-    const setupFee = oneTimeTotal;
-    const monthlyFee = recurringTotal;
-    const contractValue = setupFee + (monthlyFee * contractVars.duration);
-    
-    const totalOutsourcingCost = totalOutsourcingOneTime + (totalOutsourcingRecurring * contractVars.duration);
-    
-    const profit = contractValue - totalOutsourcingCost; 
-    
-    return { selected, setupFee, monthlyFee, contractValue, profit, totalOutsourcingCost };
   const calculations = useMemo(() => {
     const selected = services.filter(s => selectedServiceIds.includes(s.id)).map(s => ({
         ...s,
         description: getServiceDescription(s), // Override description for calculation context
-        type: getServiceType(s) // Override type for calculation context
+        type: getServiceType(s) as ServiceType // Override type for calculation context
     }));
     
     let totalOutsourcingOneTime = 0;
@@ -835,9 +809,9 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                                   const pid = e.target.value;
                                                                   const partner = contractors.find(c => c.id === pid);
                                                                   setAssignedContractors({...assignedContractors, [s.id]: pid});
-                                                                  // Auto-fill outsourcing cost based on partner's monthly rate
-                                                                  if (partner && partner.monthlyRate > 0) {
-                                                                      setOutsourcingCosts(prev => ({...prev, [s.id]: partner.monthlyRate}));
+                                                                  // Auto-fill outsourcing cost based on partner's hourly rate
+                                                                  if (partner && partner.hourlyRate > 0) {
+                                                                      setOutsourcingCosts(prev => ({...prev, [s.id]: partner.hourlyRate}));
                                                                   }
                                                               }}
                                                             >
