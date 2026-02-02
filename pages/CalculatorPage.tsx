@@ -801,6 +801,17 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                             <input type="number" className="w-20 text-right text-xs bg-gray-50 dark:bg-slate-900 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white" 
                                                                    value={getSellingPrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
                                                         </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <label className="text-[10px] text-gray-500 font-bold uppercase">Tipo de Cobro</label>
+                                                            <select 
+                                                                className="text-xs bg-gray-50 dark:bg-slate-900 rounded px-2 py-1 font-medium outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                                                                value={getServiceType(s)}
+                                                                onChange={e => setCustomTypes({...customTypes, [s.id]: e.target.value as 'ONE_TIME' | 'RECURRING'})}
+                                                            >
+                                                                <option value="ONE_TIME">Único</option>
+                                                                <option value="RECURRING">Mensual</option>
+                                                            </select>
+                                                        </div>
                                                         <div className="flex justify-between items-center bg-gray-50 dark:bg-slate-800 p-1.5 rounded-lg">
                                                             <select 
                                                               className="text-[10px] bg-transparent outline-none w-24 font-medium dark:text-white" 
