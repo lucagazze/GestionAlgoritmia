@@ -620,9 +620,16 @@ export const db = {
   },
 
   contractors: {
-    getAll: async (): Promise<Contractor[]> => {
-      // ✅ FIXED: Retornamos los datos tal cual vienen de Supabase
+    getAll: async () => {
       return handleResponse<Contractor>(supabase.from('Contractor').select('*'));
+    },
+    getById: async (id: string): Promise<Contractor | null> => {
+      const { data, error } = await supabase.from('Contractor').select('*').eq('id', id).maybeSingle();
+      if (error) {
+        console.error('Error fetching contractor:', error);
+        return null;
+      }
+      return data;
     },
     create: async (data: Omit<Contractor, 'id' | 'created_at'>): Promise<Contractor> => {
       // ✅ FIXED: Inserción directa sin mapeos confusos
@@ -630,11 +637,14 @@ export const db = {
       if (error) throw error;
       return created;
     },
-
-    delete: async (id: string): Promise<void> => {
-      const { error } = await supabase.from('Contractor').delete().eq('id', id);
+    update: async (id: string, data: Partial<Contractor>): Promise<void> => {
+      const { error } = await supabase.from('Contractor').update(data).eq('id', id);
       if (error) throw error;
     },
+    delete: async (id: string) => {
+      const { error } = await supabase.from('Contractor').delete().eq('id', id);
+      if (error) throw error;
+    }
   },
 
   // --- AUDIT LOG (Transactional Undo) ---

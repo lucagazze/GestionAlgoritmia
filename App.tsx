@@ -9,6 +9,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage';
 import TasksPage from './pages/TasksPage';
 import DashboardPage from './pages/DashboardPage';
 import PartnersPage from './pages/PartnersPage';
+import ContractorDetailPage from './pages/ContractorDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import SalesCopilotPage from './pages/SalesCopilotPage';
 import LabPage from './pages/LabPage';
@@ -201,6 +202,7 @@ const MainLayout = () => {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/partners" element={<PartnersPage />} />
+              <Route path="/partners/:id" element={<ContractorDetailPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/settings" element={<SettingsPage />} />

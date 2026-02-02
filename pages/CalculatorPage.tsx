@@ -355,7 +355,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       try {
           const serviceName = services.find(s => s.id === serviceId)?.name || 'este servicio';
           const prompt = `
-          Actúa como Copywriter de Agencia Experto.
+          Actúa como Project Manager Técnico de Agencia.
           
           CONTEXTO DEL CLIENTE:
           - Empresa: ${clientInfo.name}
@@ -367,16 +367,21 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
           Descripción Base: "${currentDesc}"
           
           TAREA:
-          Reescribe la descripción enfocándote en:
-          1. QUÉ hacemos específicamente en este servicio
-          2. CÓMO lo enfocamos para resolver el problema del cliente
-          3. El VALOR tangible que entregamos
+          Reescribe la descripción siendo MUY ESPECÍFICO sobre QUÉ vamos a entregar técnicamente.
+          Enfócate en:
+          1. Los ENTREGABLES concretos (ej: "Landing page responsive", "Sistema de reservas online")
+          2. CARACTERÍSTICAS técnicas clave (ej: "Adaptado a móvil", "Optimizado para velocidad")
+          3. Lo que el cliente VA A RECIBIR físicamente
           
-          REQUISITOS:
-          - Máximo 35 palabras
-          - Tono profesional y orientado a resultados
-          - Sin emojis ni jerga técnica innecesaria
-          - Enfócate en beneficios, no en características
+          ESTILO:
+          - Claro y directo, como una lista de trabajo
+          - Evita lenguaje de marketing o persuasivo
+          - Usa términos técnicos cuando sea apropiado
+          - Máximo 15 palabras
+          - Sin emojis
+          
+          EJEMPLO BUENO: "Landing page responsive. Formulario de contacto. Optimización SEO básica."
+          EJEMPLO MALO: "Creamos páginas que consolidan tu autoridad y atraen clientes de alto valor eliminando la dependencia..."
           `;
           const res = await ai.chat([{ role: 'user', content: prompt }]);
           if (res) {
@@ -472,7 +477,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
            doc.line(14, yPos, 194, yPos);
            yPos += 5;
 
-           // Transformation Grid
+           // Transformation Grid (Without Arrow)
            if (clientInfo.currentSituation && clientInfo.objective) {
                 // Situation (Left)
                 doc.setFontSize(8);
@@ -481,13 +486,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                 
                 doc.setFontSize(9);
                 doc.setTextColor(80);
-                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", 80); // Ensure string
+                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", 80);
                 doc.text(splitSit, 14, yPos + 5);
-                
-                // Arrow Icon (Clean ASCII)
-                doc.setFontSize(14);
-                doc.setTextColor(200);
-                doc.text("->", 100, yPos + 10); // Changed from special char to ASCII to prevent artifacts
 
                 // Objective (Right)
                 doc.setFontSize(8);
@@ -497,10 +497,10 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                 doc.setFontSize(9);
                 doc.setTextColor(0);
                 doc.setFont("helvetica", "bold");
-                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", 80); // Ensure string
+                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", 80);
                 doc.text(splitObj, 110, yPos + 5);
                 
-                yPos += Math.max(splitSit.length, splitObj.length) * 5 + 15;
+                yPos += Math.max(splitSit.length, splitObj.length) * 5 + 10;
            }
 
            /*
@@ -525,8 +525,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
               fontSize: 9, 
               cellPadding: 4,
               overflow: 'linebreak',
-              valign: 'middle',
-              textColor: [80, 80, 80] // Default to Dark Gray (for description)
+              valign: 'top',
+              textColor: [100, 100, 100] // Gray for description
           },
           headStyles: { 
               fillColor: [0, 0, 0], 
@@ -535,48 +535,46 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
               cellPadding: 4
           },
           columnStyles: { 
-              0: { cellWidth: 110, fontStyle: 'normal' }, // Normal font for description
+              0: { cellWidth: 110 },
               2: { halign: 'right', fontStyle: 'bold', textColor: [0,0,0] } 
           },
           theme: 'grid',
-          // Hook to bold the first line (Title)
+          // Modify cell content before drawing to style service name differently
+          willDrawCell: function(data: any) {
+              if (data.section === 'body' && data.column.index === 0) {
+                  const text = data.cell.text;
+                  if (text && text.length > 0) {
+                      // Clear the cell text - we'll draw it manually
+                      data.cell.text = [];
+                  }
+              }
+          },
+          // Draw service name in bold black and description in gray
           didDrawCell: function(data: any) {
               if (data.section === 'body' && data.column.index === 0) {
-                  const doc = data.doc;
-                  const text = data.cell.text; // Array of lines
-                  if (text && text.length > 0) {
-                      const title = text[0];
-                      // Re-draw the title line in Black Bold
-                      doc.setFont("helvetica", "bold");
-                      doc.setTextColor(0, 0, 0);
+                  const rawText = data.row.raw[0]; // Get original text
+                  if (rawText) {
+                      const lines = rawText.split('\n');
+                      const serviceName = lines[0];
+                      const description = lines.slice(1).join('\n');
                       
-                      // Calculate Y position similar to how autotable does it
-                      // data.cell.y is top of cell. textPos.y is approximate baseline of first line?
-                      // We can use data.cell.textPos if available, or calculate using padding.
-                      // Standard autotable padding is top/bottom.
                       const x = data.cell.x + data.cell.padding('left');
-                      const y = data.cell.y + data.cell.padding('top') + doc.internal.getLineHeight(); // Approx baseline
+                      let y = data.cell.y + data.cell.padding('top') + 3;
                       
-                      // Actually, let's just guess slightly. 
-                      // Or better: Just Uppercase it in data to be safe and avoid alignment glitches?
-                      // No, let's try just drawing bold over it.
-                      // Adjust Y: doc.text baseline is bottom-left.
-                      // Autotable uses: y + padding + lineHeight * factor.
-                      const fontSize = data.cell.styles.fontSize;
-                      doc.setFontSize(fontSize);
+                      // Draw service name in bold black
+                      data.doc.setFont("helvetica", "bold");
+                      data.doc.setTextColor(0, 0, 0);
+                      data.doc.setFontSize(9);
+                      data.doc.text(serviceName, x, y);
                       
-                      // A safer way to align is difficult without specific metrics. 
-                      // Let's try drawing it and if it blurs, we switch to Uppercase strategy.
-                      // Actually, let's just use Uppercase + darker gray for everything for now to be safe.
-                      // The user said "color mas clarito" for description.
-                      // If I make everything Bold Black, description is wrong.
-                      // If I make everything Gray Normal, Name is weak.
-                      
-                      // Let's rely on the "Overwrite" with exact coordinates from `data.cursor`? No.
-                      
-                      // Alternate Plan: Use the single cell, but just Format the string UPPERCASE for name. 
-                      // And keep the color Dark Gray [40, 40, 40].
-                      // It will look clean.
+                      // Draw description in gray normal
+                      if (description) {
+                          y += 4; // Line spacing
+                          data.doc.setFont("helvetica", "normal");
+                          data.doc.setTextColor(100, 100, 100);
+                          const descLines = data.doc.splitTextToSize(description, data.cell.width - data.cell.padding('left') - data.cell.padding('right'));
+                          data.doc.text(descLines, x, y);
+                      }
                   }
               }
           }

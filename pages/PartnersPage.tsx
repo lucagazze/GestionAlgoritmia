@@ -1,12 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Contractor, Project, ProjectStatus, Task, TaskStatus } from '../types';
 import { Button, Input, Label, Badge, Modal, Card } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
-import { Users, Plus, Trash2, Mail, DollarSign, Search, Edit2, Phone, Briefcase, ChevronRight, Wallet } from 'lucide-react';
+import { Users, Plus, Trash2, Mail, DollarSign, Search, Edit2, Phone, Briefcase, ChevronRight, Wallet, Eye } from 'lucide-react';
 
 export default function PartnersPage() {
+  const navigate = useNavigate();
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -17,7 +19,7 @@ export default function PartnersPage() {
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; contractor: Contractor | null }>({ x: 0, y: 0, contractor: null });
 
-  const [formData, setFormData] = useState({ name: '', role: '', monthlyRate: '', email: '', phone: '' });
+  const [formData, setFormData] = useState({ name: '', role: '', hourlyRate: '', email: '', phone: '' });
 
   useEffect(() => { loadData(); }, []);
 
@@ -40,13 +42,13 @@ export default function PartnersPage() {
     await db.contractors.create({ 
         name: formData.name, 
         role: formData.role, 
-        monthlyRate: parseFloat(formData.monthlyRate) || 0, 
+        hourlyRate: parseFloat(formData.hourlyRate) || 0, 
         email: formData.email, 
         phone: formData.phone,
         status: 'ACTIVE' 
     });
     setIsModalOpen(false);
-    setFormData({ name: '', role: '', monthlyRate: '', email: '', phone: '' });
+    setFormData({ name: '', role: '', hourlyRate: '', email: '', phone: '' });
     loadData();
   };
 
@@ -122,7 +124,7 @@ export default function PartnersPage() {
                               const loadColor = loadPercentage > 80 ? 'bg-red-500' : loadPercentage > 50 ? 'bg-yellow-500' : 'bg-green-500';
 
                               return (
-                                  <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer">
+                                  <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} onClick={() => navigate(`/partners/${c.id}`)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer">
                                       <td className="px-6 py-4">
                                           <div className="flex items-center gap-3">
                                               <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 flex items-center justify-center font-bold text-sm">{c.name.charAt(0)}</div>
@@ -145,10 +147,27 @@ export default function PartnersPage() {
                                           <span className={`font-mono font-bold ${monthlyPayout > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
                                               ${monthlyPayout.toLocaleString()}
                                           </span>
-                                          <div className="text-[10px] text-gray-400 mt-0.5">Tarifa ref: ${c.monthlyRate}/mes</div>
+                                          <div className="text-[10px] text-gray-400 mt-0.5">Tarifa ref: ${c.hourlyRate}/mes</div>
                                       </td>
                                       <td className="px-6 py-4 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
-                                      <td className="px-6 py-4 text-center"><button onClick={() => handleDelete(c.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button></td>
+                                      <td className="px-6 py-4 text-center">
+                                          <div className="flex items-center justify-center gap-2">
+                                              <button 
+                                                  onClick={(e) => { e.stopPropagation(); navigate(`/partners/${c.id}`); }} 
+                                                  className="text-blue-600 hover:text-blue-800 transition-colors p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                                                  title="Ver Perfil"
+                                              >
+                                                  <Eye className="w-4 h-4" />
+                                              </button>
+                                              <button 
+                                                  onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} 
+                                                  className="text-gray-300 hover:text-red-500 transition-colors p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                                  title="Eliminar"
+                                              >
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      </td>
                                   </tr>
                               )
                           })
@@ -169,7 +188,7 @@ export default function PartnersPage() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Registrar Socio">
         <form onSubmit={handleCreate} className="space-y-4">
           <div><Label>Nombre Completo</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Ej: Juan Pérez" autoFocus /></div>
-          <div className="grid grid-cols-2 gap-4"><div><Label>Rol</Label><Input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} /></div><div><Label>Fee Mensual Referencia</Label><Input type="number" value={formData.monthlyRate} onChange={e => setFormData({...formData, monthlyRate: e.target.value})} placeholder="$ Fijo" /></div></div>
+          <div className="grid grid-cols-2 gap-4"><div><Label>Rol</Label><Input value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} /></div><div><Label>Tarifa Mensual</Label><Input type="number" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} placeholder="$ Mensual" /></div></div>
           
           <div className="grid grid-cols-2 gap-4">
             <div><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
