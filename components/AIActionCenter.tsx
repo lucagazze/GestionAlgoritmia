@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { ai } from '../services/ai';
 import { db } from '../services/db';
+import { useWakeWord } from '../hooks/useWakeWord';
+import { sounds } from '../services/sounds';
 import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
 import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform, ExternalLink, Info } from 'lucide-react';
 import { ActionDetailsModal } from './ActionDetailsModal';
@@ -121,6 +123,7 @@ export const AIActionCenter = () => {
     // Audio Recording State
     const [isRecording, setIsRecording] = useState(false);
     const [isTranscribing, setIsTranscribing] = useState(false);
+    const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
 
@@ -190,6 +193,19 @@ export const AIActionCenter = () => {
         };
         checkContext();
     }, [location.pathname]);
+
+    // --- Wake Word Integration ---
+    // --- Wake Word Integration ---
+    const handleJarvisWake = () => {
+        console.log("⚡ JARVIS WAKE TRIGGERED");
+        sounds.listening();
+        setIsOpen(true); // Force open immediately
+        setTimeout(() => {
+            startRecording();
+        }, 300); // Small delay to allow sound to play and UI to open
+    };
+
+    useWakeWord(wakeWordEnabled && !isRecording, handleJarvisWake);
 
     // --- Initial Load ---
     useEffect(() => { loadSessions(); }, [isOpen]);
@@ -746,6 +762,15 @@ export const AIActionCenter = () => {
     return (
         <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[800px] bottom-6`}>
             <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[75vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
+                 
+                 {/* Wake Word Indicator */}
+                 {wakeWordEnabled && !isRecording && !isOpen && (
+                     <div className="absolute -top-10 right-0 text-[10px] text-gray-400 flex items-center gap-1 animate-pulse bg-white/80 px-2 py-1 rounded-full border border-gray-100 shadow-sm backdrop-blur-sm">
+                         <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                         Jarvis
+                     </div>
+                 )}
+
                  <div className="flex justify-between items-center p-3 border-b border-gray-100 bg-gray-50/80 flex-shrink-0">
                     <div className="flex items-center gap-2">
                         {viewMode === 'CHAT' && <button onClick={() => setViewMode('HISTORY')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><History className="w-4 h-4" /></button>}

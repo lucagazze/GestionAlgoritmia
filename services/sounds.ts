@@ -36,6 +36,10 @@ export const sounds = {
     pop: () => {
         playTone(600, 'sine', 0.05);
     },
+    listening: () => {
+        playTone(400, 'sine', 0.1);
+        setTimeout(() => playTone(600, 'sine', 0.2), 100);
+    },
     scan: () => {
         // High tech scanning sound simulation
         let i = 0;
