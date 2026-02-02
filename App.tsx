@@ -91,10 +91,10 @@ const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: bool
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-20 flex items-center px-8 border-b border-gray-100 dark:border-slate-800">
-          <div className="w-8 h-8 bg-black dark:bg-white rounded-lg mr-3 flex items-center justify-center text-white dark:text-black font-bold tracking-tighter">AL</div>
+<img src="/logo.png" alt="Algoritmia Logo" className="w-8 h-8 mr-3 object-contain" />
           <div>
             <span className="font-bold text-lg tracking-tight block leading-none text-gray-900 dark:text-white">Algoritmia</span>
-            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Agency OS 3.1</span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">2026</span>
           </div>
           <button className="ml-auto md:hidden text-gray-500 dark:text-gray-400 p-1 hover:bg-gray-200 rounded-md" onClick={() => setIsOpen(false)}>
             <X className="w-5 h-5" />
