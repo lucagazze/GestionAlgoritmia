@@ -617,14 +617,15 @@ export const AIActionCenter = () => {
                         5 // max iterations
                     );
                     
-                    // Show thinking process
+                    // Show thinking process condensed
                     if (result.iterations.length > 0) {
                         const thinkingSteps = result.iterations.map((iter, idx) => 
                             `**Paso ${idx + 1}**: ${iter.thought}\n${iter.observation ? `→ ${iter.observation}` : ''}`
                         ).join('\n\n');
                         
+                        // Use a collapsible details block for reasoning to save space
                         await db.chat.addMessage(sessionId, 'assistant', 
-                            `🤔 **Proceso de pensamiento:**\n\n${thinkingSteps}\n\n---\n\n${result.message}`
+                            `<details><summary>🤔 Proceso de pensamiento (${result.iterations.length} pasos)</summary>\n\n${thinkingSteps}\n</details>\n\n${result.message}`
                         );
                     } else {
                         await db.chat.addMessage(sessionId, 'assistant', result.message);
@@ -743,7 +744,7 @@ export const AIActionCenter = () => {
     };
 
     return (
-        <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[600px] bottom-6`}>
+        <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[800px] bottom-6`}>
             <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[75vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
                  <div className="flex justify-between items-center p-3 border-b border-gray-100 bg-gray-50/80 flex-shrink-0">
                     <div className="flex items-center gap-2">
@@ -795,8 +796,8 @@ export const AIActionCenter = () => {
                              }
                              
                              return (
-                             <div key={msg.id || idx} className={`flex flex-col max-w-[95%] md:max-w-[90%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
-                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
+                                <div key={msg.id || idx} className={`flex flex-col max-w-[95%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm break-words overflow-visible ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
                                      <MessageRenderer 
                                          content={msg.content} 
                                          role={msg.role} 

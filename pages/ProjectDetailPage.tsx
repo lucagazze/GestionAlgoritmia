@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
@@ -9,7 +8,8 @@ import { Badge, Button, Input, Label, Textarea, Card, Slider, Modal } from '../c
 import { 
   ArrowLeft, Mic2, ListTodo, Plus, Trash2, ExternalLink, Copy, 
   Sparkles, Globe, Loader2, Save,
-  CheckCircle2, User, Wallet, Palette, FileText, UploadCloud, MessageSquare, Send
+  CheckCircle2, User, Wallet, Palette, FileText, UploadCloud, MessageSquare, Send, BarChart3,
+  Phone, Briefcase, TrendingUp, Clock, MapPin, Building
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 
@@ -21,7 +21,7 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ENTREGAS' | 'PORTAL' | 'FINANCE' | 'MEETINGS' | 'HISTORY'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ACTION_PLAN' | 'HISTORY'>('PROFILE');
 
   const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
   const [clientTasks, setClientTasks] = useState<Task[]>([]);
@@ -51,7 +51,7 @@ export default function ProjectDetailPage() {
   ];
 
   useEffect(() => {
-      if (id) loadProject();
+      if (id) loadProject().catch(err => console.error("Failed to load project:", err));
   }, [id]);
 
   useEffect(() => {
@@ -144,6 +144,28 @@ export default function ProjectDetailPage() {
       } catch (e) { console.error(e); alert("Error procesando IA."); } finally { setIsProcessingMeeting(false); }
   };
 
+  const handleQuickAction = async (type: 'CALL' | 'INFO' | 'MEETING') => {
+      if (!id) return;
+      const contentMap = {
+          'CALL': '📞 Hablé con el cliente recientemente.',
+          'INFO': '📩 Envié información relevante al cliente.',
+          'MEETING': '🤝 Tuvimos una reunión de seguimiento.'
+      };
+      await db.clientNotes.create({ 
+          clientId: id, 
+          type: type as any, 
+          content: contentMap[type] 
+      });
+      loadProject();
+  };
+
+  const handleAddProgress = async () => {
+      const text = prompt("Describe el avance (ej: 'Vendió 10 puertas esta semana'):");
+      if (!text || !id) return;
+      await db.clientNotes.create({ clientId: id, type: 'PROGRESS', content: text });
+      loadProject();
+  };
+
   const applyColorPreset = (colors: string[]) => {
       setFormData({...formData, brandColors: colors});
   };
@@ -176,22 +198,26 @@ export default function ProjectDetailPage() {
             <div className="flex gap-1 mb-8 overflow-x-auto no-scrollbar pb-1">
                 {[
                     { id: 'PROFILE', label: 'Perfil', icon: User },
-                    { id: 'ENTREGAS', label: 'Entregables', icon: UploadCloud },
-                    { id: 'PORTAL', label: 'Chat Portal', icon: MessageSquare },
-                    { id: 'FINANCE', label: 'Rentabilidad', icon: Wallet },
-                    { id: 'MEETINGS', label: 'Bitácora IA', icon: Mic2 },
+                    { id: 'ACTION_PLAN', label: 'Plan de Acción', icon: TrendingUp },
                     { id: 'HISTORY', label: 'Historial', icon: ListTodo },
                 ].map(tab => {
                     const Icon = tab.icon;
                     return (
                         <button 
-                            key={tab.id} 
+                            key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${activeTab === tab.id ? 'bg-black dark:bg-white text-white dark:text-black shadow-md' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-100 dark:border-slate-700'}`}
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all
+                                ${activeTab === tab.id 
+                                    ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/10 dark:shadow-white/10' 
+                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800'
+                                }
+                            `}
                         >
-                            <Icon className="w-4 h-4" /> {tab.label}
+                            <Icon className="w-4 h-4" />
+                            {tab.label}
                         </button>
-                    )
+                    );
                 })}
             </div>
 
@@ -200,227 +226,292 @@ export default function ProjectDetailPage() {
                 
                 {/* PROFILE TAB */}
                 {activeTab === 'PROFILE' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in">
-                        <div className="space-y-6">
-                            <Card className="p-6 space-y-4">
-                                <h3 className="font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-2">Datos Principales</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><Label>Nombre</Label><Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
-                                    <div><Label>Rubro</Label><Input value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} /></div>
-                                    <div>
-                                        <Label>Fee Mensual ($)</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
-                                            <Input type="number" className="pl-6 font-mono" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})} />
+                    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
+                        
+                        {/* 1. HERO / IDENTITY */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="md:col-span-2">
+                                <Card className="h-full p-8 border-none shadow-xl bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-800/50 rounded-3xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-32 bg-blue-500/5 dark:bg-blue-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                                    <div className="relative z-10 space-y-6">
+                                        <div>
+                                            <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Cliente / Proyecto</Label>
+                                            <Input 
+                                                className="text-3xl md:text-4xl font-black bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 mt-2 text-gray-900 dark:text-white placeholder:text-gray-200" 
+                                                value={formData.name} 
+                                                onChange={e => setFormData({...formData, name: e.target.value})} 
+                                                placeholder="Nombre del Cliente" 
+                                            />
                                         </div>
-                                    </div>
-                                    <div><Label>Día de Cobro</Label><Input type="number" value={formData.billingDay} onChange={e => setFormData({...formData, billingDay: parseInt(e.target.value)})} /></div>
-                                </div>
-                            </Card>
-
-                            <Card className="p-6 space-y-4">
-                                <h3 className="font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-2 flex items-center gap-2"><Palette className="w-4 h-4"/> Brand Kit</h3>
-                                <div className="space-y-2">
-                                    <Label>Colores de Marca</Label>
-                                    <div className="flex gap-2 flex-wrap mb-2">
-                                        {formData.brandColors?.map((c, i) => (
-                                            <div key={i} className="w-10 h-10 rounded-full border shadow-sm cursor-pointer transition-transform hover:scale-110" style={{backgroundColor: c}} title={c} onClick={() => {if(confirm("Borrar color?")){const n=[...formData.brandColors!]; n.splice(i,1); setFormData({...formData, brandColors: n})}}}></div>
-                                        ))}
-                                        <input type="color" className="w-10 h-10 rounded-full overflow-hidden p-0 border-0 cursor-pointer" onChange={e => setFormData({...formData, brandColors: [...(formData.brandColors||[]), e.target.value]})} />
-                                    </div>
-                                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                                        {BRAND_COLORS_PRESETS.map((preset, i) => (
-                                            <button key={i} onClick={() => applyColorPreset(preset)} className="flex gap-0.5 border p-1 rounded hover:bg-gray-50 dark:hover:bg-slate-800">
-                                                {preset.map(c => <div key={c} className="w-3 h-3 rounded-full" style={{backgroundColor: c}}></div>)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-
-                        <div className="space-y-6">
-                            <Card className="p-6 space-y-4 h-full">
-                                <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-2">
-                                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> Recursos (The Vault)</h3>
-                                    <button onClick={() => setFormData({...formData, resources: [...(formData.resources||[]), {id: Date.now().toString(), name: 'Nuevo Link', url: '', type: 'OTHER'}]})} className="text-xs bg-black dark:bg-white text-white dark:text-black px-2 py-1 rounded flex items-center"><Plus className="w-3 h-3 mr-1"/> Agregar</button>
-                                </div>
-                                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
-                                    {formData.resources?.length === 0 && <p className="text-gray-400 text-xs italic">Sin recursos guardados.</p>}
-                                    {formData.resources?.map((r, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 p-2 rounded-lg border border-gray-100 dark:border-slate-700 group">
-                                            <div className="p-2 bg-white dark:bg-slate-900 rounded shadow-sm"><Globe className="w-4 h-4 text-gray-400"/></div>
-                                            <div className="flex-1">
-                                                <input className="text-xs font-bold bg-transparent border-none w-full focus:ring-0 p-0 text-gray-900 dark:text-white" value={r.name} onChange={e => {const n=[...formData.resources!]; n[idx].name=e.target.value; setFormData({...formData, resources:n})}} />
-                                                <input className="text-[10px] text-blue-500 bg-transparent border-none w-full focus:ring-0 p-0" value={r.url} placeholder="https://..." onChange={e => {const n=[...formData.resources!]; n[idx].url=e.target.value; setFormData({...formData, resources:n})}} />
+                                        <div>
+                                            <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Industria</Label>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <Building className="w-5 h-5 text-gray-400"/>
+                                                <Input 
+                                                    className="font-medium text-lg bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-gray-600 dark:text-gray-300"
+                                                    value={formData.industry || ''} 
+                                                    onChange={e => setFormData({...formData, industry: e.target.value})} 
+                                                    placeholder="Ej: Real Estate, Salud..." 
+                                                />
                                             </div>
-                                            <a href={r.url} target="_blank" className="p-1 text-gray-400 hover:text-blue-500"><ExternalLink className="w-3 h-3"/></a>
-                                            <button onClick={() => {const n=[...formData.resources!]; n.splice(idx,1); setFormData({...formData, resources:n})}} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
                                         </div>
-                                    ))}
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
-                )}
-
-                {/* DELIVERABLES TAB (NEW) */}
-                {activeTab === 'ENTREGAS' && (
-                    <div className="space-y-6 animate-in fade-in">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Entregables para Aprobación</h2>
-                            <Button onClick={() => setIsDelivModalOpen(true)}><Plus className="w-4 h-4 mr-2"/> Subir Entregable</Button>
-                        </div>
-
-                        {deliverables.length === 0 ? (
-                            <div className="text-center py-20 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-2xl text-gray-400">
-                                <UploadCloud className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                <p>No hay entregables pendientes.</p>
+                                        <div>
+                                             <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Ubicación</Label>
+                                             <div className="flex items-center gap-2 mt-2">
+                                                <MapPin className="w-5 h-5 text-gray-400"/>
+                                                <Input 
+                                                    className="font-medium text-lg bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-gray-600 dark:text-gray-300"
+                                                    value={formData.location || ''} 
+                                                    onChange={e => setFormData({...formData, location: e.target.value})} 
+                                                    placeholder="Ciudad, País" 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
                             </div>
-                        ) : (
-                            <div className="grid gap-4">
-                                {deliverables.map(deliv => (
-                                    <Card key={deliv.id} className="p-4 flex items-center justify-between group">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${deliv.status === 'APPROVED' ? 'bg-green-100 text-green-600' : deliv.status === 'CHANGES_REQUESTED' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>
-                                                {deliv.status === 'APPROVED' ? <CheckCircle2 className="w-5 h-5"/> : <FileText className="w-5 h-5"/>}
-                                            </div>
+
+                            {/* 2. SERVICE AGREEMENT CARD (PREMIUM) */}
+                            <div className="md:col-span-1">
+                                <Card className="h-full p-6 border-none shadow-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white rounded-3xl relative overflow-hidden flex flex-col justify-between">
+                                    <div className="absolute top-0 right-0 p-24 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                                    
+                                    <div className="relative z-10 space-y-1">
+                                        <div className="flex justify-between items-start">
+                                            <Wallet className="w-8 h-8 text-white/80 mb-4 bg-white/10 p-1.5 rounded-lg"/>
+                                            <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold border border-white/10">ACTIVE</div>
+                                        </div>
+                                        <Label className="text-indigo-200 uppercase text-xs font-bold tracking-wider">Acuerdo de Servicio</Label>
+                                        <Textarea 
+                                            className="bg-transparent border-none text-white placeholder:text-white/40 font-bold text-xl p-0 resize-none focus-visible:ring-0 min-h-[60px]"
+                                            value={formData.serviceDetails || ''} 
+                                            onChange={e => setFormData({...formData, serviceDetails: e.target.value})} 
+                                            placeholder="Detalle (ej: Gestión Redes)" 
+                                        />
+                                    </div>
+
+                                    <div className="relative z-10 pt-6 mt-4 border-t border-white/20">
+                                        <div className="flex justify-between items-end">
                                             <div>
-                                                <h4 className="font-bold text-gray-900 dark:text-white">{deliv.name}</h4>
-                                                <a href={deliv.url} target="_blank" className="text-xs text-blue-500 hover:underline truncate max-w-[200px] block">{deliv.url}</a>
+                                                <Label className="text-indigo-200 text-xs font-medium block">Inversión Mensual</Label>
+                                                <div className="flex items-center">
+                                                    <span className="text-2xl font-medium text-indigo-300 mr-1">$</span>
+                                                    <Input 
+                                                        className="bg-transparent border-none text-white placeholder:text-white/40 font-black text-4xl p-0 w-32 focus-visible:ring-0"
+                                                        value={formData.monthlyRevenue} 
+                                                        onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})} 
+                                                        type="number"
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <Badge variant={deliv.status === 'APPROVED' ? 'green' : deliv.status === 'CHANGES_REQUESTED' ? 'outline' : 'blue'}>
-                                                {deliv.status === 'APPROVED' ? 'APROBADO' : deliv.status === 'CHANGES_REQUESTED' ? 'CAMBIOS SOLICITADOS' : 'PENDIENTE'}
-                                            </Badge>
-                                            <button onClick={() => handleDeleteDeliverable(deliv.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4"/></button>
-                                        </div>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
-
-                        <Modal isOpen={isDelivModalOpen} onClose={() => setIsDelivModalOpen(false)} title="Nuevo Entregable">
-                            <form onSubmit={handleAddDeliverable} className="space-y-4">
-                                <div><Label>Nombre del Archivo/Entrega</Label><Input value={delivForm.name} onChange={e => setDelivForm({...delivForm, name: e.target.value})} placeholder="Ej: Diseño Home v1" autoFocus/></div>
-                                <div><Label>Link (Drive, Figma, WeTransfer)</Label><Input value={delivForm.url} onChange={e => setDelivForm({...delivForm, url: e.target.value})} placeholder="https://..." /></div>
-                                <div className="flex justify-end pt-2"><Button type="submit">Publicar en Portal</Button></div>
-                            </form>
-                        </Modal>
-                    </div>
-                )}
-
-                {/* PORTAL CHAT TAB (NEW) */}
-                {activeTab === 'PORTAL' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in h-[600px]">
-                        <div className="lg:col-span-2 flex flex-col bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-                            <div className="p-4 border-b border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center">
-                                <h3 className="font-bold flex items-center gap-2"><MessageSquare className="w-4 h-4"/> Chat con Cliente</h3>
-                                <div className="flex items-center gap-2">
-                                    <div className="text-xs text-gray-500 bg-white dark:bg-slate-900 px-2 py-1 rounded border">Link del Portal:</div>
-                                    <div className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-mono">
-                                        <Globe className="w-3 h-3" /> /portal/{formData.publicToken?.slice(0,6)}...
-                                    </div>
-                                    <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/#/portal/${formData.publicToken}`)} className="p-1 hover:bg-gray-200 rounded"><Copy className="w-3 h-3"/></button>
-                                </div>
-                            </div>
-                            
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 dark:bg-slate-950" ref={chatScrollRef}>
-                                {portalMessages.length === 0 && <div className="text-center text-gray-400 mt-20 text-sm">El historial de chat está vacío.</div>}
-                                {portalMessages.map((msg, idx) => (
-                                    <div key={idx} className={`flex ${msg.sender === 'AGENCY' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] p-3 rounded-xl text-sm ${msg.sender === 'AGENCY' ? 'bg-black text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'}`}>
-                                            <p>{msg.content}</p>
-                                            <div className={`text-[10px] mt-1 text-right ${msg.sender === 'AGENCY' ? 'text-gray-400' : 'text-gray-400'}`}>
-                                                {new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                            <div className="text-right">
+                                                <Label className="text-indigo-200 text-xs font-medium block mb-1">Día de Cobro</Label>
+                                                <div className="bg-white/20 backdrop-blur-md rounded-xl px-3 py-2 flex flex-col items-center min-w-[60px] border border-white/10">
+                                                     <Input 
+                                                        className="bg-transparent border-none text-white font-bold text-xl p-0 w-full text-center h-auto focus-visible:ring-0"
+                                                        value={formData.billingDay || 1} 
+                                                        onChange={e => setFormData({...formData, billingDay: parseInt(e.target.value)})} 
+                                                        type="number" max={31} min={1}
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                </Card>
                             </div>
+                        </div>
 
-                            <div className="p-4 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800">
-                                <div className="flex gap-2">
-                                    <Input 
-                                        value={chatInput} 
-                                        onChange={e => setChatInput(e.target.value)} 
-                                        onKeyDown={e => e.key === 'Enter' && handleSendPortalMessage()}
-                                        placeholder="Escribe un mensaje al cliente..." 
-                                        className="flex-1"
-                                    />
-                                    <Button onClick={handleSendPortalMessage} className="px-4"><Send className="w-4 h-4"/></Button>
+                        {/* 2.5 PROFITABILITY ANALYSIS (RESTORED) */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                                <h3 className="font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-emerald-500"/> Análisis de Rentabilidad</h3>
+                                
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="text-xs text-gray-400 mb-1">Costo Equipo / Fijo</Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
+                                                <Input 
+                                                    type="number" 
+                                                    className="pl-6 font-mono bg-gray-50 dark:bg-slate-800 border-none" 
+                                                    value={formData.internalCost || 0} 
+                                                    onChange={e => setFormData({...formData, internalCost: parseFloat(e.target.value)})} 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs text-gray-400 mb-1">Outsourcing / Ads</Label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
+                                                <Input 
+                                                    type="number" 
+                                                    className="pl-6 font-mono bg-gray-50 dark:bg-slate-800 border-none" 
+                                                    value={formData.outsourcingCost || 0} 
+                                                    onChange={e => setFormData({...formData, outsourcingCost: parseFloat(e.target.value)})} 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-4 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Margen Neto</p>
+                                            <p className={`text-3xl font-black ${
+                                                ((formData.monthlyRevenue || 0) - (formData.internalCost || 0) - (formData.outsourcingCost || 0)) > 0 ? 'text-emerald-500' : 'text-red-500'
+                                            }`}>
+                                                $ {((formData.monthlyRevenue || 0) - (formData.internalCost || 0) - (formData.outsourcingCost || 0)).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="w-16 h-16 rounded-full border-4 border-gray-200 dark:border-slate-700 flex items-center justify-center relative">
+                                                <span className="font-bold text-sm">
+                                                    {formData.monthlyRevenue ? Math.round((((formData.monthlyRevenue || 0) - (formData.internalCost || 0) - (formData.outsourcingCost || 0)) / formData.monthlyRevenue) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <Card className="p-6 text-center">
-                                <Globe className="w-10 h-10 mx-auto text-blue-500 mb-2" />
-                                <h3 className="font-bold">Acceso al Portal</h3>
-                                <p className="text-xs text-gray-500 mb-4">El cliente ve el progreso, chat y entregables aquí.</p>
-                                {formData.publicToken ? (
-                                    <a href={`/#/portal/${formData.publicToken}`} target="_blank" className="block w-full">
-                                        <Button variant="outline" className="w-full">Abrir Portal <ExternalLink className="w-3 h-3 ml-2"/></Button>
-                                    </a>
-                                ) : (
-                                    <Button onClick={() => setFormData({...formData, publicToken: Math.random().toString(36).substring(2)})} className="w-full">Generar Link</Button>
-                                )}
                             </Card>
-                            
-                            <Card className="p-6">
-                                <Label>Progreso Visible ({formData.progress}%)</Label>
-                                <Slider value={formData.progress || 0} min={0} max={100} onChange={e => setFormData({...formData, progress: parseInt(e.target.value)})} />
-                            </Card>
-                        </div>
-                    </div>
-                )}
+                         </div>
 
-                {/* MEETINGS TAB */}
-                {activeTab === 'MEETINGS' && (
-                    <div className="max-w-3xl mx-auto animate-in fade-in">
-                        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 p-6 rounded-2xl mb-6">
-                            <h3 className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2 mb-2"><Mic2 className="w-5 h-5"/> Asistente de Reuniones</h3>
-                            <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-4">Toma notas rápidas. La IA las limpiará y creará las tareas.</p>
-                            <Textarea className="bg-white dark:bg-slate-900 min-h-[200px]" placeholder="- Notas..." value={meetingNotes} onChange={e => setMeetingNotes(e.target.value)} />
-                            <div className="flex justify-end mt-4"><Button onClick={processMeetingNotes} disabled={isProcessingMeeting}>Procesar Notas</Button></div>
-                        </div>
-                    </div>
-                )}
 
-                {/* FINANCE TAB */}
-                {activeTab === 'FINANCE' && (
-                    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
+                        {/* 3. CONTEXT & STRATEGY */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="p-6">
-                                <h3 className="font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white"><Wallet className="w-4 h-4"/> Estructura de Costos</h3>
+                            <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
+                                <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Briefcase className="w-5 h-5 text-blue-500"/> Contexto & Estrategia</h3>
                                 <div className="space-y-4">
-                                    <div><Label>Ingreso (Fee Cliente)</Label><Input type="number" className="font-mono font-bold text-green-700" value={formData.monthlyRevenue} onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})} /></div>
-                                    <div className="pt-2 border-t border-gray-100 dark:border-slate-800">
-                                        <Label>Costo Socio</Label>
-                                        <div className="flex gap-2">
-                                            <select 
-                                                className="flex h-12 w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 px-3 text-sm dark:text-white" 
-                                                value={formData.assignedPartnerId || ''} 
-                                                onChange={e => {
-                                                    const pid = e.target.value;
-                                                    const partner = contractors.find(c => c.id === pid);
-                                                    setFormData({
-                                                        ...formData, 
-                                                        assignedPartnerId: pid,
-                                                        outsourcingCost: partner ? partner.monthlyRate : (pid === '' ? 0 : formData.outsourcingCost)
-                                                    })
-                                                }}
-                                            >
-                                                <option value="">-- Sin Socio (Interno) --</option>
-                                                {contractors.map(c => <option key={c.id} value={c.id}>{c.name} {c.monthlyRate > 0 ? `($${c.monthlyRate})` : ''}</option>)}
-                                            </select>
-                                            <Input type="number" className="w-32 font-mono text-red-600" value={formData.outsourcingCost} onChange={e => setFormData({...formData, outsourcingCost: parseFloat(e.target.value)})} placeholder="$ Pago" />
-                                        </div>
+                                     <Textarea 
+                                        className="bg-gray-50 dark:bg-slate-800 border-none rounded-xl p-4 min-h-[150px] focus-visible:ring-1 focus-visible:ring-blue-500" 
+                                        placeholder="Describe la situación actual del cliente, objetivos clave, y contexto importante..." 
+                                        value={formData.notes} 
+                                        onChange={e => setFormData({...formData, notes: e.target.value})} 
+                                    />
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <Clock className="w-4 h-4"/>
+                                        <span>Última actualización: {new Date().toLocaleDateString()}</span>
                                     </div>
-                                    <div><Label>Costos Fijos Internos</Label><Input type="number" className="font-mono text-red-600" value={formData.internalCost} onChange={e => setFormData({...formData, internalCost: parseFloat(e.target.value)})} placeholder="$0" /></div>
                                 </div>
                             </Card>
+
+                            <div className="space-y-6">
+                                {/* CONTACT */}
+                                <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
+                                    <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Phone className="w-5 h-5 text-green-500"/> Contacto Directo</h3>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                                            <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
+                                                <Phone className="w-5 h-5"/>
+                                            </div>
+                                            <Input 
+                                                className="bg-transparent border-none shadow-none font-medium"
+                                                value={formData.phone || ''} 
+                                                onChange={e => setFormData({...formData, phone: e.target.value})} 
+                                                placeholder="+54 9 11 1234 5678" 
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                                             <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                                                <User className="w-5 h-5"/>
+                                            </div>
+                                            <Input 
+                                                className="bg-transparent border-none shadow-none font-medium"
+                                                value={formData.email || ''} 
+                                                // Assuming email is editable in formData or we rely on contact list
+                                                 onChange={e => setFormData({...formData, email: e.target.value})} 
+                                                placeholder="contacto@empresa.com" 
+                                            />
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                {/* BRAND KIT */}
+                                 <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full -mr-10 -mt-10"></div>
+                                    <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2 relative z-10"><Palette className="w-5 h-5 text-purple-500"/> Identidad Visual</h3>
+                                    <div className="flex gap-3 relative z-10">
+                                        {(formData.brandColors || ['#000000', '#ffffff']).slice(0, 5).map((color, i) => (
+                                            <div key={i} className="group relative">
+                                                <div 
+                                                    className="w-12 h-12 rounded-full shadow-sm border border-black/5 dark:border-white/10 cursor-pointer transition-transform hover:scale-110"
+                                                    style={{backgroundColor: color}}
+                                                    onClick={() => {
+                                                        const newColor = prompt("Nuevo color HEX:", color);
+                                                        if(newColor) {
+                                                            const newColors = [...(formData.brandColors || [])];
+                                                            newColors[i] = newColor;
+                                                            setFormData({...formData, brandColors: newColors});
+                                                        }
+                                                    }}
+                                                ></div>
+                                            </div>
+                                        ))}
+                                        <button 
+                                            className="w-12 h-12 rounded-full border-2 border-dashed border-gray-300 dark:border-slate-700 flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                            onClick={() => {
+                                                const newColor = prompt("Nuevo color HEX:", "#000000");
+                                                if(newColor) setFormData({...formData, brandColors: [...(formData.brandColors || []), newColor]});
+                                            }}
+                                        >
+                                            <Plus className="w-4 h-4"/>
+                                        </button>
+                                    </div>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* RESOURCES SECTION */}
+                        <Card className="p-6 space-y-4 h-full border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
+                             <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-2">
+                                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> Recursos (The Vault)</h3>
+                                <button onClick={() => setFormData({...formData, resources: [...(formData.resources||[]), {id: Date.now().toString(), name: 'Nuevo Link', url: '', type: 'OTHER'}]})} className="text-xs bg-black dark:bg-white text-white dark:text-black px-2 py-1 rounded flex items-center"><Plus className="w-3 h-3 mr-1"/> Agregar</button>
+                            </div>
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
+                                {formData.resources?.length === 0 && <p className="text-gray-400 text-xs italic">Sin recursos guardados.</p>}
+                                {formData.resources?.map((r, idx) => (
+                                    <div key={idx} className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 p-2 rounded-lg border border-gray-100 dark:border-slate-700 group">
+                                        <div className="p-2 bg-white dark:bg-slate-900 rounded shadow-sm"><Globe className="w-4 h-4 text-gray-400"/></div>
+                                        <div className="flex-1">
+                                            <input className="text-xs font-bold bg-transparent border-none w-full focus:ring-0 p-0 text-gray-900 dark:text-white" value={r.name} onChange={e => {const n=[...formData.resources!]; n[idx].name=e.target.value; setFormData({...formData, resources:n})}} />
+                                            <input className="text-[10px] text-blue-500 bg-transparent border-none w-full focus:ring-0 p-0" value={r.url} placeholder="https://..." onChange={e => {const n=[...formData.resources!]; n[idx].url=e.target.value; setFormData({...formData, resources:n})}} />
+                                        </div>
+                                        <a href={r.url} target="_blank" className="p-1 text-gray-400 hover:text-blue-500"><ExternalLink className="w-3 h-3"/></a>
+                                        <button onClick={() => {const n=[...formData.resources!]; n.splice(idx,1); setFormData({...formData, resources:n})}} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
+                {/* REMOVED TABS: ENTREGAS, PORTAL, FINANCE, MEETINGS */}
+
+                {/* ACTION PLAN TAB */}
+                {activeTab === 'ACTION_PLAN' && (
+                    <div className="max-w-3xl mx-auto animate-in fade-in space-y-6">
+                         <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Evolución & Progreso</h2>
+                                <p className="text-sm text-gray-500">Bitácora de crecimiento y resultados.</p>
+                            </div>
+                            <Button onClick={handleAddProgress} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"><Plus className="w-4 h-4 mr-2"/> Registrar Avance</Button>
+                        </div>
+
+                        <div className="relative border-l-2 border-blue-200 dark:border-blue-900 ml-4 space-y-8 pl-8 py-2">
+                            {clientNotes.filter(n => n.type === 'PROGRESS').length === 0 && <div className="text-gray-400 italic">No hay registros de progreso aún.</div>}
+                            
+                            {clientNotes.filter(n => n.type === 'PROGRESS').map((note, idx) => (
+                                <div key={idx} className="relative group">
+                                     <div className="absolute -left-[41px] w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 shadow-sm bg-blue-500"></div>
+                                     <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <Badge variant="blue">Progreso</Badge>
+                                            <span className="text-xs text-gray-400 font-mono">{new Date(note.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-medium">{note.content}</p>
+                                     </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
@@ -428,6 +519,13 @@ export default function ProjectDetailPage() {
                 {/* HISTORY TAB */}
                 {activeTab === 'HISTORY' && (
                     <div className="max-w-4xl mx-auto animate-in fade-in">
+                        {/* Quick Actions */}
+                         <div className="flex gap-2 mb-6 justify-center">
+                            <button onClick={() => handleQuickAction('CALL')} className="flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 rounded-full text-sm font-bold hover:bg-indigo-100 transition-colors"><Phone className="w-4 h-4"/> Hablé Hoy</button>
+                            <button onClick={() => handleQuickAction('INFO')} className="flex items-center gap-2 px-4 py-2 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-300 rounded-full text-sm font-bold hover:bg-cyan-100 transition-colors"><Send className="w-4 h-4"/> Envié Info</button>
+                            <button onClick={() => handleQuickAction('MEETING')} className="flex items-center gap-2 px-4 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 rounded-full text-sm font-bold hover:bg-purple-100 transition-colors"><Mic2 className="w-4 h-4"/> Reunión</button>
+                        </div>
+                        
                         <div className="relative border-l-2 border-gray-200 dark:border-slate-800 ml-4 space-y-8 pl-8 py-4">
                             {clientTasks.filter(t => t.status === 'DONE').length === 0 && clientNotes.length === 0 && <p className="text-gray-400 italic">No hay historial aún.</p>}
                             {[...clientNotes.map(n => ({type:'NOTE', data:n, date: n.createdAt})), ...clientTasks.filter(t => t.status === 'DONE').map(t => ({type:'TASK', data:t, date: t.created_at}))]

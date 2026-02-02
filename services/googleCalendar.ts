@@ -38,6 +38,10 @@ export const googleCalendarService = {
 
   loadScripts: async () => {
       try {
+          if (API_KEY === 'YOUR_API_KEY_HERE' || CLIENT_ID === 'YOUR_CLIENT_ID_HERE') {
+              console.warn("Google Calendar API Key or Client ID is missing. Skipping GAPI load.");
+              return;
+          }
           await loadScript('https://apis.google.com/js/api.js');
           await new Promise<void>((resolve, reject) => {
               (window as any).gapi.load('client', { callback: resolve, onerror: reject });

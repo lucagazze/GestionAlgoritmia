@@ -63,6 +63,7 @@ export interface Client {
   industry?: string;
   email?: string;
   phone?: string; 
+  location?: string;
   createdAt: Date;
 }
 
@@ -97,6 +98,7 @@ export interface Project extends Client {
   
   // Growth
   growthStrategy?: string;      // Texto de estrategia
+  serviceDetails?: string;      // Detalle del servicio (ej: "Community Manager + Ads")
 }
 
 export interface Contractor {
@@ -129,7 +131,7 @@ export interface ClientNote {
     id: string;
     clientId: string;
     content: string;
-    type: 'MEETING' | 'NOTE' | 'CALL' | 'PAYMENT';
+    type: 'MEETING' | 'NOTE' | 'CALL' | 'PAYMENT' | 'PROGRESS' | 'INFO';
     createdAt: string;
 }
 

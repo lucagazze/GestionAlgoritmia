@@ -18,7 +18,7 @@ const tools = [{
     functionDeclarations: [
         {
             name: "manage_tasks",
-            description: "Crear, actualizar o borrar tareas. SIEMPRE usa esto cuando el usuario pida crear/modificar/eliminar tareas. Soporta múltiples acciones en una sola llamada.",
+            description: "Gestión de TAREAS (Todo List). ⚠️ NO USAR PARA CLIENTES/PROYECTOS. Solo para crear, actualizar o borrar items de la lista de tareas.",
             parameters: {
                 type: "object",
                 properties: {
@@ -95,6 +95,58 @@ const tools = [{
                 required: ["question"]
             }
         }
+    ],
+}, 
+{
+    functionDeclarations: [
+        {
+            name: "manage_clients",
+            description: "Crear o actualizar clientes (PROYECTOS). Usa esto cuando el usuario quiera agregar un nuevo cliente o modificar uno existente. Si falta info, INVENTA datos realistas.",
+            parameters: {
+                type: "object",
+                properties: {
+                    action: { 
+                        type: "string", 
+                        enum: ["CREATE", "UPDATE", "DELETE"],
+                        description: "CREATE=nuevo cliente, UPDATE=modificar existente, DELETE=eliminar cliente"
+                    },
+                    name: { 
+                        type: "string",
+                        description: "Nombre de la empresa/cliente. Ej: 'Puertas Blindadas Jack'"
+                    },
+                    industry: { 
+                        type: "string",
+                        description: "Industria/Rubro. Ej: 'Seguridad', 'Software', 'Real Estate'"
+                    },
+                    monthlyRevenue: { 
+                        type: "number",
+                        description: "Fee mensual estimado. Si no dice, estima un valor realista (ej: 500-2000)"
+                    },
+                    billingDay: {
+                        type: "number",
+                        description: "Día del mes de cobro (1-31). Ej: 24"
+                    },
+                    status: {
+                        type: "string",
+                        enum: ["ONBOARDING", "ACTIVE", "PAUSED", "COMPLETED"],
+                        description: "Estado del proyecto. Default: ACTIVE"
+                    },
+                    description: {
+                        type: "string",
+                        description: "Resumen completo del cliente: qué hacen, dónde están, desde cuándo, servicios que se les da. Incluye TODO el contexto."
+                    },
+                    location: {
+                        type: "string", 
+                        description: "Ubicación (Ciudad/País). Ej: 'Buenos Aires, Argentina'"
+                    },
+                    id: { 
+                        type: "string",
+                        description: "UUID (Solo para UPDATE)"
+                    }
+                },
+                required: ["action", "name", "description"]
+            }
+        }
     ]
 }];
 
@@ -151,11 +203,12 @@ ${activeProjects || '[No hay proyectos]'}
 ${teamMembers || '[No hay equipo]'}
 
 REGLAS CRÍTICAS:
-1. ⚠️ NUNCA respondas solo con "Entendido", "Ok", "Perfecto"
-2. Si pide crear/modificar/borrar → USA manage_tasks
-3. Si pide "lunes a viernes" → Crea 5 acciones separadas (una por día)
-4. Si dice "de 8 a 14:30" → usa dueDate=8:00, endTime=14:30
-5. Interpreta: "dos y media"=14:30, "lunes"=próximo lunes
+1. ⚠️ RESPUESTAS CORTAS Y DIRECTAS. Solo confirma la acción.
+2. Si pide crear/modificar/borrar → USA manage_tasks o manage_clients.
+3. Si el usuario refiere a "este cliente" o "el de recién", BUSCA el ID en el historial reciente.
+4. Si falta el ID para un UPDATE, y acabas de crear uno, USA ESE ID.
+5. Interpreta fechas relativas ("lunes", "24 de cada mes").
+6. NO expliques obviedades. Solo di "Listo", "Hecho", "Agendado".
 
 EJEMPLO REAL:
 Usuario: "Poneme una tarea para el lunes a las dos y media ir a caminar. Y poneme también para entre las ocho a las dos y media de toda la semana de lunes a viernes trabajar."
@@ -235,6 +288,27 @@ Debes llamar manage_tasks con:
                         type: 'QUESTION',
                         message: functionCall.args.question,
                         context: functionCall.args.context
+                    };
+                } else if (functionCall.name === 'manage_clients') {
+                    const args = functionCall.args as any;
+                    return {
+                        type: 'BATCH', // Reusing BATCH type for now, frontend should handle ACTION types generically if possible, or I'll map it to CREATE_CLIENT payload
+                        actions: [{
+                            action: args.action === 'CREATE' ? 'CREATE_PROJECT' : 
+                                    args.action === 'UPDATE' ? 'UPDATE_PROJECT' : 'DELETE_PROJECT',
+                            payload: {
+                                name: args.name,
+                                industry: args.industry || 'General',
+                                monthlyRevenue: args.monthlyRevenue || 0,
+                                billingDay: args.billingDay || 1,
+                                status: args.status || 'ACTIVE',
+                                notes: args.description || '',
+                                // Mapping extra fields to notes if needed or extending the Project type later
+                                location: args.location, 
+                                id: args.id
+                            }
+                        }],
+                        message: `✅ Procesado cliente: **${args.name}**`
                     };
                 }
             }

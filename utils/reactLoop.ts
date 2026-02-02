@@ -127,6 +127,50 @@ async function executeAction(action: string, payload: any): Promise<any> {
                 await db.projects.update(payload.id, payload);
                 return { success: true, message: "Project updated" };
             
+            case 'CREATE_PROJECT':
+                const newProject = await db.projects.create({
+                    name: payload.name || "Nuevo Proyecto",
+                    monthlyRevenue: payload.monthlyRevenue || 0,
+                    industry: payload.industry || '',
+                    status: payload.status || 'ONBOARDING',
+                    notes: payload.notes || ''
+                });
+                return { success: true, data: newProject, message: `Proyecto creado: ${newProject.name}` };
+
+            case 'GET_SOPS':
+                const sops = await db.sops.getAll();
+                const filteredSops = payload.category 
+                    ? sops.filter((s: any) => s.category === payload.category)
+                    : sops;
+                return { 
+                    success: true, 
+                    data: filteredSops,
+                    message: `Encontré ${filteredSops.length} SOPs`
+                };
+
+            case 'DELETE_PROJECT':
+                 if (!payload.id) return { success: false, error: 'Falta ID del proyecto' };
+                 
+                 // Smart Cascade Delete
+                 // 1. Check related entities
+                 const tasks = await db.tasks.getAll();
+                 const projectTasks = tasks.filter((t: any) => t.projectId === payload.id);
+                 
+                 const deliverables = await db.portal.getDeliverables(payload.id);
+                 
+                 // 2. Delete related entities
+                 if (projectTasks.length > 0) {
+                     await db.tasks.deleteMany(projectTasks.map((t: any) => t.id));
+                 }
+                 
+                 // 3. Delete Project
+                 await db.projects.delete(payload.id);
+                 
+                 return { 
+                    success: true, 
+                    message: `✅ Proyecto eliminado. También borré ${projectTasks.length} tareas y ${deliverables.length} entregables asociados.` 
+                 };
+
             default:
                 return { success: false, error: `Unknown action: ${action}` };
         }

@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus } from '../types';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3 } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Card, Button } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function PaymentsPage() {
+    const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [referenceDate, setReferenceDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
@@ -45,13 +47,13 @@ export default function PaymentsPage() {
     const getEventsForDate = (date: Date) => {
         if (!date) return [];
         const day = date.getDate();
-        const events: { type: 'IN' | 'OUT', label: string, amount: number }[] = [];
+        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string }[] = [];
 
         // Incoming: Client Billings
         activeProjects.forEach(p => {
             const billDay = p.billingDay || 1;
             if (billDay === day) {
-                events.push({ type: 'IN', label: p.name, amount: p.monthlyRevenue });
+                events.push({ type: 'IN', label: p.name, amount: p.monthlyRevenue, projectId: p.id });
             }
         });
 
@@ -183,10 +185,11 @@ export default function PaymentsPage() {
                                             {events.map((evt, idx) => (
                                                 <div 
                                                     key={idx} 
+                                                    onClick={() => evt.projectId && navigate(`/projects/${evt.projectId}?tab=PROFILE`)}
                                                     className={`
-                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center
+                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors
                                                         ${evt.type === 'IN' 
-                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800' 
+                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' 
                                                             : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-800'
                                                         }
                                                     `}

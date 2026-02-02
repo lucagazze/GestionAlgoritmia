@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -350,7 +350,7 @@ export const db = {
          };
     },
     create: async (data: Partial<Project>): Promise<Project> => {
-      const { data: created, error } = await supabase.from('Project').insert(data).select().single();
+      const { data: created, error } = await supabase.from('Client').insert(data).select().single();
       if (error) throw error;
 
       // 🧠 AUTO-SAVE MEMORY
@@ -551,6 +551,9 @@ export const db = {
          const { data, error } = await supabase.from('Proposal').select(`*, client:Client(*)`).order('createdAt', { ascending: false });
          if (error) throw error;
          return data as Proposal[];
+    },
+    getItems: async (proposalId: string): Promise<ProposalItem[]> => {
+        return handleResponse<ProposalItem>(supabase.from('ProposalItem').select('*').eq('proposalId', proposalId));
     }
   },
 
