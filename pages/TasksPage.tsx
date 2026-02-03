@@ -43,7 +43,7 @@ export default function TasksPage() {
   const [sops, setSops] = useState<SOP[]>([]); 
   const [googleEvents, setGoogleEvents] = useState<any[]>([]); // New state for external events
   
-  const [viewMode, setViewMode] = useState<ViewMode>('CALENDAR'); 
+  const [viewMode, setViewMode] = useState<ViewMode>('WEEK'); 
   const [searchTerm, setSearchTerm] = useState('');
   
   const [referenceDate, setReferenceDate] = useState(new Date()); 
@@ -491,7 +491,13 @@ export default function TasksPage() {
   // --- TIME GRID RENDERER (Day/Week) ---
   const renderTimeGrid = () => {
       const isWeek = viewMode === 'WEEK';
-      const hours = Array.from({ length: 24 }, (_, i) => i);
+      
+      // 1. CONFIGURACIÓN DE HORARIOS (7 AM a 11 PM)
+      const START_HOUR = 7;
+      const END_HOUR = 23; // 11 PM
+      const TOTAL_HOURS = END_HOUR - START_HOUR;
+      const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i + START_HOUR);
+      const ROW_HEIGHT = 35; // Aumenté un poco la altura (de 25 a 35) para que se vea mejor al tener menos horas.
       
       // Determine columns
       let daysToShow: Date[] = [];
@@ -530,12 +536,12 @@ export default function TasksPage() {
               {/* Scrollable Grid */}
               <div className="flex flex-1 overflow-y-auto relative custom-scrollbar bg-white dark:bg-slate-900">
                   {/* Time Axis */}
-                  <div className="w-16 flex-shrink-0 relative h-[600px] bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-                      {hours.map(h => (
+                  <div className="w-16 flex-shrink-0 relative bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.02)]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
+                      {hours.map((h, index) => (
                           <span 
                             key={h} 
                             className="absolute right-3 text-xs font-medium text-gray-400 dark:text-gray-500 font-mono -translate-y-1/2"
-                            style={{ top: `${h * 25}px` }}
+                            style={{ top: `${index * ROW_HEIGHT}px` }}
                           >
                                 {h}:00
                           </span>
@@ -543,14 +549,14 @@ export default function TasksPage() {
                   </div>
 
                   {/* Columns */}
-                  <div className="flex-1 flex relative min-w-[600px] h-[600px]"> 
+                  <div className="flex-1 flex relative min-w-[600px]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}> 
                       {/* Horizontal Lines */}
                       <div className="absolute inset-0 z-0 pointer-events-none">
-                          {hours.map(h => (
+                          {hours.map((h, index) => (
                               <div 
                                 key={h} 
                                 className="absolute left-0 right-0 border-b border-gray-100 dark:border-slate-800 dashed"
-                                style={{ top: `${h * 25}px` }}
+                                style={{ top: `${index * ROW_HEIGHT}px` }}
                               />
                           ))}
                       </div>
@@ -559,18 +565,20 @@ export default function TasksPage() {
                           const { dayTasks, dayGoogle } = getEventsForDate(date);
                           const isToday = new Date().toDateString() === date.toDateString();
 
+                          // 3. LÓGICA DE CLIC (UN SOLO CLIC + CÁLCULO DE HORA CORRECTO)
                           const handleColumnClick = (e: React.MouseEvent) => {
                               const rect = e.currentTarget.getBoundingClientRect();
-                              const y = e.clientY - rect.top; // Relative Y
-                              const scrollY = e.currentTarget.scrollTop; 
+                              const y = e.clientY - rect.top; // Relative Y inside the visible area
+                              // Sumamos el scrollTop si el contenedor tuviera scroll, pero aquí usamos e.clientY relativo al target directo
                               
-                              // Logic: 25px = 60 mins
-                              const totalMinutes = (y / 25) * 60;
-                              const hour = Math.floor(totalMinutes / 60);
-                              const minute = Math.floor(totalMinutes % 60);
+                              const relativeHour = Math.floor(y / ROW_HEIGHT);
+                              const actualHour = START_HOUR + relativeHour;
                               
+                              // Check bounds
+                              if (actualHour > END_HOUR) return;
+
                               const newDate = new Date(date);
-                              newDate.setHours(hour, minute, 0, 0);
+                              newDate.setHours(actualHour, 0, 0, 0);
                               
                               setFormData(prev => ({ ...prev, dueDate: newDate.toISOString(), title: '' }));
                               setIsModalOpen(true);
@@ -579,12 +587,12 @@ export default function TasksPage() {
                           return (
                               <div 
                                 key={i} 
-                                className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors h-[672px] group ${isToday ? 'bg-blue-50/10' : ''}`}
+                                className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors group ${isToday ? 'bg-blue-50/10' : ''}`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} 
                                 onDrop={(e) => handleDrop(e, date)}
-                                onDoubleClick={handleColumnClick}
+                                onClick={handleColumnClick} // 2. AHORA ES UN SOLO CLIC
                               >
-                                  {/* Vertical Hour Lines (Subtle) */}
+                                   {/* Vertical Hour Lines (Subtle) */}
                                    <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
 
                                    {/* Render Tasks */}
@@ -602,9 +610,16 @@ export default function TasksPage() {
                                           title = item.title;
                                       }
 
-                                      const minutesTotal = start.getHours() * 60 + start.getMinutes();
-                                      const top = minutesTotal * (25 / 60); 
-                                      const height = 25; 
+                                      const taskHour = start.getHours();
+                                      const taskMinutes = start.getMinutes();
+
+                                      // 4. FILTRAR VISUALMENTE SI ESTÁ FUERA DE RANGO
+                                      if (taskHour < START_HOUR || taskHour > END_HOUR) return null;
+
+                                      // CÁLCULO DE POSICIÓN RELATIVA
+                                      const hoursFromStart = taskHour - START_HOUR;
+                                      const top = (hoursFromStart * ROW_HEIGHT) + (taskMinutes * (ROW_HEIGHT / 60));
+                                      const height = ROW_HEIGHT; // Altura fija estética
 
                                       return (
                                           <div
@@ -623,7 +638,7 @@ export default function TasksPage() {
                                                    setDragOverSlot(null);
                                                }}
                                               className={`
-                                                  absolute left-1 right-2 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
+                                                  absolute left-1 right-2 rounded-lg px-3 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
                                                   ${isGoogle 
                                                       ? 'bg-white border-blue-200 text-blue-700 shadow-[0_2px_8px_rgba(59,130,246,0.15)] dark:bg-slate-800 dark:border-blue-900 dark:text-blue-300' 
                                                       : item.status === 'DONE' 
@@ -644,14 +659,25 @@ export default function TasksPage() {
                           );
                       })}
                       
-                      {/* Current Time Line */}
+                      {/* Current Time Line (Ajustado al nuevo rango) */}
                       {daysToShow.some(d => d.toDateString() === new Date().toDateString()) && (
-                          <div 
-                              className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center"
-                              style={{ top: `${(new Date().getHours() * 60 + new Date().getMinutes()) * (28/60)}px` }}
-                          >
-                              <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-sm"></div>
-                          </div>
+                          (() => {
+                              const now = new Date();
+                              const currentHour = now.getHours();
+                              if (currentHour >= START_HOUR && currentHour <= END_HOUR) {
+                                  const hoursFromStart = currentHour - START_HOUR;
+                                  const top = (hoursFromStart * ROW_HEIGHT) + (now.getMinutes() * (ROW_HEIGHT / 60));
+                                  return (
+                                      <div 
+                                          className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center"
+                                          style={{ top: `${top}px` }}
+                                      >
+                                          <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-sm"></div>
+                                      </div>
+                                  );
+                              }
+                              return null;
+                          })()
                       )}
                   </div>
               </div>
