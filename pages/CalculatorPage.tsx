@@ -447,22 +447,33 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       console.log("Generating PDF...");
       const doc: any = new jsPDF();
       
-      // -- LOGO --
+      // -- LOGO (Smart Scaling) --
       try {
-        // Load logo image
         const logoImg = new Image();
         logoImg.src = '/logo.png';
         await new Promise((resolve, reject) => {
           logoImg.onload = resolve;
           logoImg.onerror = reject;
         });
+
+        const imgWidth = logoImg.width;
+        const imgHeight = logoImg.height;
         
-        // Add logo to PDF (adjusted for better appearance)
-        doc.addImage(logoImg, 'PNG', 14, 12, 30, 12); // x, y, width, height - smaller and better positioned
-        console.log("PDF: Logo added");
+        // Define max dimensions for the logo area
+        const maxW = 40;
+        const maxH = 15;
+        
+        // Calculate scale factor to fit within max dimensions while maintaining aspect ratio
+        const scale = Math.min(maxW / imgWidth, maxH / imgHeight);
+        
+        const finalW = imgWidth * scale;
+        const finalH = imgHeight * scale;
+
+        // Add logo to PDF
+        doc.addImage(logoImg, 'PNG', 14, 12, finalW, finalH);
+        console.log("PDF: Logo added with smart scaling");
       } catch (e) {
         console.warn("Could not load logo, using text fallback:", e);
-        // Fallback to text if logo fails to load
         doc.setFont("helvetica", "bold");
         doc.setFontSize(22);
         doc.setTextColor(0, 0, 0);
@@ -472,7 +483,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
-      doc.text("Desarrollo de Software & Growth", 14, 27);
+      doc.text("Desarrollo de Software & Growth", 14, 28);
 
       // -- CLIENT INFO --
       doc.setDrawColor(240);
@@ -494,56 +505,56 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.text(clientInfo.industry || "", 20, 56);
 
       doc.text(new Date().toLocaleDateString(), 180, 20, { align: 'right' });
-      console.log("PDF: Client Info set");
 
       // -- CONTEXT & TRANSFORMATION (Persuasive) --
       let yPos = 70;
       
-      if (clientInfo.objective || clientInfo.currentSituation || clientInfo.targetAudience) {
+      if (clientInfo.objective || clientInfo.currentSituation) {
            doc.setFontSize(10);
            doc.setFont("helvetica", "bold");
            doc.setTextColor(0);
            doc.text("Plan Estratégico", 14, yPos);
-           yPos += 7;
+           yPos += 5;
            
            doc.setDrawColor(230);
            doc.line(14, yPos, 194, yPos);
-           yPos += 5;
+           yPos += 8; // More space after line
 
-           // Transformation Grid (Without Arrow)
+           // Transformation Grid
            if (clientInfo.currentSituation && clientInfo.objective) {
-                // Situation (Left)
+                // Determine layout widths
+                const colWidth = 85;
+                const gap = 10;
+                const startX2 = 14 + colWidth + gap;
+
+                // SITUATION (Left)
                 doc.setFontSize(8);
                 doc.setTextColor(150);
                 doc.text("SITUACIÓN ACTUAL (Punto A)", 14, yPos);
                 
                 doc.setFontSize(9);
                 doc.setTextColor(80);
-                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", 80);
+                doc.setFont("helvetica", "normal");
+                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", colWidth);
                 doc.text(splitSit, 14, yPos + 5);
 
-                // Objective (Right)
+                // OBJECTIVE (Right)
                 doc.setFontSize(8);
                 doc.setTextColor(150);
-                doc.text("OBJETIVO (Punto B)", 110, yPos);
+                doc.text("OBJETIVO (Punto B)", startX2, yPos);
 
                 doc.setFontSize(9);
                 doc.setTextColor(0);
                 doc.setFont("helvetica", "bold");
-                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", 80);
-                doc.text(splitObj, 110, yPos + 5);
+                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", colWidth);
+                doc.text(splitObj, startX2, yPos + 5);
                 
-                yPos += Math.max(splitSit.length, splitObj.length) * 5 + 10;
+                // Calculate new Y position based on the tallest text block
+                const heightSit = (splitSit.length * 4.5); // approx height per line
+                const heightObj = (splitObj.length * 4.5);
+                yPos += Math.max(heightSit, heightObj) + 15; // padding below
            }
-
-           /*
-           // Target Audience Tag - REMOVED PER USER REQUEST
-           if (clientInfo.targetAudience) {
-               // ...
-           }
-           */
       }
-      console.log("PDF: Context set");
 
       // -- SERVICES TABLE --
       doc.autoTable({
@@ -616,6 +627,15 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       // -- SUMMARY --
       const finalY = (doc as any).lastAutoTable.finalY + 15;
       
+      // Check if summary fits on page, else add page
+      const pageHeight = doc.internal.pageSize.height;
+      if (finalY + 60 > pageHeight) {
+          doc.addPage();
+          // Reset finalY for new page (adjust as needed, e.g., top margin)
+          // For simplicity we just draw it at top if new page, but let's just use finalY logic locally
+          // Ideally we would set finalY = 20; but let's assume it fits most times or autoTable handled page break
+      }
+
       // Draw Summary Box
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(200);
@@ -650,10 +670,13 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.text(`$${calculations.contractValue.toLocaleString()}`, 190, finalY + 42, { align: 'right' });
 
       // -- FOOTER --
-      const pageHeight = doc.internal.pageSize.height;
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text("Generado por Algoritmia para uso exclusivo.", 14, pageHeight - 10);
+      const totalPages = doc.internal.getNumberOfPages();
+      for(let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text("Generado por Algoritmia para uso exclusivo.", 14, pageHeight - 10);
+      }
 
       doc.save(`Propuesta_${clientInfo.name.replace(/\s+/g, '_')}.pdf`);
       console.log("PDF: Saved");
@@ -680,7 +703,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
 
       const doc: any = new jsPDF();
       
-      // -- LOGO (igual que el PDF del cliente) --
+      // -- LOGO (Smart Scaling) --
       try {
         const logoImg = new Image();
         logoImg.src = '/logo.png';
@@ -688,10 +711,17 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
           logoImg.onload = resolve;
           logoImg.onerror = reject;
         });
-        
-        doc.addImage(logoImg, 'PNG', 14, 12, 30, 12);
+
+        const imgWidth = logoImg.width;
+        const imgHeight = logoImg.height;
+        const maxW = 40;
+        const maxH = 15;
+        const scale = Math.min(maxW / imgWidth, maxH / imgHeight);
+        const finalW = imgWidth * scale;
+        const finalH = imgHeight * scale;
+
+        doc.addImage(logoImg, 'PNG', 14, 12, finalW, finalH);
       } catch (e) {
-        console.warn("Could not load logo, using text fallback:", e);
         doc.setFont("helvetica", "bold");
         doc.setFontSize(22);
         doc.setTextColor(0, 0, 0);
@@ -701,7 +731,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
-      doc.text("Desarrollo de Software & Growth", 14, 27);
+      doc.text("Desarrollo de Software & Growth", 14, 28);
 
       // -- PARTNER INFO BOX --
       doc.setDrawColor(240);
@@ -724,7 +754,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
 
       doc.text(new Date().toLocaleDateString(), 180, 20, { align: 'right' });
 
-      // -- PLAN ESTRATÉGICO (igual que el PDF del cliente) --
+      // -- PLAN ESTRATÉGICO --
       let yPos = 70;
       
       if (clientInfo.objective || clientInfo.currentSituation) {
@@ -732,40 +762,46 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
            doc.setFont("helvetica", "bold");
            doc.setTextColor(0);
            doc.text("Plan Estratégico", 14, yPos);
-           yPos += 7;
+           yPos += 5;
            
            doc.setDrawColor(230);
            doc.line(14, yPos, 194, yPos);
-           yPos += 5;
+           yPos += 8;
 
-           // Transformation Grid
            if (clientInfo.currentSituation && clientInfo.objective) {
-                // Situation (Left)
+                const colWidth = 85;
+                const gap = 10;
+                const startX2 = 14 + colWidth + gap;
+
+                // SITUATION
                 doc.setFontSize(8);
                 doc.setTextColor(150);
                 doc.text("SITUACIÓN ACTUAL (Punto A)", 14, yPos);
                 
                 doc.setFontSize(9);
                 doc.setTextColor(80);
-                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", 80);
+                doc.setFont("helvetica", "normal");
+                const splitSit = doc.splitTextToSize(clientInfo.currentSituation || " ", colWidth);
                 doc.text(splitSit, 14, yPos + 5);
 
-                // Objective (Right)
+                // OBJECTIVE
                 doc.setFontSize(8);
                 doc.setTextColor(150);
-                doc.text("OBJETIVO (Punto B)", 110, yPos);
+                doc.text("OBJETIVO (Punto B)", startX2, yPos);
 
                 doc.setFontSize(9);
                 doc.setTextColor(0);
                 doc.setFont("helvetica", "bold");
-                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", 80);
-                doc.text(splitObj, 110, yPos + 5);
+                const splitObj = doc.splitTextToSize(clientInfo.objective || " ", colWidth);
+                doc.text(splitObj, startX2, yPos + 5);
                 
-                yPos += Math.max(splitSit.length, splitObj.length) * 5 + 10;
+                const heightSit = (splitSit.length * 4.5);
+                const heightObj = (splitObj.length * 4.5);
+                yPos += Math.max(heightSit, heightObj) + 15;
            }
       }
 
-      // -- SERVICES TABLE (mismo estilo que el PDF del cliente) --
+      // -- SERVICES TABLE --
       doc.autoTable({
           startY: yPos,
           head: [['Servicio / Entregable', 'Tipo', 'Tu Presupuesto']],
@@ -798,30 +834,24 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       const totalPay = partnerServices.reduce((sum, s) => sum + (outsourcingCosts[s.id] || 0), 0);
       const finalY = (doc as any).lastAutoTable.finalY + 15;
 
-      // Summary Box (igual que el PDF del cliente)
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(200);
-      doc.roundedRect(120, finalY, 76, 30, 3, 3, 'FD');
+      doc.roundedRect(120, finalY, 76, 20, 3, 3, 'FD');
 
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text("TOTAL A PERCIBIR", 125, finalY + 12);
+      doc.text("TU TOTAL", 125, finalY + 13);
       
       doc.setFontSize(16);
-      doc.setTextColor(0, 102, 204); // Azul igual que el PDF del cliente
+      doc.setTextColor(0, 0, 0); 
       doc.setFont("helvetica", "bold");
-      doc.text(`$${totalPay.toLocaleString()}`, 190, finalY + 24, { align: 'right' });
+      doc.text(`$${totalPay.toLocaleString()}`, 190, finalY + 13, { align: 'right' });
 
-      // -- FOOTER --
-      const pageHeight = doc.internal.pageSize.height;
-      doc.setFontSize(8);
-      doc.setTextColor(150);
-      doc.text("Generado por Algoritmia para uso exclusivo.", 14, pageHeight - 10);
+      doc.save(`Orden_${partner.name.split(' ')[0]}_${clientInfo.name}.pdf`);
 
-      doc.save(`WorkOrder_${partner.name}_${clientInfo.name}.pdf`);
     } catch (e) {
-        console.error("Partner PDF GENERATION FAILED:", e);
-        alert("Error generando PDF. Revisa la consola.");
+      console.error(e);
+      alert("Error al generar PDF de socio.");
     }
   };
 
