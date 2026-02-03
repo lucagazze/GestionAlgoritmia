@@ -17,6 +17,14 @@ interface UndoPayload {
 }
 
 // --- MESSAGE RENDERER COMPONENT ---
+const cleanMessageContent = (text: string) => {
+    if (!text) return "";
+    return text
+        .replace(/<details>[\s\S]*?<\/details>/gi, "")
+        .replace(/<[^>]*>?/gm, "")
+        .trim();
+};
+
 const MessageRenderer = ({ content, role, entities, onShowDetails }: { 
     content: string, 
     role: 'user' | 'assistant',
@@ -24,8 +32,8 @@ const MessageRenderer = ({ content, role, entities, onShowDetails }: {
     onShowDetails?: () => void
 }) => {
     const navigate = useNavigate();
-    // 1. Split by new lines to handle paragraphs and lists
-    const lines = content.split('\n');
+    // 1. Clean content and split by new lines
+    const lines = cleanMessageContent(content).split('\n');
 
     return (
         <div className={`space-y-1 ${role === 'user' ? 'text-right' : 'text-left'}`}>
