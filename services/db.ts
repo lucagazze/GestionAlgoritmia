@@ -887,6 +887,32 @@ export const db = {
       }
   },
 
+  payments: {
+      getAll: async () => {
+        const { data, error } = await supabase
+            .from('Payment')
+            .select(`
+                *,
+                client:Client (
+                    id, 
+                    name, 
+                    outsourcingCost, 
+                    monthlyRevenue
+                )
+            `)
+            .order('date', { ascending: false });
+        
+        if (error) {
+             if (error.code === 'PGRST205') {
+                 console.warn("Table Payment not found.");
+                 return [];
+             }
+             throw error;
+        }
+        return data || [];
+    },
+  },
+
   // --- VECTOR MEMORY (RAG) ---
   documents: {
       /**

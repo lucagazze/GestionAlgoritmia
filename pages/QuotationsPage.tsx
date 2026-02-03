@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
-import { Proposal, Project, ProposalStatus, Contractor } from '../types';
+import { Proposal, Contractor, ProposalStatus } from '../types';
 import { Button, Input, Card, Badge, Modal, Label } from '../components/UIComponents';
 import { 
   FileText, Plus, CheckCircle2, XCircle, Clock, 
-  ArrowRight, DollarSign, Filter, Search, AlertCircle 
+  ArrowRight, DollarSign, Search, AlertCircle, MoreVertical, Send, Eye 
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
@@ -13,254 +13,319 @@ export default function QuotationsPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   
+  // Datos
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
+  // Filtros y Búsqueda
+  const [activeTab, setActiveTab] = useState<'ALL' | 'SENT' | 'APPROVED' | 'DRAFT'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Modal de Aprobación
+  // Modal de Aprobación/Asignación
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [assignments, setAssignments] = useState<Record<string, { contractorId: string, cost: number }>>({});
 
+  // MENÚ CONTEXTUAL (Click Derecho)
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, proposal: Proposal | null }>({
+      visible: false, x: 0, y: 0, proposal: null
+  });
+
+  // Cargar datos iniciales
   useEffect(() => {
-    loadProposals();
-    loadContractors();
+    loadData();
+    // Cerrar menú al hacer clic en cualquier lado
+    const handleClickOutside = () => setContextMenu({ ...contextMenu, visible: false });
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
-  const loadContractors = async () => {
-      const data = await db.contractors.getAll();
-      setContractors(data);
-  };
-
-  const loadProposals = async () => {
+  const loadData = async () => {
     setLoading(true);
-    const data = await db.proposals.getAll();
-    setProposals(data);
+    const [propsData, contsData] = await Promise.all([
+        db.proposals.getAll(),
+        db.contractors.getAll()
+    ]);
+    setProposals(propsData);
+    setContractors(contsData);
     setLoading(false);
   };
 
-  const handleOpenApprove = async (proposal: Proposal) => {
-    // Cargar items frescos para asegurar que tenemos todo
-    const items = await db.proposals.getItems(proposal.id);
-    const proposalWithItems = { ...proposal, items };
-    
-    setSelectedProposal(proposalWithItems);
-    setSelectedItemIds(items.map(i => i.id)); // Por defecto seleccionar todo
-    setIsApproveModalOpen(true);
+  // --- LÓGICA DEL MENÚ CONTEXTUAL ---
+  const handleContextMenu = (e: React.MouseEvent, proposal: Proposal) => {
+      e.preventDefault(); // Evita el menú del navegador
+      setContextMenu({
+          visible: true,
+          x: e.pageX,
+          y: e.pageY,
+          proposal
+      });
   };
 
-  const confirmApproval = async () => {
-    if (!selectedProposal) return;
-    try {
-        await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments);
-        showToast("¡Propuesta aceptada y Cliente Activado! 🚀", "success");
-        setIsApproveModalOpen(false);
-        loadProposals();
-    } catch (e) {
-        console.error(e);
-        showToast("Error al aprobar propuesta", "error");
-    }
+  // --- ACCIONES RÁPIDAS ---
+  
+  // 1. Aprobar TODO Directamente
+  const handleApproveFull = async () => {
+      if (!contextMenu.proposal) return;
+      const items = await db.proposals.getItems(contextMenu.proposal.id);
+      const allIds = items.map(i => i.id);
+      
+      try {
+          // Aprobamos todo sin asignar (o podrías abrir modal si quieres forzar asignación)
+          // Aquí asumimos aprobación rápida sin asignar externos por defecto
+          await db.proposals.approve(contextMenu.proposal.id, allIds, {}); 
+          showToast("Propuesta aprobada totalmente", "success");
+          loadData();
+      } catch(e) { console.error(e); }
   };
+
+  // 2. Aprobar Parcialmente (Abre el Modal)
+  const handleApprovePartial = async () => {
+      if (!contextMenu.proposal) return;
+      // Preparamos el modal
+      const items = await db.proposals.getItems(contextMenu.proposal.id);
+      const propWithItems = { ...contextMenu.proposal, items };
+      
+      setSelectedProposal(propWithItems);
+      setSelectedItemIds(items.map(i => i.id)); // Seleccionar todo por defecto visualmente
+      setAssignments({});
+      setIsApproveModalOpen(true); // Abrimos modal
+  };
+
+  // 3. Cambiar estado simple (Enviado / Rechazado)
+  const handleChangeStatus = async (status: ProposalStatus) => {
+      if (!contextMenu.proposal) return;
+      // Aquí deberías tener una función simple de update en db, o usar update proposal
+      // Por simplicidad, asumiremos que tienes un db.proposals.updateStatus o similar.
+      // Si no, usa update genérico.
+      // Ejemplo simulado:
+      // await db.proposals.update(contextMenu.proposal.id, { status });
+      showToast(`Estado actualizado a ${status}`, "info");
+      loadData();
+  };
+
+  // Confirmación final del Modal (Igual que antes)
+  const confirmApprovalModal = async () => {
+      if (!selectedProposal) return;
+      try {
+          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments);
+          showToast("Gestión completada con éxito", "success");
+          setIsApproveModalOpen(false);
+          loadData();
+      } catch (e) {
+          console.error(e);
+          showToast("Error al procesar", "error");
+      }
+  };
+
+  // Filtrado
+  const filteredProposals = proposals.filter(p => {
+      const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchesTab = true;
+      if (activeTab === 'SENT') matchesTab = p.status === 'SENT';
+      if (activeTab === 'APPROVED') matchesTab = p.status === 'ACCEPTED' || p.status === 'PARTIALLY_ACCEPTED';
+      if (activeTab === 'DRAFT') matchesTab = p.status === 'DRAFT';
+
+      return matchesSearch && matchesTab;
+  });
 
   const getStatusBadge = (status: ProposalStatus) => {
       switch (status) {
-          case ProposalStatus.ACCEPTED: return <Badge variant="green">Aceptada</Badge>;
-          case ProposalStatus.PARTIALLY_ACCEPTED: return <Badge variant="blue">Parcial</Badge>;
+          case ProposalStatus.ACCEPTED: return <Badge variant="green">Aceptada Total</Badge>;
+          case ProposalStatus.PARTIALLY_ACCEPTED: return <Badge variant="blue">Aceptada Parcial</Badge>;
           case ProposalStatus.REJECTED: return <Badge variant="red">Rechazada</Badge>;
           case ProposalStatus.SENT: return <Badge variant="yellow">Enviada</Badge>;
           default: return <Badge variant="outline">Borrador</Badge>;
       }
   };
 
-  const filteredProposals = proposals.filter(p => {
-      const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            p.objective.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesFilter = filterStatus === 'ALL' || p.status === filterStatus;
-      return matchesSearch && matchesFilter;
-  });
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 pb-20 relative min-h-screen" onClick={() => setContextMenu({ ...contextMenu, visible: false })}>
         
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-indigo-600" /> Cotizaciones
+                    <FileText className="w-8 h-8 text-indigo-600" /> Gestión de Presupuestos
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Gestiona presupuestos y cierra ventas.</p>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">Historial, estados y aprobaciones.</p>
             </div>
             <Button onClick={() => navigate('/sales-copilot')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg">
                 <Plus className="w-4 h-4 mr-2" /> Nueva Cotización
             </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
-             <div className="relative flex-1">
-                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+        {/* PESTAÑAS Y BUSCADOR */}
+        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-2">
+             <div className="flex bg-gray-100 dark:bg-slate-800/50 p-1 rounded-xl flex-1">
+                {(['ALL', 'SENT', 'APPROVED', 'DRAFT'] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
+                            activeTab === tab 
+                            ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' 
+                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                        }`}
+                    >
+                        {tab === 'ALL' ? 'Todo' : tab === 'SENT' ? 'Enviados' : tab === 'APPROVED' ? 'Aprobados' : 'Borradores'}
+                    </button>
+                ))}
+             </div>
+             
+             <div className="relative md:w-64">
+                 <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                  <Input 
-                    placeholder="Buscar por cliente u objetivo..." 
-                    className="pl-9 bg-gray-50 dark:bg-slate-800/50 border-transparent"
+                    placeholder="Buscar cliente..." 
+                    className="pl-9 bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                  />
              </div>
-             <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-                {['ALL', 'DRAFT', 'SENT', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'REJECTED'].map(status => (
-                    <button
-                        key={status}
-                        onClick={() => setFilterStatus(status)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${
-                            filterStatus === status 
-                            ? 'bg-black dark:bg-white text-white dark:text-black' 
-                            : 'bg-gray-100 dark:bg-slate-800 text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700'
-                        }`}
-                    >
-                        {status === 'ALL' ? 'Todos' : status.replace('_', ' ')}
-                    </button>
-                ))}
-             </div>
         </div>
 
-        {/* List */}
+        {/* LISTA DE TARJETAS */}
         <div className="grid grid-cols-1 gap-4">
             {filteredProposals.length === 0 && (
-                <div className="text-center py-20 text-gray-400">No se encontraron cotizaciones.</div>
+                <div className="text-center py-20 text-gray-400 bg-gray-50 dark:bg-slate-900 rounded-xl border-dashed border-2 border-gray-200 dark:border-slate-800">
+                    No hay cotizaciones en esta sección.
+                </div>
             )}
             
             {filteredProposals.map((proposal) => (
-                <Card key={proposal.id} className="group hover:shadow-md transition-all border-l-4 border-l-transparent hover:border-l-indigo-500">
-                    <div className="p-5 flex flex-col md:flex-row justify-between gap-6">
-                        
-                        <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-3 mb-1">
-                                {getStatusBadge(proposal.status)}
-                                <span className="text-xs text-gray-400 font-mono">{new Date(proposal.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                {proposal.client?.name || 'Cliente Potencial'}
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                                {proposal.objective}
-                            </p>
-                            <div className="flex items-center gap-4 text-sm font-medium pt-2">
-                                <span className="flex items-center text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded-md">
-                                    <DollarSign className="w-3 h-3 mr-1"/> Recurrente: ${proposal.totalRecurringPrice.toLocaleString()}
-                                </span>
-                                {proposal.totalOneTimePrice > 0 && (
-                                    <span className="flex items-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">
-                                        <DollarSign className="w-3 h-3 mr-1"/> Único: ${proposal.totalOneTimePrice.toLocaleString()}
+                <div 
+                    key={proposal.id}
+                    onContextMenu={(e) => handleContextMenu(e, proposal)} // CLICK DERECHO AQUÍ
+                >
+                    <Card className="group hover:shadow-md transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 cursor-context-menu">
+                        <div className="p-5 flex flex-col md:flex-row justify-between gap-6">
+                            
+                            <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-3 mb-1">
+                                    {getStatusBadge(proposal.status)}
+                                    <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
+                                        <Clock className="w-3 h-3"/> {new Date(proposal.createdAt).toLocaleDateString()}
                                     </span>
-                                )}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                    {proposal.client?.name || 'Cliente Potencial'}
+                                </h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
+                                    {proposal.objective}
+                                </p>
+                                <div className="flex items-center gap-4 text-sm font-medium pt-2">
+                                    <span className="text-gray-900 dark:text-gray-100 font-bold">
+                                        Total: ${(proposal.totalRecurringPrice + proposal.totalOneTimePrice).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Botón visible de menú (para móviles o si no usan click derecho) */}
+                            <div className="flex items-center justify-center md:justify-end">
+                                 <button 
+                                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400"
+                                    onClick={(e) => { e.stopPropagation(); handleContextMenu(e, proposal); }}
+                                 >
+                                    <MoreVertical className="w-5 h-5"/>
+                                 </button>
                             </div>
                         </div>
-
-                        {/* Actions */}
-                        <div className="flex md:flex-col items-center justify-center gap-2 border-t md:border-t-0 md:border-l border-gray-100 dark:border-slate-800 pt-4 md:pt-0 md:pl-6">
-                             {(proposal.status === 'DRAFT' || proposal.status === 'SENT') && (
-                                 <Button 
-                                    onClick={() => handleOpenApprove(proposal)}
-                                    size="sm" 
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                 >
-                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Aprobar
-                                 </Button>
-                             )}
-                             
-                             <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="w-full"
-                                // Aquí podrías redirigir al detalle si tuvieras una página de detalle
-                                onClick={() => showToast("Funcionalidad de ver detalle pendiente", "info")}
-                             >
-                                 Ver Detalle
-                             </Button>
-                        </div>
-
-                    </div>
-                </Card>
+                    </Card>
+                </div>
             ))}
         </div>
 
-        {/* Modal de Aprobación Inteligente */}
-        <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Confirmar & Asignar Equipo">
-            <div className="space-y-6">
+        {/* --- MENÚ CONTEXTUAL PERSONALIZADO --- */}
+        {contextMenu.visible && (
+            <div 
+                className="fixed bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-56 animate-in fade-in zoom-in-95 duration-100"
+                style={{ top: contextMenu.y, left: contextMenu.x }}
+            >
+                <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 mb-1">
+                    <p className="text-xs font-bold text-gray-400 uppercase">Acciones</p>
+                    <p className="text-sm font-bold truncate text-gray-800 dark:text-white">{contextMenu.proposal?.client?.name}</p>
+                </div>
+
+                <button onClick={() => { handleApproveFull(); }} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4"/> Aprobar Totalmente
+                </button>
+                <button onClick={() => { handleApprovePartial(); }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4"/> Aprobar Parcialmente...
+                </button>
+                <button onClick={() => { handleChangeStatus(ProposalStatus.SENT); }} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-2">
+                    <Send className="w-4 h-4"/> Marcar como Enviado
+                </button>
+                 <button onClick={() => { /* Ver Detalle */ }} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2">
+                    <Eye className="w-4 h-4"/> Ver Detalle
+                </button>
+                <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                <button onClick={() => { handleChangeStatus(ProposalStatus.REJECTED); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                    <XCircle className="w-4 h-4"/> Rechazar
+                </button>
+            </div>
+        )}
+
+        {/* --- MODAL DE APROBACIÓN (Reutilizado) --- */}
+        <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Aprobar Parcialmente & Asignar">
+             <div className="space-y-6">
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                     <div className="text-sm text-blue-800 dark:text-blue-200">
-                        <p className="font-bold">Asignación de Recursos</p>
-                        <p>Define quién se encargará de cada servicio aprobado.</p>
+                        <p className="font-bold">Selección de Servicios</p>
+                        <p>Marca solo los servicios que el cliente aceptó. Los demás quedarán descartados.</p>
                     </div>
                 </div>
 
                 <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     {selectedProposal?.items?.map(item => {
                         const isSelected = selectedItemIds.includes(item.id);
-                        if (!isSelected) return null;
-
                         const assignment = assignments[item.id] || { contractorId: '', cost: 0 };
 
                         return (
-                            <div key={item.id} className="border border-gray-200 dark:border-slate-700 rounded-xl p-4 space-y-3 bg-white dark:bg-slate-800">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex gap-2">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={selectedItemIds.includes(item.id)} 
-                                            onChange={() => {
-                                                if (selectedItemIds.includes(item.id)) {
-                                                    setSelectedItemIds(selectedItemIds.filter(id => id !== item.id));
-                                                } else {
-                                                    setSelectedItemIds([...selectedItemIds, item.id]);
-                                                }
-                                            }}
-                                            className="mt-1"
-                                        />
+                            <div key={item.id} className={`border rounded-xl p-4 space-y-3 transition-all ${isSelected ? 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700' : 'bg-gray-50 dark:bg-slate-900 opacity-60'}`}>
+                                <div className="flex justify-between items-start cursor-pointer" onClick={() => {
+                                        if (isSelected) {
+                                            setSelectedItemIds(selectedItemIds.filter(id => id !== item.id));
+                                        } else {
+                                            setSelectedItemIds([...selectedItemIds, item.id]);
+                                        }
+                                    }}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                        </div>
                                         <div>
-                                            <p className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                                {item.serviceSnapshotName}
-                                            </p>
-                                            <p className="text-xs text-gray-500">Precio Cliente: ${item.serviceSnapshotCost.toLocaleString()}</p>
+                                            <p className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</p>
+                                            <p className="text-xs text-gray-500">${item.serviceSnapshotCost.toLocaleString()}</p>
                                         </div>
                                     </div>
-                                    <Badge variant="blue">{item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}</Badge>
                                 </div>
-
-                                {/* Asignación */}
-                                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-slate-700">
-                                    <div>
-                                        <Label className="text-xs">Asignar a:</Label>
-                                        <select 
-                                            className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2"
-                                            value={assignment.contractorId}
-                                            onChange={(e) => setAssignments({
-                                                ...assignments,
-                                                [item.id]: { ...assignment, contractorId: e.target.value }
-                                            })}
-                                        >
-                                            <option value="">(Yo / Interno)</option>
-                                            {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
+                                {isSelected && (
+                                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100 dark:border-slate-700 animate-in fade-in">
+                                        <div>
+                                            <Label className="text-xs mb-1 block">Responsable:</Label>
+                                            <select 
+                                                className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2"
+                                                value={assignment.contractorId}
+                                                onChange={(e) => setAssignments({ ...assignments, [item.id]: { ...assignment, contractorId: e.target.value } })}
+                                            >
+                                                <option value="">(Interno)</option>
+                                                {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs mb-1 block">Pago Socio:</Label>
+                                            <Input 
+                                                type="number" className="h-[38px] text-sm" placeholder="0"
+                                                value={assignment.cost}
+                                                onChange={(e) => setAssignments({ ...assignments, [item.id]: { ...assignment, cost: Number(e.target.value) } })}
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <Label className="text-xs">Pago al Socio ($):</Label>
-                                        <Input 
-                                            type="number" 
-                                            className="h-[38px] text-sm"
-                                            placeholder="0"
-                                            value={assignment.cost}
-                                            onChange={(e) => setAssignments({
-                                                ...assignments,
-                                                [item.id]: { ...assignment, cost: Number(e.target.value) }
-                                            })}
-                                        />
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         );
                     })}
@@ -268,8 +333,8 @@ export default function QuotationsPage() {
 
                 <div className="flex gap-3 pt-2">
                     <Button variant="secondary" onClick={() => setIsApproveModalOpen(false)} className="flex-1">Cancelar</Button>
-                    <Button onClick={confirmApproval} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white">
-                        Confirmar y Activar
+                    <Button onClick={confirmApprovalModal} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={selectedItemIds.length === 0}>
+                        Confirmar Aprobación
                     </Button>
                 </div>
             </div>

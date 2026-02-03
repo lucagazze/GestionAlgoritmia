@@ -3,21 +3,28 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3 } from 'lucide-react';
-import { Card, Button } from '../components/UIComponents';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight } from 'lucide-react';
+import { Card, Button, Modal, Badge } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function PaymentsPage() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
+    const [payments, setPayments] = useState<any[]>([]); // Real payments
     const [referenceDate, setReferenceDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'CALENDAR' | 'FORECAST'>('CALENDAR');
+    const [viewMode, setViewMode] = useState<'CALENDAR' | 'FORECAST' | 'HISTORY'>('CALENDAR');
+    const [selectedPayment, setSelectedPayment] = useState<any>(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     useEffect(() => {
         const load = async () => {
-            const data = await db.projects.getAll();
-            setProjects(data);
+            const [projectsData, paymentsData] = await Promise.all([
+                db.projects.getAll(),
+                db.payments.getAll()
+            ]);
+            setProjects(projectsData);
+            setPayments(paymentsData);
             setLoading(false);
         };
         load();
@@ -123,7 +130,13 @@ export default function PaymentsPage() {
                         onClick={() => setViewMode('FORECAST')} 
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'FORECAST' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
-                        <TrendingUp className="w-4 h-4" /> Proyección 90 Días
+                        <TrendingUp className="w-4 h-4" /> Proyección
+                    </button>
+                    <button 
+                        onClick={() => setViewMode('HISTORY')} 
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        <History className="w-4 h-4" /> Historial
                     </button>
                 </div>
             </div>
@@ -263,6 +276,130 @@ export default function PaymentsPage() {
                     </Card>
                 </div>
             )}
+
+            {/* --- VIEW: HISTORY --- */}
+            {viewMode === 'HISTORY' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    <Card className="p-6">
+                        <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                             <History className="w-5 h-5"/> Historial de Transacciones
+                        </h2>
+                        
+                        {payments.length === 0 ? (
+                            <p className="text-gray-500 text-center py-10">No hay pagos registrados aún.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {payments.map((payment) => (
+                                    <div 
+                                        key={payment.id} 
+                                        onClick={() => { setSelectedPayment(payment); setIsDetailModalOpen(true); }}
+                                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex justify-between items-center group"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                                <DollarSign className="w-5 h-5"/>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 dark:text-white">
+                                                    {payment.client?.name || 'Cliente'}
+                                                </h4>
+                                                <p className="text-xs text-gray-500">
+                                                    {new Date(payment.date).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <p className="font-mono font-bold text-lg text-emerald-600 dark:text-emerald-400">
+                                                    +${payment.amount.toLocaleString()}
+                                                </p>
+                                                <Badge variant="outline" className="text-[10px]">PAGADO</Badge>
+                                            </div>
+                                            <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            )}
+
+            {/* MODAL DE DESGLOSE DE DINERO */}
+            <Modal 
+                isOpen={isDetailModalOpen} 
+                onClose={() => setIsDetailModalOpen(false)} 
+                title="Desglose de Transacción"
+            >
+                {selectedPayment && (
+                    <div className="space-y-6">
+                        {/* Encabezado del Pago */}
+                        <div className="text-center space-y-1">
+                            <p className="text-sm text-gray-500">Pago recibido de</p>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                {selectedPayment.client?.name || 'Cliente Desconocido'}
+                            </h3>
+                            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
+                                ${selectedPayment.amount.toLocaleString()}
+                            </div>
+                            <Badge variant="outline" className="mt-2">
+                                {new Date(selectedPayment.date).toLocaleDateString()}
+                            </Badge>
+                        </div>
+
+                        {/* La Matemática (Tú vs Socio) */}
+                        <div className="bg-gray-50 dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 space-y-4">
+                            
+                            {/* Fila del Socio */}
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                                        <User className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Para el Socio (Costos)</p>
+                                        <p className="text-xs text-gray-500">Pago por servicios asignados</p>
+                                    </div>
+                                </div>
+                                <span className="text-lg font-bold text-red-500">
+                                    - ${selectedPayment.client?.outsourcingCost?.toLocaleString() || '0'}
+                                </span>
+                            </div>
+
+                            <div className="border-t border-gray-200 dark:border-slate-700"></div>
+
+                            {/* Fila Tuya (Agencia) */}
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                                        <Briefcase className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">Tu Ganancia Neta</p>
+                                        <p className="text-xs text-gray-500">Lo que queda en caja</p>
+                                    </div>
+                                </div>
+                                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                                    ${(selectedPayment.amount - (selectedPayment.client?.outsourcingCost || 0)).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Nota Visual de Margen */}
+                        <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
+                            <Wallet className="w-3 h-3" />
+                            <span>
+                                Margen de ganancia: {Math.round(((selectedPayment.amount - (selectedPayment.client?.outsourcingCost || 0)) / selectedPayment.amount) * 100)}%
+                            </span>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={() => setIsDetailModalOpen(false)}>Cerrar</Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }
