@@ -624,7 +624,61 @@ export const db = {
         
         const { error } = await supabase.from('Proposal').delete().eq('id', id);
         if (error) throw error;
-    }
+    },
+
+    // ✅ NUEVA FUNCIÓN: Aprobar propuesta y activar cliente
+    approve: async (proposalId: string, acceptedItemIds: string[], assignments?: Record<string, { contractorId: string, cost: number }>): Promise<void> => {
+        // 1. Obtener la propuesta y sus items
+        const { data: proposal } = await supabase.from('Proposal').select('*, items:ProposalItem(*)').eq('id', proposalId).single();
+        if (!proposal) throw new Error("Propuesta no encontrada");
+
+        // 2. Filtrar items aceptados
+        const allItems = proposal.items || [];
+        const acceptedItems = allItems.filter((item: any) => acceptedItemIds.includes(item.id));
+        
+        // ✨ ACTUALIZAR ASIGNACIONES
+        if (assignments) {
+             for (const item of acceptedItems) {
+                 const assignment = assignments[item.id];
+                 if (assignment) {
+                     await supabase.from('ProposalItem').update({
+                         assignedContractorId: assignment.contractorId || null,
+                         outsourcingCost: assignment.cost || 0
+                     }).eq('id', item.id);
+                 }
+             }
+        }
+
+        // 3. Calcular nuevos totales reales
+        const newRecurring = acceptedItems
+            .filter((i: any) => i.serviceSnapshotType === 'RECURRING')
+            .reduce((acc: number, curr: any) => acc + (curr.serviceSnapshotCost || 0), 0);
+
+        const status = acceptedItemIds.length === allItems.length ? 'ACCEPTED' : 'PARTIALLY_ACCEPTED';
+
+        // 4. Actualizar Propuesta
+        await supabase.from('Proposal').update({ 
+            status: status,
+            totalRecurringPrice: newRecurring // Actualizamos al valor real aceptado
+        }).eq('id', proposalId);
+
+        // 5. ✨ MAGIA: Activar Cliente y actualizar su Revenue
+        if (proposal.clientId) {
+            await supabase.from('Client').update({
+                status: 'ACTIVE', // ¡Cliente pasa a Activo!
+                monthlyRevenue: newRecurring, // Se actualiza lo que paga por mes
+                lastContactDate: new Date().toISOString()
+            }).eq('id', proposal.clientId);
+            
+            // Opcional: Crear nota automática en el cliente
+            await supabase.from('ClientNote').insert({
+                clientId: proposal.clientId,
+                type: 'INFO',
+                content: `🚀 Propuesta aceptada (${status === 'ACCEPTED' ? 'Total' : 'Parcial'}). Nuevo fee mensual: $${newRecurring}`,
+                createdAt: new Date().toISOString()
+            });
+        }
+    },
   },
 
   contractors: {
@@ -652,7 +706,23 @@ export const db = {
     delete: async (id: string) => {
       const { error } = await supabase.from('Contractor').delete().eq('id', id);
       if (error) throw error;
-    }
+    },
+    getAssignedItems: async (contractorId: string) => {
+        // Traemos items donde el assignedContractor sea el ID, y hacemos join con Proposal y Client
+        const { data, error } = await supabase
+            .from('ProposalItem')
+            .select(`
+                *,
+                proposal:Proposal (
+                    id,
+                    client:Client ( id, name )
+                )
+            `)
+            .eq('assignedContractorId', contractorId);
+        
+        if (error) console.error(error);
+        return data || [];
+    },
   },
 
   // --- AUDIT LOG (Transactional Undo) ---

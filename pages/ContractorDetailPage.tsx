@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Contractor, Project, Task, ProjectStatus, TaskStatus } from '../types';
 import { Card, Button, Input, Label, Badge } from '../components/UIComponents';
-import { ArrowLeft, Edit2, Trash2, Save, X, Briefcase, CheckCircle2, Clock, DollarSign, Mail, Phone } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, Save, X, Briefcase, CheckCircle2, Clock, DollarSign, Mail, Phone, ExternalLink } from 'lucide-react';
 
 export default function ContractorDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +12,7 @@ export default function ContractorDetailPage() {
   const [contractor, setContractor] = useState<Contractor | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [assignedItems, setAssignedItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -32,10 +33,11 @@ export default function ContractorDetailPage() {
     if (!id) return;
     setLoading(true);
     
-    const [contractorData, allProjects, allTasks] = await Promise.all([
+    const [contractorData, allProjects, allTasks, assignedData] = await Promise.all([
       db.contractors.getById(id),
       db.projects.getAll(),
-      db.tasks.getAll()
+      db.tasks.getAll(),
+      db.contractors.getAssignedItems(id)
     ]);
     
     if (contractorData) {
@@ -52,6 +54,7 @@ export default function ContractorDetailPage() {
     
     setProjects(allProjects.filter(p => p.assignedPartnerId === id));
     setTasks(allTasks.filter(t => t.assigneeId === id));
+    setAssignedItems(assignedData || []);
     setLoading(false);
   };
 
@@ -295,6 +298,48 @@ export default function ContractorDetailPage() {
           </div>
         )}
       </Card>
+
+      {/* Work Order / Assigned Items Section */}
+      <div className="mt-8">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Briefcase className="w-5 h-5 text-indigo-500"/> Carga de Trabajo Activa
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {assignedItems.length === 0 && <p className="text-gray-500 italic">No tiene servicios asignados actualmente.</p>}
+              
+              {assignedItems.map((item, idx) => (
+                  <Card key={idx} className="p-4 flex flex-col gap-3 border-l-4 border-l-indigo-500">
+                      <div className="flex justify-between items-start">
+                          <div>
+                              <h4 className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</h4>
+                              <p className="text-sm text-gray-500">Cliente: <span className="font-semibold text-indigo-600">{item.proposal?.client?.name}</span></p>
+                          </div>
+                          <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>
+                              {item.serviceSnapshotType === 'RECURRING' ? 'Recurrente' : 'One-Time'}
+                          </Badge>
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-slate-800 text-sm">
+                          <span className="text-gray-500">Pago acordado:</span>
+                          <span className="font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
+                              ${item.outsourcingCost?.toLocaleString()}
+                          </span>
+                      </div>
+                      
+                      {/* Enlace directo al proyecto */}
+                      <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="w-full mt-1 text-xs text-gray-400 hover:text-indigo-600"
+                          onClick={() => navigate(`/projects/${item.proposal?.clientId}?tab=PROFILE`)}
+                      >
+                          Ver Proyecto <ExternalLink className="w-3 h-3 ml-1"/>
+                      </Button>
+                  </Card>
+              ))}
+          </div>
+      </div>
 
     </div>
   );

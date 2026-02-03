@@ -18,6 +18,7 @@ import ClientPortalPage from './pages/ClientPortalPage';
 import PaymentsPage from './pages/PaymentsPage';
 import AuditPage from './pages/AuditPage';
 import AutomationsPage from './pages/AutomationsPage';
+import QuotationsPage from './pages/QuotationsPage';
 import { AIActionCenter } from './components/AIActionCenter';
 import { CommandPalette } from './components/CommandPalette';
 import { db } from './services/db';
@@ -205,6 +206,7 @@ const MainLayout = () => {
               <Route path="/partners/:id" element={<ContractorDetailPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/services" element={<ServicesPage />} />
+              <Route path="/quotations" element={<QuotationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/sales-copilot" element={<SalesCopilotPage />} />
               <Route path="/lab" element={<LabPage />} />

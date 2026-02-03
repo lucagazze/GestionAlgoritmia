@@ -8,6 +8,7 @@ export enum ProposalStatus {
   DRAFT = 'DRAFT',
   SENT = 'SENT',
   ACCEPTED = 'ACCEPTED',
+  PARTIALLY_ACCEPTED = 'PARTIALLY_ACCEPTED', // ✅ NUEVO
   REJECTED = 'REJECTED',
 }
 
