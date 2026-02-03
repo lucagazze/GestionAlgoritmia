@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { Project, ProjectStatus } from '../types';
 import { Card, Button, Input, Slider, Label } from '../components/UIComponents';
-import { Rocket, Target, TrendingUp, DollarSign, Calculator, ArrowRight, UserPlus, MinusCircle } from 'lucide-react';
+import { Rocket, Target, TrendingUp, DollarSign, Calculator, ArrowRight, UserPlus, MinusCircle, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function LabPage() {
     const [currentMRR, setCurrentMRR] = useState(0);
@@ -18,6 +17,10 @@ export default function LabPage() {
     // Scenario Simulator Inputs
     const [hiringCost, setHiringCost] = useState(500);
     const [newHires, setNewHires] = useState(0);
+
+    // ESTADO PARA EL TEST DE EMAIL
+    const [sending, setSending] = useState(false);
+    const [emailStatus, setEmailStatus] = useState<'idle' | 'success' | 'error'>('idle');
     
     useEffect(() => {
         const load = async () => {
@@ -42,6 +45,32 @@ export default function LabPage() {
     // Scenario Logic
     const projectedCost = newHires * hiringCost;
     const breakEvenClients = Math.ceil(projectedCost / (avgTicket || 1));
+
+    // FUNCIÓN PARA PROBAR EL EMAIL
+    const handleTestEmail = async () => {
+        setSending(true);
+        setEmailStatus('idle');
+        try {
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ destEmail: 'info@algoritmiadesarrollos.com.ar' }) // Se auto-envía para probar
+            });
+            
+            if (response.ok) {
+                setEmailStatus('success');
+                alert("¡Correo enviado! Revisa la bandeja de entrada de info@algoritmiadesarrollos.com.ar");
+            } else {
+                throw new Error('Falló el envío');
+            }
+        } catch (error) {
+            console.error(error);
+            setEmailStatus('error');
+            alert("Error al enviar. Asegurate de estar corriendo esto con 'vercel dev' o desplegado en Vercel, ya que 'npm run dev' a veces no carga la carpeta /api localmente.");
+        } finally {
+            setSending(false);
+        }
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto pb-20">
@@ -132,6 +161,28 @@ export default function LabPage() {
                                     </ul>
                                 </div>
                             )}
+                        </div>
+                    </Card>
+
+                    {/* NUEVA CARD: ZONA DE PRUEBAS SMTP */}
+                    <Card className="border-indigo-100 dark:border-indigo-900/30">
+                        <div className="p-6 flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <Mail className="w-5 h-5 text-indigo-500"/> Test de Conexión
+                                </h3>
+                                <p className="text-xs text-gray-500 mt-1">Prueba envío con Hostinger</p>
+                            </div>
+                            <Button 
+                                onClick={handleTestEmail} 
+                                disabled={sending}
+                                className={`
+                                    ${emailStatus === 'success' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                    ${emailStatus === 'error' ? 'bg-red-600 hover:bg-red-700' : ''}
+                                `}
+                            >
+                                {sending ? 'Enviando...' : emailStatus === 'success' ? '¡Enviado!' : emailStatus === 'error' ? 'Reintentar' : 'Probar Email'}
+                            </Button>
                         </div>
                     </Card>
                 </div>
