@@ -656,7 +656,7 @@ export const db = {
         if (error) throw error;
     },
 
-    approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}): Promise<void> => {
+    approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}, durationMonths?: number): Promise<void> => {
         // A. Obtener propuesta
         const { data: proposal } = await supabase.from('Proposal').select('*, items:ProposalItem(*)').eq('id', proposalId).single();
         if (!proposal) throw new Error("Propuesta no encontrada");
@@ -676,6 +676,10 @@ export const db = {
             .filter((i: any) => i.serviceSnapshotType === 'RECURRING')
             .reduce((acc: number, curr: any) => acc + (curr.serviceSnapshotCost || 0), 0);
         
+        const newOneTime = acceptedItems
+            .filter((i: any) => i.serviceSnapshotType === 'ONE_TIME')
+            .reduce((acc: number, curr: any) => acc + (curr.serviceSnapshotCost || 0), 0);
+        
         let totalOutsourcing = 0;
 
         // D. Asignar Contratistas
@@ -690,11 +694,17 @@ export const db = {
             }
         }
 
-        // E. Actualizar Estado Propuesta
+        // E. Actualizar Estado Propuesta (con duración modificada si se proporciona)
         const status = acceptedItemIds.length === allItems.length ? 'ACCEPTED' : 'PARTIALLY_ACCEPTED';
+        const finalDuration = durationMonths !== undefined ? durationMonths : proposal.durationMonths;
+        const totalContractValue = newOneTime + (newRecurring * finalDuration);
+        
         await supabase.from('Proposal').update({ 
             status: status,
-            totalRecurringPrice: newRecurring
+            totalRecurringPrice: newRecurring,
+            totalOneTimePrice: newOneTime,
+            totalContractValue: totalContractValue,
+            durationMonths: finalDuration
         }).eq('id', proposalId);
 
         // F. Activar Cliente

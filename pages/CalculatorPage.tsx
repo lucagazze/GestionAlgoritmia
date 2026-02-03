@@ -105,6 +105,23 @@ export default function CalculatorPage() {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isChatOpen]);
 
+  // ✅ NUEVO EFFECT: DETECTAR ID EN URL Y CARGAR
+  useEffect(() => {
+      const proposalId = searchParams.get('proposalId');
+      if (proposalId && !isLoading) {
+          // Buscamos la propuesta en los datos ya cargados o la pedimos
+          const proposal = proposals.find(p => p.id === proposalId);
+          if (proposal) {
+              handleLoadProposal(proposal);
+          } else {
+              // Si no está en la lista inicial (ej. recarga de página), la pedimos
+              db.proposals.getById(proposalId).then(p => {
+                  if (p) handleLoadProposal(p);
+              });
+          }
+      }
+  }, [searchParams, isLoading, proposals]); // Se ejecuta cuando cambian los params o terminan de cargar los datos
+
   // --- LOGIC: CALCULATIONS ---
   const toggleService = (id: string) => {
     setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
@@ -201,6 +218,13 @@ export default function CalculatorPage() {
   const handleLoadProposal = (p: any) => {
       setActiveProposalId(p.id); // Set active ID for updates
       
+      // Chequeo si es read-only (aprobada)
+      if (p.status === ProposalStatus.ACCEPTED || p.status === ProposalStatus.PARTIALLY_ACCEPTED) {
+          setIsReadOnly(true);
+      } else {
+          setIsReadOnly(false);
+      }
+      
       // 1. Load Client Info
       setClientInfo({
           name: p.client?.name || '',
@@ -248,6 +272,7 @@ export default function CalculatorPage() {
               duration: p.durationMonths || 6
           });
 
+          // ✅ Forzamos la vista al modo Calculadora y al Paso 3
           setViewMode('CALCULATOR');
           setCurrentStep(3);
           
@@ -283,6 +308,7 @@ export default function CalculatorPage() {
   };
 
   const saveProposal = async () => {
+    if (isReadOnly) { alert("Esta propuesta ya está aprobada y no se puede modificar."); return; }
     if (!clientInfo.name || selectedServiceIds.length === 0) {
       alert("Falta nombre del cliente o servicios.");
       return;
@@ -341,6 +367,7 @@ export default function CalculatorPage() {
 
   const handleNewProposal = () => {
       setActiveProposalId(null);
+      setIsReadOnly(false); // Reset read only
       setClientInfo({ name: '', industry: '', targetAudience: '', currentSituation: '', objective: '' });
       setSelectedServiceIds([]);
       setCustomPrices({});
@@ -894,20 +921,28 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Cotizador</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400">Generador de presupuestos High-Ticket.</p>
           </div>
-          <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
-              <button 
-                onClick={handleNewProposal} 
-                className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'CALCULATOR' && !activeProposalId ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Generador
-              </button>
-              <button 
-                onClick={() => {setViewMode('HISTORY'); handleRefreshHistory();}} 
-                className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                Historial
-              </button>
-          </div>
+          
+          {/* Si estamos viendo una propuesta cargada, mostrar botón de cerrar */}
+          {activeProposalId ? (
+              <Button variant="outline" onClick={handleNewProposal} className="border-red-200 text-red-500 hover:bg-red-50">
+                  <X className="w-4 h-4 mr-2"/> Cerrar Propuesta
+              </Button>
+          ) : (
+              <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                  <button 
+                    onClick={handleNewProposal} 
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'CALCULATOR' ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Generador
+                  </button>
+                  <button 
+                    onClick={() => {setViewMode('HISTORY'); handleRefreshHistory();}} 
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    Historial
+                  </button>
+              </div>
+          )}
       </div>
 
       {viewMode === 'HISTORY' ? (

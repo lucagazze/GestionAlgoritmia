@@ -6,7 +6,7 @@ import { Button, Input, Card, Badge, Modal, Label } from '../components/UICompon
 import { 
   FileText, Plus, CheckCircle2, XCircle, Clock, 
   Search, MoreVertical, Send, AlertCircle, Loader2, 
-  Wallet, User, Calendar, Briefcase, Edit, ArrowRight
+  Wallet, User, Calendar, Briefcase, Edit, ArrowRight, Eye // Importamos Eye
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
@@ -104,9 +104,8 @@ export default function QuotationsPage() {
       setIsDetailModalOpen(true);
   };
 
-  // ✅ NUEVA ACCIÓN: IR AL COTIZADOR PARA VER EL ARMADO
+  // ✅ ACCIÓN PRINCIPAL: IR AL COTIZADOR (CALCULATOR)
   const handleViewInCopilot = (proposal: Proposal) => {
-      // Redirige a la página del cotizador pasando el ID de la propuesta en la URL
       navigate(`/calculator?proposalId=${proposal.id}`);
   };
 
@@ -115,7 +114,7 @@ export default function QuotationsPage() {
       try {
           const items = await db.proposals.getItems(contextMenu.proposal.id);
           const allItemIds = items.map(i => i.id);
-          await db.proposals.approve(contextMenu.proposal.id, allItemIds, {});
+          await db.proposals.approve(contextMenu.proposal.id, allItemIds, {}, contextMenu.proposal.durationMonths);
           showToast("✅ Presupuesto Aprobado", "success");
           loadData();
       } catch (e) { showToast("Error al aprobar", "error"); }
@@ -137,7 +136,7 @@ export default function QuotationsPage() {
   const confirmApprovalModal = async () => {
       if (!selectedProposal) return;
       try {
-          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments);
+          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments, approvedDuration);
           showToast("Gestión completada con éxito", "success");
           setIsApproveModalOpen(false);
           loadData();
@@ -173,11 +172,6 @@ export default function QuotationsPage() {
       }
   };
 
-  const getContractorName = (id?: string) => {
-      if (!id) return 'Agencia (Interno)';
-      return contractors.find(c => c.id === id)?.name || 'Desconocido';
-  };
-
   const filteredProposals = proposals.filter(p => {
       const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase());
       let matchesTab = true;
@@ -198,7 +192,6 @@ export default function QuotationsPage() {
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400 mt-1">Gestión financiera y estados.</p>
             </div>
-            {/* Botón "Generar Nuevo" redirige al cotizador vacío */}
             <Button onClick={() => navigate('/calculator')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg">
                 <Plus className="w-4 h-4 mr-2" /> Generar Nuevo
             </Button>
@@ -243,9 +236,7 @@ export default function QuotationsPage() {
             
             {!loading && filteredProposals.map((proposal) => {
                 const finance = calculateFinancials(proposal);
-                // Determinamos si está aprobado para deshabilitar el clic derecho si quisieras (opcional)
-                // const isApproved = proposal.status === ProposalStatus.ACCEPTED || proposal.status === ProposalStatus.PARTIALLY_ACCEPTED;
-
+                
                 return (
                     <div 
                         key={proposal.id}
@@ -280,7 +271,6 @@ export default function QuotationsPage() {
                                     </div>
                                 </div>
 
-                                {/* Valor Total del Contrato */}
                                 <div className="flex flex-col items-end justify-center border-l pl-4 border-gray-100 dark:border-slate-800 min-w-[120px]">
                                     <span className="text-xl font-black text-gray-900 dark:text-white">
                                         ${finance.totalContractRevenue.toLocaleString()}
@@ -292,21 +282,21 @@ export default function QuotationsPage() {
                                 </div>
                             </div>
 
-                            {/* ✅ BOTÓN "VER EN COTIZADOR" (Visible al hacer hover) */}
+                            {/* ✅ BOTÓN ACTUALIZADO: VER DETALLE */}
                             <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity md:block hidden">
                                 <Button 
                                     size="sm" 
                                     variant="secondary"
                                     onClick={(e) => {
-                                        e.stopPropagation(); // Evita que se abra el detalle al hacer clic
+                                        e.stopPropagation();
                                         handleViewInCopilot(proposal);
                                     }}
-                                    className="shadow-sm border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                                    className="shadow-sm border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-indigo-600 font-bold"
                                 >
-                                    <Edit className="w-4 h-4 mr-2 text-indigo-600"/> Ver Armado
+                                    <Eye className="w-4 h-4 mr-2"/> Ver Detalle
                                 </Button>
                             </div>
-                            {/* Versión móvil del botón */}
+                            
                              <div className="md:hidden flex justify-end px-5 pb-4">
                                 <Button 
                                     size="sm" 
@@ -317,7 +307,7 @@ export default function QuotationsPage() {
                                     }}
                                     className="w-full"
                                 >
-                                    <Edit className="w-4 h-4 mr-2"/> Ver Armado en Cotizador
+                                    <Eye className="w-4 h-4 mr-2"/> Ver Detalle
                                 </Button>
                             </div>
                         </Card>
@@ -326,19 +316,13 @@ export default function QuotationsPage() {
             })}
         </div>
 
-        {/* Menú Contextual */}
+        {/* ... (Menú Contextual y Modales se mantienen igual) ... */}
         {contextMenu.visible && (
-            <div 
-                className="fixed bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
-                style={{ top: contextMenu.y, left: contextMenu.x }}
-            >
+            <div className="fixed bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}>
                 <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones Rápidas</p>
                 </div>
                 <div className="p-1 space-y-0.5">
-                    {/* Opcional: Deshabilitar acciones si ya está aprobado */}
-                    {/* {contextMenu.proposal && contextMenu.proposal.status !== ProposalStatus.ACCEPTED && contextMenu.proposal.status !== ProposalStatus.PARTIALLY_ACCEPTED && ( ... botones ... )} */}
-                    
                     <button onClick={handleQuickApprove} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4"/> Aprobar Totalmente
                     </button>
@@ -355,60 +339,42 @@ export default function QuotationsPage() {
             </div>
         )}
 
-        {/* MODAL DETALLE FINANCIERO (DOBLE CLIC) - Se mantiene igual */}
-        <Modal 
-            isOpen={isDetailModalOpen} 
-            onClose={() => setIsDetailModalOpen(false)} 
-            title="Detalle Económico del Proyecto"
-        >
+        {/* Modal Detalle (Modificado para usar el nuevo botón también) */}
+        <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Detalle Económico del Proyecto">
             {selectedDetailProposal && (() => {
                 const fin = calculateFinancials(selectedDetailProposal);
                 return (
                     <div className="space-y-6">
-                        {/* ... (Contenido del modal de detalle igual que antes) ... */}
                         <div className="flex justify-between items-start">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {selectedDetailProposal.client?.name}
-                                </h2>
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedDetailProposal.client?.name}</h2>
                                 <div className="flex items-center gap-2 mt-1">
                                     {getStatusBadge(selectedDetailProposal.status)}
-                                    <span className="text-sm text-gray-500">
-                                        Duración: <b>{fin.duration} meses</b>
-                                    </span>
+                                    <span className="text-sm text-gray-500">Duración: <b>{fin.duration} meses</b></span>
                                 </div>
                             </div>
                             <div className="text-right">
                                 <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
-                                <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
-                                    ${fin.totalContractRevenue.toLocaleString()}
-                                </p>
+                                <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">${fin.totalContractRevenue.toLocaleString()}</p>
                             </div>
                         </div>
-
+                        {/* ... Grids de finanzas ... */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
                                 <p className="text-sm font-bold text-emerald-700">Tu Ganancia Neta</p>
-                                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
-                                    ${fin.netProfit.toLocaleString()}
-                                </p>
+                                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">${fin.netProfit.toLocaleString()}</p>
                             </div>
                             <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
                                 <p className="text-sm font-bold text-red-700">Gastos de Equipo</p>
-                                <p className="text-2xl font-bold text-red-800 dark:text-red-200">
-                                    ${fin.totalContractCost.toLocaleString()}
-                                </p>
+                                <p className="text-2xl font-bold text-red-800 dark:text-red-200">${fin.totalContractCost.toLocaleString()}</p>
                             </div>
                             <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Mensualidad</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                                    ${fin.revenueRecurring.toLocaleString()}
-                                </p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">${fin.revenueRecurring.toLocaleString()}</p>
                             </div>
                         </div>
 
                         <div className="flex justify-end gap-3 pt-2">
-                             {/* ✅ BOTÓN TAMBIÉN EN EL MODAL DE DETALLE */}
                              <Button 
                                 variant="outline"
                                 onClick={() => {
@@ -416,7 +382,7 @@ export default function QuotationsPage() {
                                     handleViewInCopilot(selectedDetailProposal);
                                 }}
                             >
-                                <Edit className="w-4 h-4 mr-2"/> Ver Armado Completo
+                                <Eye className="w-4 h-4 mr-2"/> Ver Detalle Completo
                             </Button>
                             <Button onClick={() => setIsDetailModalOpen(false)} variant="secondary">Cerrar</Button>
                         </div>
@@ -425,12 +391,13 @@ export default function QuotationsPage() {
             })()}
         </Modal>
 
-        {/* MODAL DE APROBACIÓN PARCIAL (Se mantiene igual) */}
+        {/* Modal de Aprobación (Mismo código que tenías) */}
         <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Modificar Condiciones & Aprobar">
              {selectedProposal && (() => {
                  const previewFin = calculateFinancials(selectedProposal, approvedDuration, selectedItemIds);
                  return (
                     <div className="space-y-6">
+                        {/* ... contenido del modal ... */}
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-start gap-3">
                             <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
                             <div className="text-sm text-blue-800 dark:text-blue-200">
@@ -441,17 +408,10 @@ export default function QuotationsPage() {
                         <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
                             <Label className="mb-2 block font-bold">Duración del Contrato (Meses)</Label>
                             <div className="flex items-center gap-4">
-                                <Input 
-                                    type="number" min={1} max={60}
-                                    value={approvedDuration}
-                                    onChange={(e) => setApprovedDuration(Number(e.target.value))}
-                                    className="w-24 text-center font-bold text-lg"
-                                />
+                                <Input type="number" min={1} max={60} value={approvedDuration} onChange={(e) => setApprovedDuration(Number(e.target.value))} className="w-24 text-center font-bold text-lg" />
                                 <div className="text-sm text-gray-500">
                                     <p>Nuevo Total Estimado:</p>
-                                    <p className="font-bold text-indigo-600 text-lg">
-                                        ${previewFin.totalContractRevenue.toLocaleString()}
-                                    </p>
+                                    <p className="font-bold text-indigo-600 text-lg">${previewFin.totalContractRevenue.toLocaleString()}</p>
                                 </div>
                             </div>
                         </div>
@@ -461,13 +421,7 @@ export default function QuotationsPage() {
                                 const isSelected = selectedItemIds.includes(item.id);
                                 return (
                                     <div key={item.id} className={`border rounded-xl p-3 transition-all ${isSelected ? 'bg-white dark:bg-slate-800 border-indigo-200 shadow-sm' : 'bg-gray-50 dark:bg-slate-900 opacity-60'}`}>
-                                        <div className="flex justify-between items-center cursor-pointer" onClick={() => {
-                                                if (isSelected) {
-                                                    setSelectedItemIds(selectedItemIds.filter(id => id !== item.id));
-                                                } else {
-                                                    setSelectedItemIds([...selectedItemIds, item.id]);
-                                                }
-                                            }}>
+                                        <div className="flex justify-between items-center cursor-pointer" onClick={() => { if (isSelected) setSelectedItemIds(selectedItemIds.filter(id => id !== item.id)); else setSelectedItemIds([...selectedItemIds, item.id]); }}>
                                             <div className="flex items-center gap-3">
                                                 <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
                                                     {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
@@ -477,9 +431,7 @@ export default function QuotationsPage() {
                                                     <p className="text-xs text-gray-500">${item.serviceSnapshotCost.toLocaleString()}</p>
                                                 </div>
                                             </div>
-                                            <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>
-                                                {item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}
-                                            </Badge>
+                                            <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>{item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}</Badge>
                                         </div>
                                     </div>
                                 );
@@ -487,9 +439,7 @@ export default function QuotationsPage() {
                         </div>
                         <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-slate-700">
                             <Button variant="secondary" onClick={() => setIsApproveModalOpen(false)} className="flex-1">Cancelar</Button>
-                            <Button onClick={confirmApprovalModal} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={selectedItemIds.length === 0}>
-                                Confirmar y Activar Contrato
-                            </Button>
+                            <Button onClick={confirmApprovalModal} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={selectedItemIds.length === 0}>Confirmar y Activar Contrato</Button>
                         </div>
                     </div>
                  );
