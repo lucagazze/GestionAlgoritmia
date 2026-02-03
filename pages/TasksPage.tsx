@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { googleCalendarService } from '../services/googleCalendar';
@@ -37,18 +37,29 @@ import {
 // View Modes
 type ViewMode = 'TODAY' | 'WEEK' | 'CALENDAR' | 'LIST';
 
+// ✅ Helper para inputs de fecha (Datetime Local)
+const toLocalISOString = (date: Date) => {
+    const tzOffset = date.getTimezoneOffset() * 60000; // offset in milliseconds
+    return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+};
+
 export default function TasksPage() {
+  // ✅ CONSTANTES PARA LA GRILLA (HORARIOS)
+  const START_HOUR = 7;
+  const ROW_HEIGHT = 35; 
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [sops, setSops] = useState<SOP[]>([]); 
   const [googleEvents, setGoogleEvents] = useState<any[]>([]); // New state for external events
   
-  const [viewMode, setViewMode] = useState<ViewMode>('WEEK'); 
+  const [viewMode, setViewMode] = useState<ViewMode>('CALENDAR'); 
   const [searchTerm, setSearchTerm] = useState('');
   
   const [referenceDate, setReferenceDate] = useState(new Date()); 
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ date: string, hour: number, minutes: number, top: number } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,6 +70,19 @@ export default function TasksPage() {
 
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [googleAuthDone, setGoogleAuthDone] = useState(false);
+
+  // 1. Crear la referencia para el elemento del día de hoy
+  const todayRef = useRef<HTMLDivElement>(null);
+
+  // 2. Efecto para hacer scroll automático cuando cambias a vista CALENDAR
+  useEffect(() => {
+      if (viewMode === 'CALENDAR' && todayRef.current) {
+          // Esperamos un milisegundo para que el render termine
+          setTimeout(() => {
+              todayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+      }
+  }, [viewMode]);
 
   const [formData, setFormData] = useState<{
     id?: string;
@@ -333,31 +357,38 @@ export default function TasksPage() {
       e.preventDefault();
       const taskId = e.dataTransfer.getData('taskId');
       setDragOverSlot(null);
+      setDragPreview(null);
       setDraggingTaskId(null);
+
       if (taskId) {
           const task = tasks.find(t => t.id === taskId);
-            if (task) {
-                const originalDate = new Date(task.dueDate || new Date());
-                const newDate = new Date(slotDate);
+          if (task) {
+              const newDate = new Date(slotDate);
 
-                // If dropping on a specific time slot (Day/Week view), slotDate already has the time.
-                // If dropping on a Month View cell, slotDate is 00:00. We should preserve original time.
-                // We detect Month drop because slotDate hours are 0 usually, OR we pass a flag. 
-                // Better heuristic: Check viewMode. 
-                // If CALENDAR (Month), preserve original time.
-                // If WEEK/TODAY, use the slot time (which is passed as slotDate).
-                
-                if (viewMode === 'CALENDAR') {
-                    newDate.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
-                } else {
-                    // In TimeGrid, slotDate already includes the specific hour logic context
-                }
-                
-                const newIso = newDate.toISOString();
-                
-                await db.tasks.update(taskId, { dueDate: newIso });
-                await loadData();
-            }
+              if (viewMode === 'WEEK' || viewMode === 'TODAY') {
+                  // 🧠 CÁLCULO MATEMÁTICO DE LA HORA AL SOLTAR
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  
+                  const hoursFromStart = Math.floor(y / ROW_HEIGHT);
+                  const minutesFromStart = Math.floor(((y % ROW_HEIGHT) / ROW_HEIGHT) * 60); // Calcula minutos proporcionales
+                  
+                  const finalHour = START_HOUR + hoursFromStart;
+                  
+                  // Ajustamos la hora y minutos (redondeando minutos a múltiplos de 30)
+                  const roundedMinutes = Math.round(minutesFromStart / 30) * 30;
+                  
+                  newDate.setHours(finalHour, roundedMinutes, 0, 0);
+
+              } else if (viewMode === 'CALENDAR') {
+                   // En vista mensual, mantenemos la hora que ya tenía la tarea
+                   const originalDate = new Date(task.dueDate || new Date());
+                   newDate.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
+              }
+
+              await db.tasks.update(taskId, { dueDate: newDate.toISOString() });
+              await loadData();
+          }
       }
   };
 
@@ -488,23 +519,17 @@ export default function TasksPage() {
       );
   };
 
-  // --- TIME GRID RENDERER (Day/Week) ---
   const renderTimeGrid = () => {
       const isWeek = viewMode === 'WEEK';
-      
-      // 1. CONFIGURACIÓN DE HORARIOS (7 AM a 11 PM)
-      const START_HOUR = 7;
-      const END_HOUR = 23; // 11 PM
+      const END_HOUR = 23; 
       const TOTAL_HOURS = END_HOUR - START_HOUR;
       const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i + START_HOUR);
-      const ROW_HEIGHT = 35; // Aumenté un poco la altura (de 25 a 35) para que se vea mejor al tener menos horas.
       
-      // Determine columns
       let daysToShow: Date[] = [];
       if (isWeek) {
           const start = new Date(referenceDate);
           const day = start.getDay() || 7; 
-          start.setDate(start.getDate() - (day - 1)); // Monday
+          start.setDate(start.getDate() - (day - 1));
           daysToShow = Array.from({ length: 7 }, (_, i) => {
               const d = new Date(start);
               d.setDate(d.getDate() + i);
@@ -516,7 +541,7 @@ export default function TasksPage() {
 
       return (
           <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              {/* Header Row */}
+              {/* Header con Días */}
               <div className="flex border-b border-gray-200 dark:border-slate-800 ml-14">
                   {daysToShow.map((date, i) => {
                        const isToday = new Date().toDateString() === date.toDateString();
@@ -533,31 +558,22 @@ export default function TasksPage() {
                   })}
               </div>
 
-              {/* Scrollable Grid */}
+              {/* Cuerpo del Calendario */}
               <div className="flex flex-1 overflow-y-auto relative custom-scrollbar bg-white dark:bg-slate-900">
-                  {/* Time Axis */}
-                  <div className="w-16 flex-shrink-0 relative bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800 shadow-[4px_0_24px_rgba(0,0,0,0.02)]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
+                  {/* Columna de Horas (Eje Y) */}
+                  <div className="w-16 flex-shrink-0 relative bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
                       {hours.map((h, index) => (
-                          <span 
-                            key={h} 
-                            className="absolute right-3 text-xs font-medium text-gray-400 dark:text-gray-500 font-mono -translate-y-1/2"
-                            style={{ top: `${index * ROW_HEIGHT}px` }}
-                          >
+                          <span key={h} className="absolute right-3 text-xs font-medium text-gray-400 dark:text-gray-500 font-mono -translate-y-1/2" style={{ top: `${index * ROW_HEIGHT}px` }}>
                                 {h}:00
                           </span>
                       ))}
                   </div>
 
-                  {/* Columns */}
+                  {/* Columnas de Días */}
                   <div className="flex-1 flex relative min-w-[600px]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}> 
-                      {/* Horizontal Lines */}
                       <div className="absolute inset-0 z-0 pointer-events-none">
                           {hours.map((h, index) => (
-                              <div 
-                                key={h} 
-                                className="absolute left-0 right-0 border-b border-gray-100 dark:border-slate-800 dashed"
-                                style={{ top: `${index * ROW_HEIGHT}px` }}
-                              />
+                              <div key={h} className="absolute left-0 right-0 border-b border-gray-100 dark:border-slate-800 dashed" style={{ top: `${index * ROW_HEIGHT}px` }} />
                           ))}
                       </div>
 
@@ -565,22 +581,20 @@ export default function TasksPage() {
                           const { dayTasks, dayGoogle } = getEventsForDate(date);
                           const isToday = new Date().toDateString() === date.toDateString();
 
-                          // 3. LÓGICA DE CLIC (UN SOLO CLIC + CÁLCULO DE HORA CORRECTO)
+                          // 🧠 CLICK PARA CREAR TAREA
                           const handleColumnClick = (e: React.MouseEvent) => {
                               const rect = e.currentTarget.getBoundingClientRect();
-                              const y = e.clientY - rect.top; // Relative Y inside the visible area
-                              // Sumamos el scrollTop si el contenedor tuviera scroll, pero aquí usamos e.clientY relativo al target directo
+                              const y = e.clientY - rect.top;
                               
                               const relativeHour = Math.floor(y / ROW_HEIGHT);
                               const actualHour = START_HOUR + relativeHour;
-                              
-                              // Check bounds
+
                               if (actualHour > END_HOUR) return;
 
                               const newDate = new Date(date);
-                              newDate.setHours(actualHour, 0, 0, 0);
+                              newDate.setHours(actualHour, 0, 0, 0); // Pone la hora exacta, minuto 00
                               
-                              setFormData(prev => ({ ...prev, dueDate: newDate.toISOString(), title: '' }));
+                              setFormData(prev => ({ ...prev, dueDate: toLocalISOString(newDate), title: '' }));
                               setIsModalOpen(true);
                           };
 
@@ -588,38 +602,67 @@ export default function TasksPage() {
                               <div 
                                 key={i} 
                                 className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors group ${isToday ? 'bg-blue-50/10' : ''}`}
-                                onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }} 
-                                onDrop={(e) => handleDrop(e, date)}
-                                onClick={handleColumnClick} // 2. AHORA ES UN SOLO CLIC
+                                onDragOver={(e) => { 
+                                    e.preventDefault(); 
+                                    setDragOverSlot(date.toISOString());
+                                    
+                                    // Calculate Preview Position
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const y = e.clientY - rect.top;
+                                    const hoursFromStart = Math.floor(y / ROW_HEIGHT);
+                                    const minutesFromStart = Math.floor(((y % ROW_HEIGHT) / ROW_HEIGHT) * 60);
+                                    
+                                    const roundedMinutes = Math.round(minutesFromStart / 30) * 30;
+                                    const finalHour = START_HOUR + hoursFromStart;
+                                    
+                                    // Visual snapping
+                                    const top = (hoursFromStart * ROW_HEIGHT) + (roundedMinutes * (ROW_HEIGHT / 60));
+                                    
+                                    setDragPreview({
+                                        date: date.toISOString(),
+                                        hour: finalHour,
+                                        minutes: roundedMinutes,
+                                        top
+                                    });
+                                }} 
+                                onDragLeave={() => {
+                                    setDragOverSlot(null);
+                                    setDragPreview(null);
+                                }}
+                                onDrop={(e) => handleDrop(e, date)} // ✅ Usa el nuevo handleDrop
+                                onClick={handleColumnClick} // ✅ Usa el nuevo click handler
                               >
-                                   {/* Vertical Hour Lines (Subtle) */}
                                    <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
 
-                                   {/* Render Tasks */}
+                                   {/* Drag Preview Ghost */}
+                                   {dragPreview && dragPreview.date === date.toISOString() && (
+                                       <div 
+                                            className="absolute left-1 right-2 rounded-lg px-2 border-2 border-dashed border-blue-400 bg-blue-50/50 z-20 pointer-events-none flex items-center justify-center animate-pulse"
+                                            style={{ top: `${dragPreview.top}px`, height: `${ROW_HEIGHT}px` }}
+                                       >
+                                           <span className="text-xs font-bold text-blue-600 bg-white/80 px-1 rounded">
+                                               {dragPreview.hour}:{dragPreview.minutes === 0 ? '00' : dragPreview.minutes}
+                                           </span>
+                                       </div>
+                                   )}
+
                                   {[...dayTasks, ...dayGoogle].map((item: any) => {
                                       let start: Date, id: string, title: string, isGoogle = false;
-                                      
                                       if (item.start) { 
                                           start = new Date(item.start.dateTime || item.start.date);
-                                          id = item.id;
-                                          title = item.summary;
-                                          isGoogle = true;
+                                          id = item.id; title = item.summary; isGoogle = true;
                                       } else { 
                                           start = new Date(item.dueDate);
-                                          id = item.id;
-                                          title = item.title;
+                                          id = item.id; title = item.title;
                                       }
 
                                       const taskHour = start.getHours();
                                       const taskMinutes = start.getMinutes();
 
-                                      // 4. FILTRAR VISUALMENTE SI ESTÁ FUERA DE RANGO
                                       if (taskHour < START_HOUR || taskHour > END_HOUR) return null;
 
-                                      // CÁLCULO DE POSICIÓN RELATIVA
                                       const hoursFromStart = taskHour - START_HOUR;
                                       const top = (hoursFromStart * ROW_HEIGHT) + (taskMinutes * (ROW_HEIGHT / 60));
-                                      const height = ROW_HEIGHT; // Altura fija estética
 
                                       return (
                                           <div
@@ -633,24 +676,20 @@ export default function TasksPage() {
                                                        setDraggingTaskId(id);
                                                    }
                                                }}
-                                               onDragEnd={() => {
-                                                   setDraggingTaskId(null);
-                                                   setDragOverSlot(null);
-                                               }}
                                               className={`
-                                                  absolute left-1 right-2 rounded-lg px-3 text-xs font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center
+                                                  absolute left-1 right-2 rounded-lg px-2 text-[10px] font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all z-10 flex flex-col justify-center leading-tight
                                                   ${isGoogle 
-                                                      ? 'bg-white border-blue-200 text-blue-700 shadow-[0_2px_8px_rgba(59,130,246,0.15)] dark:bg-slate-800 dark:border-blue-900 dark:text-blue-300' 
+                                                      ? 'bg-white border-blue-200 text-blue-700' 
                                                       : item.status === 'DONE' 
-                                                          ? 'bg-green-100 text-green-700 border-green-200 opacity-90' 
-                                                          : 'bg-gradient-to-br from-indigo-50 to-white border-indigo-200 text-indigo-800 dark:from-indigo-900 dark:to-slate-900 dark:border-indigo-700 dark:text-indigo-200'
+                                                          ? 'bg-green-100 text-green-700 border-green-200 opacity-80' 
+                                                          : 'bg-indigo-50 border-indigo-200 text-indigo-800'
                                                   }
                                               `}
-                                              style={{ top: `${top}px`, height: `${height}px` }}
+                                              style={{ top: `${top}px`, height: `${ROW_HEIGHT}px` }}
                                           >
-                                              <div className="flex items-center gap-1.5">
-                                                <span className="opacity-75 font-mono text-[10px]">{start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                                <span className="truncate leading-tight">{title}</span>
+                                              <div className="flex items-center gap-1">
+                                                <span className="opacity-70 font-mono">{start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                                <span className="truncate font-bold">{title}</span>
                                               </div>
                                           </div>
                                       );
@@ -659,7 +698,7 @@ export default function TasksPage() {
                           );
                       })}
                       
-                      {/* Current Time Line (Ajustado al nuevo rango) */}
+                      {/* Línea de Hora Actual */}
                       {daysToShow.some(d => d.toDateString() === new Date().toDateString()) && (
                           (() => {
                               const now = new Date();
@@ -668,10 +707,7 @@ export default function TasksPage() {
                                   const hoursFromStart = currentHour - START_HOUR;
                                   const top = (hoursFromStart * ROW_HEIGHT) + (now.getMinutes() * (ROW_HEIGHT / 60));
                                   return (
-                                      <div 
-                                          className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center"
-                                          style={{ top: `${top}px` }}
-                                      >
+                                      <div className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none flex items-center" style={{ top: `${top}px` }}>
                                           <div className="w-2 h-2 rounded-full bg-red-500 -ml-1 shadow-sm"></div>
                                       </div>
                                   );
@@ -685,118 +721,119 @@ export default function TasksPage() {
       );
   };
     
-  // Calendar Logic (Month)
-  const renderCalendar = () => {
-      const year = referenceDate.getFullYear();
-      const month = referenceDate.getMonth();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sunday
+  // --- MONTH GRID RENDERER (Optimized height & Auto-focus) ---
+  const renderMonthGrid = () => {
+      const start = new Date(referenceDate);
+      start.setDate(1); // Primer día del mes
+      const startDay = start.getDay() || 7; // Ajustar lunes
+      const daysInMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0).getDate();
       
-      const daysArray = Array.from({ length: 42 }, (_, i) => {
-          const dayNumber = i - firstDayIndex + 1;
-          if (dayNumber > 0 && dayNumber <= daysInMonth) return new Date(year, month, dayNumber);
-          return null; 
-      });
+      // Días previos (padding)
+      const blanks = Array.from({ length: startDay - 1 });
+      // Días del mes
+      const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+      // Nombres de días
+      const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
       return (
-          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col flex-1 min-h-0">
-              {/* Calendar Header */}
-              <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-slate-800">
-                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronLeft className="w-5 h-5"/></button>
-                  <h2 className="text-lg font-bold capitalize text-gray-900 dark:text-white">{referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
-                  <button onClick={() => {const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d)}} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-500"><ChevronRight className="w-5 h-5"/></button>
-              </div>
-              
-              {/* Days Header */}
-              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                      <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>
+          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              {/* Header Semanal */}
+              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 z-10">
+                  {weekDays.map(d => (
+                      <div key={d} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          {d}
+                      </div>
                   ))}
               </div>
 
-              <div className="grid grid-cols-7 auto-rows-[minmax(150px,1fr)] flex-1 bg-gray-200 dark:bg-slate-800 gap-px overflow-y-auto">
-                  {daysArray.map((date, i) => {
-                      if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50 min-h-[150px]"></div>;
+              {/* Grid Scrollable */}
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
+                  <div className="grid grid-cols-7 auto-rows-fr">
                       
-                      const dayTasks = filteredTasks.filter(t => {
-                          if (!t.dueDate) return false;
-                          const tDate = new Date(t.dueDate);
-                          return tDate.getDate() === date.getDate() && tDate.getMonth() === date.getMonth() && tDate.getFullYear() === date.getFullYear();
-                      });
-                      
-                      const isToday = new Date().toDateString() === date.toDateString();
-                      const isDragOver = dragOverSlot === date.toISOString();
+                      {/* Espacios vacíos mes anterior */}
+                      {blanks.map((_, i) => (
+                          <div key={`blank-${i}`} className="bg-gray-50/30 dark:bg-slate-800/20 border-b border-r border-gray-100 dark:border-slate-800 min-h-[160px]" />
+                      ))}
 
-                      return (
-                          <div 
-                              key={i} 
-                              className={`bg-white dark:bg-slate-900 p-2 flex flex-col gap-1 relative transition-colors ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''} ${isDragOver ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}
-                              onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }}
-                              onDragLeave={() => setDragOverSlot(null)}
-                              onDrop={(e) => handleDrop(e, date)}
-                              onDoubleClick={() => {
-                                  // Open modal with this date
-                                  const d = new Date(date);
-                                  d.setHours(9, 0, 0, 0); // Default 9 AM
-                                  setFormData(prev => ({ ...prev, dueDate: d.toISOString(), title: '' }));
-                                  setIsModalOpen(true);
-                              }}
-                          >
-                              <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-black dark:bg-white text-white dark:text-black' : 'text-gray-400'}`}>
-                                  {date.getDate()}
-                              </span>
-                              
-                              <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-                                  {/* APP TASKS */}
-                                  {dayTasks.map(t => (
-                                      <div 
-                                          key={t.id} 
-                                          draggable
-                                          onDragStart={(e) => e.dataTransfer.setData('taskId', t.id)}
-                                          onContextMenu={(e) => handleContextMenu(e, t)}
-                                          onClick={() => handleEdit(t)}
-                                          className={`
-                                              text-[10px] px-2 py-1 rounded-sm border truncate cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all flex items-center gap-1
-                                              ${t.status === TaskStatus.DONE 
-                                                  ? 'bg-green-100 text-green-700 border-green-200 opacity-90' 
-                                                  : t.priority === 'HIGH' 
-                                                      ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-900' 
-                                                      : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 hover:border-blue-300'
-                                              }
-                                          `}
-                                      >
-                                          <span className="opacity-75 font-mono text-[9px] mr-1">
-                                            {t.dueDate ? new Date(t.dueDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-                                          </span>
-                                          <span className="truncate">{t.title}</span>
-                                      </div>
-                                  ))}
+                      {/* Días del mes */}
+                      {days.map(d => {
+                          const date = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), d);
+                          const { dayTasks, dayGoogle } = getEventsForDate(date);
+                          
+                          // Chequeo si es HOY
+                          const isToday = new Date().toDateString() === date.toDateString();
 
-                                  {/* EXTERNAL GOOGLE EVENTS */}
-                                  {googleEvents
-                                    .filter(ev => {
-                                        const evDate = new Date(ev.start.dateTime || ev.start.date);
-                                        // Match date
-                                        if (evDate.getDate() !== date.getDate() || evDate.getMonth() !== date.getMonth() || evDate.getFullYear() !== date.getFullYear()) return false;
-                                        // De-duplicate: Don't show if this google ID is already linked to a local task
-                                        if (dayTasks.some(t => t.googleEventId === ev.id)) return false;
-                                        return true;
-                                    })
-                                    .map(ev => (
-                                        <div 
-                                            key={ev.id}
-                                            title="Evento de Google Calendar (Externo)"
-                                            className="text-[10px] px-2 py-1.5 rounded-md border border-blue-100 bg-blue-50/50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-900 dark:text-blue-300 truncate flex items-center gap-1 opacity-80 hover:opacity-100"
+                          return (
+                              <div 
+                                  key={d}
+                                  // AQUÍ CONECTAMOS EL REF PARA EL SCROLL AUTOMÁTICO
+                                  ref={isToday ? todayRef : null}
+                                onDragOver={(e) => { e.preventDefault(); setDragOverSlot(date.toISOString()); }}
+                                onDrop={(e) => handleDrop(e, date)}
+                                onClick={() => {
+                                      // Al hacer clic en el día, abre modal para ese día a las 9 AM por defecto
+                                      const newDate = new Date(date);
+                                      newDate.setHours(9, 0, 0, 0);
+                                      setFormData(prev => ({ ...prev, dueDate: toLocalISOString(newDate), title: '' }));
+                                      setIsModalOpen(true);
+                                  }}
+                                  className={`
+                                      relative border-b border-r border-gray-100 dark:border-slate-800 p-2 transition-colors cursor-pointer group min-h-[160px]
+                                      ${isToday 
+                                          ? 'bg-blue-50/60 dark:bg-blue-900/20 shadow-[inset_0_0_0_2px_rgba(59,130,246,0.3)]' // Color especial para HOY
+                                          : 'hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                                      }
+                                  `}
+                              >
+                                  {/* Número del día */}
+                                  <div className="flex justify-between items-start mb-2">
+                                      <span className={`
+                                          text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full
+                                          ${isToday ? 'bg-blue-600 text-white shadow-md scale-110' : 'text-gray-700 dark:text-gray-300'}
+                                      `}>
+                                          {d}
+                                      </span>
+                                      {/* Indicador sutil de agregar tarea (+) visible al hover */}
+                                      <span className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600">
+                                          <i className="fa-solid fa-plus text-xs"></i>
+                                      </span>
+                                  </div>
+
+                                  {/* Lista de Tareas */}
+                                  <div className="space-y-1.5">
+                                      {[...dayTasks, ...dayGoogle].map((task: any) => (
+                                          <div 
+                                            key={task.id}
+                                            draggable={!task.summary}
+                                            onContextMenu={(e) => !task.summary && handleContextMenu(e, task)}
+                                            onDragStart={(e) => {
+                                                if (!task.summary) {
+                                                    e.dataTransfer.setData('taskId', task.id);
+                                                    setDraggingTaskId(task.id);
+                                                }
+                                            }}
+                                            onClick={(e) => { e.stopPropagation(); !task.summary && handleEdit(task); }}
+                                            className={`
+                                                cursor-grab active:cursor-grabbing
+                                                text-[11px] px-2 py-1 rounded border truncate font-medium
+                                                ${task.summary 
+                                                    ? 'bg-white border-blue-200 text-blue-700 dark:bg-slate-800 dark:border-blue-900 dark:text-blue-300' 
+                                                    : task.status === 'DONE'
+                                                        ? 'bg-green-50 text-green-700 border-green-200 line-through opacity-70'
+                                                        : 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-200'
+                                                }
+                                            `}
+                                            title={task.title || task.summary}
                                         >
-                                           <img src="https://www.google.com/favicon.ico" className="w-2 h-2 opacity-50" alt="G" />
-                                           <span className="truncate">{ev.summary}</span>
-                                        </div>
-                                    ))
-                                  }
+                                              {task.title || task.summary}
+                                          </div>
+                                      ))}
+                                  </div>
                               </div>
-                          </div>
-                      );
-                  })}
+                          );
+                      })}
+                  </div>
               </div>
           </div>
       );
@@ -868,7 +905,7 @@ export default function TasksPage() {
       </div>
 
       {/* Content */}
-      {viewMode === 'CALENDAR' && renderCalendar()}
+      {viewMode === 'CALENDAR' && renderMonthGrid()}
       {viewMode === 'LIST' && renderListView()}
       {(viewMode === 'WEEK' || viewMode === 'TODAY') && renderTimeGrid()}
 
