@@ -259,6 +259,20 @@ export default function QuotationsPage() {
                                         {proposal.client?.name || 'Cliente Potencial'}
                                     </h3>
                                     
+                                    {/* Lista de Servicios */}
+                                    {proposal.items && proposal.items.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {proposal.items.map((item: any) => (
+                                                <span 
+                                                    key={item.id}
+                                                    className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-medium border border-indigo-100 dark:border-indigo-800"
+                                                >
+                                                    {item.serviceSnapshotName}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
                                     <div className="flex gap-4 mt-2 text-xs">
                                         <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
                                             <Wallet className="w-3.5 h-3.5" />
