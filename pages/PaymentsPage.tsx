@@ -119,6 +119,7 @@ export default function PaymentsPage() {
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Control de caja y proyecciones.</p>
                 </div>
                 
+                
                 <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-xl flex">
                     <button 
                         onClick={() => setViewMode('CALENDAR')} 

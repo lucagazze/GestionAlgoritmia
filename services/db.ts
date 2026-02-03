@@ -595,6 +595,20 @@ export const db = {
          return data as Proposal[];
     },
 
+    getById: async (id: string): Promise<Proposal | null> => {
+        const { data, error } = await supabase
+            .from('Proposal')
+            .select(`*, client:Client(*), items:ProposalItem(*)`) // Traer todo
+            .eq('id', id)
+            .maybeSingle();
+        
+        if (error) {
+            console.error("Error getting proposal by id:", error);
+            return null;
+        }
+        return data as Proposal;
+    },
+
     // 2. Asegúrate de tener la función approve completa que hicimos antes
     getItems: async (proposalId: string): Promise<ProposalItem[]> => {
         return handleResponse<ProposalItem>(supabase.from('ProposalItem').select('*').eq('proposalId', proposalId));

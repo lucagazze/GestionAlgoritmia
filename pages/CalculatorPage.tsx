@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { Service, ServiceType, ProposalStatus, Contractor } from '../types';
@@ -30,6 +31,9 @@ export default function CalculatorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [rewritingServiceId, setRewritingServiceId] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [loadedProposalId, setLoadedProposalId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
 
   // --- STEP 1: CLIENT DISCOVERY ---
   const [clientInfo, setClientInfo] = useState({
@@ -252,6 +256,30 @@ export default function CalculatorPage() {
               setShowPrompt(true);
           }
       });
+  };
+
+  const loadProposalFromUrl = async (id: string) => {
+    try {
+      const proposal = await db.proposals.getById(id);
+      if (!proposal) {
+        alert("Propuesta no encontrada");
+        return;
+      }
+      
+      // Use the existing handleLoadProposal function
+      handleLoadProposal(proposal);
+      
+      // Check if proposal is approved (read-only mode)
+      if (proposal.status === ProposalStatus.ACCEPTED || 
+          proposal.status === ProposalStatus.PARTIALLY_ACCEPTED) {
+        setIsReadOnly(true);
+      }
+      
+      setLoadedProposalId(id);
+    } catch (error) {
+      console.error(error);
+      alert("Error al cargar la propuesta");
+    }
   };
 
   const saveProposal = async () => {
