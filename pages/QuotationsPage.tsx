@@ -66,19 +66,18 @@ export default function QuotationsPage() {
 
   // --- ACCIONES RÁPIDAS ---
   
-  // 1. Aprobar TODO Directamente
   const handleApproveFull = async () => {
       if (!contextMenu.proposal) return;
+      // Obtener todos los items para aprobar todo
       const items = await db.proposals.getItems(contextMenu.proposal.id);
       const allIds = items.map(i => i.id);
       
-      try {
-          // Aprobamos todo sin asignar (o podrías abrir modal si quieres forzar asignación)
-          // Aquí asumimos aprobación rápida sin asignar externos por defecto
-          await db.proposals.approve(contextMenu.proposal.id, allIds, {}); 
-          showToast("Propuesta aprobada totalmente", "success");
-          loadData();
-      } catch(e) { console.error(e); }
+      // Aprobar sin asignaciones específicas (o puedes agregar lógica aquí)
+      await db.proposals.approve(contextMenu.proposal.id, allIds, {}); 
+      
+      showToast("Propuesta activada. El proyecto inicia hoy.", "success");
+      setContextMenu({ ...contextMenu, visible: false }); // Cerrar menú
+      loadData(); // Recargar lista
   };
 
   // 2. Aprobar Parcialmente (Abre el Modal)

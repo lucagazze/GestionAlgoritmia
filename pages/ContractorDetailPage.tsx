@@ -301,42 +301,20 @@ export default function ContractorDetailPage() {
 
       {/* Work Order / Assigned Items Section */}
       <div className="mt-8">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-indigo-500"/> Carga de Trabajo Activa
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {assignedItems.length === 0 && <p className="text-gray-500 italic">No tiene servicios asignados actualmente.</p>}
-              
-              {assignedItems.map((item, idx) => (
-                  <Card key={idx} className="p-4 flex flex-col gap-3 border-l-4 border-l-indigo-500">
-                      <div className="flex justify-between items-start">
-                          <div>
-                              <h4 className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</h4>
-                              <p className="text-sm text-gray-500">Cliente: <span className="font-semibold text-indigo-600">{item.proposal?.client?.name}</span></p>
-                          </div>
-                          <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>
-                              {item.serviceSnapshotType === 'RECURRING' ? 'Recurrente' : 'One-Time'}
-                          </Badge>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Carga de Trabajo Activa</h3>
+          <div className="grid grid-cols-1 gap-3">
+              {assignedItems.length === 0 && <p className="text-gray-500">Sin asignaciones activas.</p>}
+              {assignedItems.map((item: any) => (
+                  <div key={item.id} className="p-4 border rounded-xl bg-white dark:bg-slate-800 flex justify-between items-center">
+                      <div>
+                          <p className="font-bold">{item.serviceSnapshotName}</p>
+                          <p className="text-sm text-gray-500">Cliente: {item.proposal?.client?.name}</p>
                       </div>
-                      
-                      <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-slate-800 text-sm">
-                          <span className="text-gray-500">Pago acordado:</span>
-                          <span className="font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
-                              ${item.outsourcingCost?.toLocaleString()}
-                          </span>
+                      <div className="text-right">
+                          <p className="text-emerald-600 font-bold">${item.outsourcingCost?.toLocaleString()}</p>
+                          <p className="text-xs text-gray-400">Mensual</p>
                       </div>
-                      
-                      {/* Enlace directo al proyecto */}
-                      <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="w-full mt-1 text-xs text-gray-400 hover:text-indigo-600"
-                          onClick={() => navigate(`/projects/${item.proposal?.clientId}?tab=PROFILE`)}
-                      >
-                          Ver Proyecto <ExternalLink className="w-3 h-3 ml-1"/>
-                      </Button>
-                  </Card>
+                  </div>
               ))}
           </div>
       </div>

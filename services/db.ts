@@ -627,56 +627,50 @@ export const db = {
     },
 
     // ✅ NUEVA FUNCIÓN: Aprobar propuesta y activar cliente
-    approve: async (proposalId: string, acceptedItemIds: string[], assignments?: Record<string, { contractorId: string, cost: number }>): Promise<void> => {
-        // 1. Obtener la propuesta y sus items
+    approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}): Promise<void> => {
+        // 1. Obtener la propuesta
         const { data: proposal } = await supabase.from('Proposal').select('*, items:ProposalItem(*)').eq('id', proposalId).single();
         if (!proposal) throw new Error("Propuesta no encontrada");
 
-        // 2. Filtrar items aceptados
+        // 2. Calcular el nuevo ingreso recurrente basado en lo aceptado
         const allItems = proposal.items || [];
         const acceptedItems = allItems.filter((item: any) => acceptedItemIds.includes(item.id));
         
-        // ✨ ACTUALIZAR ASIGNACIONES
-        if (assignments) {
-             for (const item of acceptedItems) {
-                 const assignment = assignments[item.id];
-                 if (assignment) {
-                     await supabase.from('ProposalItem').update({
-                         assignedContractorId: assignment.contractorId || null,
-                         outsourcingCost: assignment.cost || 0
-                     }).eq('id', item.id);
-                 }
-             }
-        }
-
-        // 3. Calcular nuevos totales reales
         const newRecurring = acceptedItems
             .filter((i: any) => i.serviceSnapshotType === 'RECURRING')
             .reduce((acc: number, curr: any) => acc + (curr.serviceSnapshotCost || 0), 0);
+        
+        // Calcular costo total de outsourcing para este cliente
+        let totalOutsourcing = 0;
 
-        const status = acceptedItemIds.length === allItems.length ? 'ACCEPTED' : 'PARTIALLY_ACCEPTED';
+        // 3. GUARDAR ASIGNACIONES (Vincular a Gonzalo/Socios)
+        for (const itemId of acceptedItemIds) {
+            const assign = assignments[itemId];
+            if (assign && assign.contractorId) {
+                await supabase.from('ProposalItem').update({
+                    assignedContractorId: assign.contractorId,
+                    outsourcingCost: assign.cost
+                }).eq('id', itemId);
+                totalOutsourcing += assign.cost;
+            }
+        }
 
         // 4. Actualizar Propuesta
+        const status = acceptedItemIds.length === allItems.length ? 'ACCEPTED' : 'PARTIALLY_ACCEPTED';
         await supabase.from('Proposal').update({ 
             status: status,
-            totalRecurringPrice: newRecurring // Actualizamos al valor real aceptado
+            totalRecurringPrice: newRecurring
         }).eq('id', proposalId);
 
-        // 5. ✨ MAGIA: Activar Cliente y actualizar su Revenue
+        // 5. ACTIVAR CLIENTE y actualizar Fecha de Inicio (hoy)
         if (proposal.clientId) {
             await supabase.from('Client').update({
-                status: 'ACTIVE', // ¡Cliente pasa a Activo!
-                monthlyRevenue: newRecurring, // Se actualiza lo que paga por mes
-                lastContactDate: new Date().toISOString()
+                status: 'ACTIVE',
+                monthlyRevenue: newRecurring,
+                outsourcingCost: totalOutsourcing, // ✅ Guardamos cuánto le pagamos al equipo
+                lastContactDate: new Date().toISOString(), // Fecha de "Inicio" del contrato activo
+                billingDay: new Date().getDate() // El día de cobro pasa a ser hoy
             }).eq('id', proposal.clientId);
-            
-            // Opcional: Crear nota automática en el cliente
-            await supabase.from('ClientNote').insert({
-                clientId: proposal.clientId,
-                type: 'INFO',
-                content: `🚀 Propuesta aceptada (${status === 'ACCEPTED' ? 'Total' : 'Parcial'}). Nuevo fee mensual: $${newRecurring}`,
-                createdAt: new Date().toISOString()
-            });
         }
     },
   },
