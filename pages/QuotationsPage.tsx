@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
-import { Proposal, Contractor, ProposalStatus } from '../types';
+import { Proposal, Contractor, ProposalStatus, ProposalItem } from '../types';
 import { Button, Input, Card, Badge, Modal, Label } from '../components/UIComponents';
 import { 
   FileText, Plus, CheckCircle2, XCircle, Clock, 
-  ArrowRight, DollarSign, Search, AlertCircle, MoreVertical, Send, Eye 
+  Search, MoreVertical, Send, AlertCircle, Loader2, 
+  DollarSign, Briefcase, User, Wallet, Calendar 
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
@@ -13,30 +14,26 @@ export default function QuotationsPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   
-  // Datos
+  // --- ESTADOS ---
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Filtros y Búsqueda
-  const [activeTab, setActiveTab] = useState<'ALL' | 'SENT' | 'APPROVED' | 'DRAFT'>('ALL');
+  
+  // Filtros
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Modal de Aprobación/Asignación
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
-  const [assignments, setAssignments] = useState<Record<string, { contractorId: string, cost: number }>>({});
-
-  // MENÚ CONTEXTUAL (Click Derecho)
+  // Menú Contextual (Clic Derecho)
   const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, proposal: Proposal | null }>({
       visible: false, x: 0, y: 0, proposal: null
   });
 
-  // Cargar datos iniciales
+  // Modales
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedDetailProposal, setSelectedDetailProposal] = useState<Proposal | null>(null);
+
   useEffect(() => {
     loadData();
-    // Cerrar menú al hacer clic en cualquier lado
     const handleClickOutside = () => setContextMenu({ ...contextMenu, visible: false });
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
@@ -53,128 +50,147 @@ export default function QuotationsPage() {
     setLoading(false);
   };
 
-  // --- LÓGICA DEL MENÚ CONTEXTUAL ---
-  const handleContextMenu = (e: React.MouseEvent, proposal: Proposal) => {
-      e.preventDefault(); // Evita el menú del navegador
-      setContextMenu({
-          visible: true,
-          x: e.pageX,
-          y: e.pageY,
-          proposal
-      });
+  // --- LÓGICA FINANCIERA ---
+  const calculateFinancials = (proposal: Proposal) => {
+      const duration = proposal.durationMonths || 1; // Por defecto 1 mes si no se especifica
+      
+      // 1. Ingresos (Lo que paga el cliente)
+      const revenueRecurring = proposal.totalRecurringPrice || 0;
+      const revenueOneTime = proposal.totalOneTimePrice || 0;
+      const totalContractRevenue = (revenueRecurring * duration) + revenueOneTime;
+
+      // 2. Egresos (Lo que pagas al equipo)
+      let costRecurring = 0;
+      let costOneTime = 0;
+
+      if (proposal.items) {
+          proposal.items.forEach(item => {
+              if (item.serviceSnapshotType === 'RECURRING') {
+                  costRecurring += (item.outsourcingCost || 0);
+              } else {
+                  costOneTime += (item.outsourcingCost || 0);
+              }
+          });
+      }
+      
+      const totalContractCost = (costRecurring * duration) + costOneTime;
+
+      // 3. Ganancia Neta
+      const netProfit = totalContractRevenue - totalContractCost;
+      const margin = totalContractRevenue > 0 ? (netProfit / totalContractRevenue) * 100 : 0;
+
+      return {
+          revenueRecurring,
+          revenueOneTime,
+          totalContractRevenue,
+          costRecurring,
+          costOneTime,
+          totalContractCost,
+          netProfit,
+          margin: Math.round(margin),
+          duration
+      };
   };
 
-  // --- ACCIONES RÁPIDAS ---
-  
-  const handleApproveFull = async () => {
-      if (!contextMenu.proposal) return;
-      // Obtener todos los items para aprobar todo
-      const items = await db.proposals.getItems(contextMenu.proposal.id);
-      const allIds = items.map(i => i.id);
-      
-      // Aprobar sin asignaciones específicas (o puedes agregar lógica aquí)
-      await db.proposals.approve(contextMenu.proposal.id, allIds, {}); 
-      
-      showToast("Propuesta activada. El proyecto inicia hoy.", "success");
-      setContextMenu({ ...contextMenu, visible: false }); // Cerrar menú
-      loadData(); // Recargar lista
+  // --- ACCIONES ---
+
+  // Abrir Detalle (Doble Clic)
+  const handleOpenDetail = (proposal: Proposal) => {
+      setSelectedDetailProposal(proposal);
+      setIsDetailModalOpen(true);
   };
 
-  // 2. Aprobar Parcialmente (Abre el Modal)
-  const handleApprovePartial = async () => {
+  // Aprobar Totalmente (Desde menú contextual)
+  const handleQuickApprove = async () => {
       if (!contextMenu.proposal) return;
-      // Preparamos el modal
-      const items = await db.proposals.getItems(contextMenu.proposal.id);
-      const propWithItems = { ...contextMenu.proposal, items };
-      
-      setSelectedProposal(propWithItems);
-      setSelectedItemIds(items.map(i => i.id)); // Seleccionar todo por defecto visualmente
-      setAssignments({});
-      setIsApproveModalOpen(true); // Abrimos modal
+      try {
+          const items = await db.proposals.getItems(contextMenu.proposal.id);
+          const allItemIds = items.map(i => i.id);
+          await db.proposals.approve(contextMenu.proposal.id, allItemIds, {});
+          showToast("✅ Presupuesto Aprobado", "success");
+          loadData();
+      } catch (e) { showToast("Error al aprobar", "error"); }
   };
 
-  // 3. Cambiar estado simple (Enviado / Rechazado)
-  const handleChangeStatus = async (status: ProposalStatus) => {
+  const handleSetWaiting = async () => {
       if (!contextMenu.proposal) return;
-      // Aquí deberías tener una función simple de update en db, o usar update proposal
-      // Por simplicidad, asumiremos que tienes un db.proposals.updateStatus o similar.
-      // Si no, usa update genérico.
-      // Ejemplo simulado:
-      // await db.proposals.update(contextMenu.proposal.id, { status });
-      showToast(`Estado actualizado a ${status}`, "info");
+      await db.proposals.updateStatus(contextMenu.proposal.id, ProposalStatus.SENT);
+      showToast("⏳ En Espera", "info");
       loadData();
   };
 
-  // Confirmación final del Modal (Igual que antes)
-  const confirmApprovalModal = async () => {
-      if (!selectedProposal) return;
-      try {
-          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments);
-          showToast("Gestión completada con éxito", "success");
-          setIsApproveModalOpen(false);
-          loadData();
-      } catch (e) {
-          console.error(e);
-          showToast("Error al procesar", "error");
-      }
+  const handleReject = async () => {
+      if (!contextMenu.proposal) return;
+      if (!confirm("¿Rechazar presupuesto?")) return;
+      await db.proposals.updateStatus(contextMenu.proposal.id, ProposalStatus.REJECTED);
+      showToast("❌ Rechazado", "info");
+      loadData();
   };
 
-  // Filtrado
+  // --- FILTROS ---
   const filteredProposals = proposals.filter(p => {
       const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase());
-      
       let matchesTab = true;
-      if (activeTab === 'SENT') matchesTab = p.status === 'SENT';
-      if (activeTab === 'APPROVED') matchesTab = p.status === 'ACCEPTED' || p.status === 'PARTIALLY_ACCEPTED';
-      if (activeTab === 'DRAFT') matchesTab = p.status === 'DRAFT';
-
+      if (activeTab === 'WAITING') matchesTab = p.status === ProposalStatus.SENT || p.status === ProposalStatus.DRAFT;
+      if (activeTab === 'APPROVED') matchesTab = p.status === ProposalStatus.ACCEPTED || p.status === ProposalStatus.PARTIALLY_ACCEPTED;
+      if (activeTab === 'REJECTED') matchesTab = p.status === ProposalStatus.REJECTED;
       return matchesSearch && matchesTab;
   });
 
   const getStatusBadge = (status: ProposalStatus) => {
       switch (status) {
-          case ProposalStatus.ACCEPTED: return <Badge variant="green">Aceptada Total</Badge>;
-          case ProposalStatus.PARTIALLY_ACCEPTED: return <Badge variant="blue">Aceptada Parcial</Badge>;
+          case ProposalStatus.ACCEPTED: return <Badge variant="green">Aprobado</Badge>;
+          case ProposalStatus.PARTIALLY_ACCEPTED: return <Badge variant="blue">Parcial</Badge>;
           case ProposalStatus.REJECTED: return <Badge variant="red">Rechazada</Badge>;
-          case ProposalStatus.SENT: return <Badge variant="yellow">Enviada</Badge>;
+          case ProposalStatus.SENT: return <Badge variant="yellow">En Espera</Badge>;
           default: return <Badge variant="outline">Borrador</Badge>;
       }
   };
 
+  // Helper para nombre de contractor
+  const getContractorName = (id?: string) => {
+      if (!id) return 'Agencia (Interno)';
+      return contractors.find(c => c.id === id)?.name || 'Desconocido';
+  };
+
   return (
-    <div className="space-y-6 pb-20 relative min-h-screen" onClick={() => setContextMenu({ ...contextMenu, visible: false })}>
+    <div className="space-y-6 pb-20 relative min-h-screen">
         
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-indigo-600" /> Gestión de Presupuestos
+                    <FileText className="w-8 h-8 text-indigo-600" /> Historial de Presupuestos
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Historial, estados y aprobaciones.</p>
+                <p className="text-gray-500 dark:text-gray-400 mt-1">Doble clic para ver detalle financiero completo.</p>
             </div>
             <Button onClick={() => navigate('/sales-copilot')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg">
-                <Plus className="w-4 h-4 mr-2" /> Nueva Cotización
+                <Plus className="w-4 h-4 mr-2" /> Generar Nuevo
             </Button>
         </div>
 
-        {/* PESTAÑAS Y BUSCADOR */}
+        {/* Filtros */}
         <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-2">
-             <div className="flex bg-gray-100 dark:bg-slate-800/50 p-1 rounded-xl flex-1">
-                {(['ALL', 'SENT', 'APPROVED', 'DRAFT'] as const).map((tab) => (
+             <div className="flex bg-gray-100 dark:bg-slate-800/50 p-1 rounded-xl flex-1 overflow-x-auto">
+                {[
+                    { id: 'ALL', label: 'Todos' },
+                    { id: 'APPROVED', label: 'Aprobados' },
+                    { id: 'WAITING', label: 'En Espera' },
+                    { id: 'REJECTED', label: 'No Aprobados' }
+                ].map((tab) => (
                     <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-                            activeTab === tab 
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+                            activeTab === tab.id 
                             ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' 
                             : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                         }`}
                     >
-                        {tab === 'ALL' ? 'Todo' : tab === 'SENT' ? 'Enviados' : tab === 'APPROVED' ? 'Aprobados' : 'Borradores'}
+                        {tab.label}
                     </button>
                 ))}
              </div>
-             
              <div className="relative md:w-64">
                  <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                  <Input 
@@ -186,157 +202,210 @@ export default function QuotationsPage() {
              </div>
         </div>
 
-        {/* LISTA DE TARJETAS */}
+        {/* Lista */}
         <div className="grid grid-cols-1 gap-4">
-            {filteredProposals.length === 0 && (
-                <div className="text-center py-20 text-gray-400 bg-gray-50 dark:bg-slate-900 rounded-xl border-dashed border-2 border-gray-200 dark:border-slate-800">
-                    No hay cotizaciones en esta sección.
-                </div>
-            )}
+            {loading && <div className="text-center py-10"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>}
             
-            {filteredProposals.map((proposal) => (
-                <div 
-                    key={proposal.id}
-                    onContextMenu={(e) => handleContextMenu(e, proposal)} // CLICK DERECHO AQUÍ
-                >
-                    <Card className="group hover:shadow-md transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 cursor-context-menu">
-                        <div className="p-5 flex flex-col md:flex-row justify-between gap-6">
-                            
-                            <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-3 mb-1">
-                                    {getStatusBadge(proposal.status)}
-                                    <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
-                                        <Clock className="w-3 h-3"/> {new Date(proposal.createdAt).toLocaleDateString()}
-                                    </span>
+            {!loading && filteredProposals.map((proposal) => {
+                const finance = calculateFinancials(proposal);
+                
+                return (
+                    <div 
+                        key={proposal.id}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
+                        }}
+                        onDoubleClick={() => handleOpenDetail(proposal)} // DOBLE CLIC AQUÍ
+                    >
+                        <Card className="group hover:shadow-md transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 cursor-pointer select-none">
+                            <div className="p-5 flex flex-col md:flex-row justify-between gap-6">
+                                <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        {getStatusBadge(proposal.status)}
+                                        <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
+                                            <Clock className="w-3 h-3"/> {new Date(proposal.createdAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                        {proposal.client?.name || 'Cliente Potencial'}
+                                    </h3>
+                                    
+                                    {/* Servicios (Tags) */}
+                                    {proposal.items && proposal.items.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {proposal.items.map((item: any) => (
+                                                <Badge key={item.id} variant="outline" className="text-[10px] opacity-70">
+                                                    {item.serviceSnapshotName}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                    {proposal.client?.name || 'Cliente Potencial'}
-                                </h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-1">
-                                    {proposal.objective}
-                                </p>
-                                <div className="flex items-center gap-4 text-sm font-medium pt-2">
-                                    <span className="text-gray-900 dark:text-gray-100 font-bold">
-                                        Total: ${(proposal.totalRecurringPrice + proposal.totalOneTimePrice).toLocaleString()}
-                                    </span>
-                                </div>
-                            </div>
 
-                            {/* Botón visible de menú (para móviles o si no usan click derecho) */}
-                            <div className="flex items-center justify-center md:justify-end">
-                                 <button 
-                                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400"
-                                    onClick={(e) => { e.stopPropagation(); handleContextMenu(e, proposal); }}
-                                 >
-                                    <MoreVertical className="w-5 h-5"/>
-                                 </button>
+                                {/* Valor Total del Contrato (Visualización Principal) */}
+                                <div className="flex flex-col items-end justify-center border-l pl-4 border-gray-100 dark:border-slate-800">
+                                    <span className="text-xl font-black text-gray-900 dark:text-white">
+                                        ${finance.totalContractRevenue.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Valor Contrato Total</span>
+                                    {finance.duration > 1 && (
+                                        <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded mt-1">
+                                            {finance.duration} meses
+                                        </span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </Card>
-                </div>
-            ))}
+                        </Card>
+                    </div>
+                );
+            })}
         </div>
 
-        {/* --- MENÚ CONTEXTUAL PERSONALIZADO --- */}
+        {/* --- MENÚ CONTEXTUAL --- */}
         {contextMenu.visible && (
             <div 
-                className="fixed bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-56 animate-in fade-in zoom-in-95 duration-100"
+                className="fixed bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
                 style={{ top: contextMenu.y, left: contextMenu.x }}
             >
-                <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 mb-1">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Acciones</p>
-                    <p className="text-sm font-bold truncate text-gray-800 dark:text-white">{contextMenu.proposal?.client?.name}</p>
+                <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones Rápidas</p>
                 </div>
-
-                <button onClick={() => { handleApproveFull(); }} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4"/> Aprobar Totalmente
-                </button>
-                <button onClick={() => { handleApprovePartial(); }} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4"/> Aprobar Parcialmente...
-                </button>
-                <button onClick={() => { handleChangeStatus(ProposalStatus.SENT); }} className="w-full text-left px-4 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-2">
-                    <Send className="w-4 h-4"/> Marcar como Enviado
-                </button>
-                 <button onClick={() => { /* Ver Detalle */ }} className="w-full text-left px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2">
-                    <Eye className="w-4 h-4"/> Ver Detalle
-                </button>
-                <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
-                <button onClick={() => { handleChangeStatus(ProposalStatus.REJECTED); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
-                    <XCircle className="w-4 h-4"/> Rechazar
-                </button>
+                <div className="p-1 space-y-0.5">
+                    <button onClick={handleQuickApprove} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4"/> Aprobar Totalmente
+                    </button>
+                    <button onClick={handleSetWaiting} className="w-full text-left px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2">
+                        <Clock className="w-4 h-4"/> En Espera
+                    </button>
+                    <button onClick={handleReject} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                        <XCircle className="w-4 h-4"/> Rechazar
+                    </button>
+                </div>
             </div>
         )}
 
-        {/* --- MODAL DE APROBACIÓN (Reutilizado) --- */}
-        <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Aprobar Parcialmente & Asignar">
-             <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                    <div className="text-sm text-blue-800 dark:text-blue-200">
-                        <p className="font-bold">Selección de Servicios</p>
-                        <p>Marca solo los servicios que el cliente aceptó. Los demás quedarán descartados.</p>
-                    </div>
-                </div>
-
-                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {selectedProposal?.items?.map(item => {
-                        const isSelected = selectedItemIds.includes(item.id);
-                        const assignment = assignments[item.id] || { contractorId: '', cost: 0 };
-
-                        return (
-                            <div key={item.id} className={`border rounded-xl p-4 space-y-3 transition-all ${isSelected ? 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700' : 'bg-gray-50 dark:bg-slate-900 opacity-60'}`}>
-                                <div className="flex justify-between items-start cursor-pointer" onClick={() => {
-                                        if (isSelected) {
-                                            setSelectedItemIds(selectedItemIds.filter(id => id !== item.id));
-                                        } else {
-                                            setSelectedItemIds([...selectedItemIds, item.id]);
-                                        }
-                                    }}>
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
-                                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</p>
-                                            <p className="text-xs text-gray-500">${item.serviceSnapshotCost.toLocaleString()}</p>
-                                        </div>
-                                    </div>
+        {/* --- MODAL DETALLE FINANCIERO (DOBLE CLIC) --- */}
+        <Modal 
+            isOpen={isDetailModalOpen} 
+            onClose={() => setIsDetailModalOpen(false)} 
+            title="Detalle Económico del Proyecto"
+        >
+            {selectedDetailProposal && (() => {
+                const fin = calculateFinancials(selectedDetailProposal);
+                
+                return (
+                    <div className="space-y-6">
+                        {/* 1. Header del Modal */}
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {selectedDetailProposal.client?.name}
+                                </h2>
+                                <div className="flex items-center gap-2 mt-1">
+                                    {getStatusBadge(selectedDetailProposal.status)}
+                                    <span className="text-sm text-gray-500">
+                                        Duración: <b>{fin.duration} meses</b>
+                                    </span>
                                 </div>
-                                {isSelected && (
-                                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100 dark:border-slate-700 animate-in fade-in">
-                                        <div>
-                                            <Label className="text-xs mb-1 block">Responsable:</Label>
-                                            <select 
-                                                className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2"
-                                                value={assignment.contractorId}
-                                                onChange={(e) => setAssignments({ ...assignments, [item.id]: { ...assignment, contractorId: e.target.value } })}
-                                            >
-                                                <option value="">(Interno)</option>
-                                                {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs mb-1 block">Pago Socio:</Label>
-                                            <Input 
-                                                type="number" className="h-[38px] text-sm" placeholder="0"
-                                                value={assignment.cost}
-                                                onChange={(e) => setAssignments({ ...assignments, [item.id]: { ...assignment, cost: Number(e.target.value) } })}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
                             </div>
-                        );
-                    })}
-                </div>
+                            <div className="text-right">
+                                <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
+                                <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">
+                                    ${fin.totalContractRevenue.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
 
-                <div className="flex gap-3 pt-2">
-                    <Button variant="secondary" onClick={() => setIsApproveModalOpen(false)} className="flex-1">Cancelar</Button>
-                    <Button onClick={confirmApprovalModal} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={selectedItemIds.length === 0}>
-                        Confirmar Aprobación
-                    </Button>
-                </div>
-            </div>
+                        {/* 2. Tarjetas de Finanzas (Tus Ganancias vs Gastos) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
+                                <div className="flex items-center gap-2 mb-2 text-emerald-700 dark:text-emerald-300">
+                                    <Wallet className="w-5 h-5"/>
+                                    <span className="font-bold text-sm">Tu Ganancia Neta</span>
+                                </div>
+                                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+                                    ${fin.netProfit.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-emerald-600 mt-1">Margen: {fin.margin}%</p>
+                            </div>
+
+                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
+                                <div className="flex items-center gap-2 mb-2 text-red-700 dark:text-red-300">
+                                    <User className="w-5 h-5"/>
+                                    <span className="font-bold text-sm">Gastos de Equipo</span>
+                                </div>
+                                <p className="text-2xl font-bold text-red-800 dark:text-red-200">
+                                    ${fin.totalContractCost.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-red-600 mt-1">Pago a socios/terceros</p>
+                            </div>
+
+                            <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
+                                <div className="flex items-center gap-2 mb-2 text-gray-700 dark:text-gray-300">
+                                    <Calendar className="w-5 h-5"/>
+                                    <span className="font-bold text-sm">Facturación Mensual</span>
+                                </div>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    ${fin.revenueRecurring.toLocaleString()}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">Pago recurrente del cliente</p>
+                            </div>
+                        </div>
+
+                        {/* 3. Tabla de Servicios y Asignaciones */}
+                        <div>
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <Briefcase className="w-4 h-4"/> Desglose de Servicios & Equipo
+                            </h3>
+                            <div className="border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-50 dark:bg-slate-900 text-gray-500 font-medium">
+                                        <tr>
+                                            <th className="p-3">Servicio</th>
+                                            <th className="p-3">Responsable (Socio)</th>
+                                            <th className="p-3 text-right">Cobro Cliente</th>
+                                            <th className="p-3 text-right">Pago Socio</th>
+                                            <th className="p-3 text-right">Tu Margen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                                        {selectedDetailProposal.items?.map((item: any) => {
+                                            const profit = item.serviceSnapshotCost - (item.outsourcingCost || 0);
+                                            return (
+                                                <tr key={item.id} className="bg-white dark:bg-slate-800">
+                                                    <td className="p-3 font-medium text-gray-900 dark:text-white">
+                                                        {item.serviceSnapshotName}
+                                                        <div className="text-xs text-gray-400 font-normal">{item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}</div>
+                                                    </td>
+                                                    <td className="p-3 text-indigo-600">
+                                                        {getContractorName(item.assignedContractorId)}
+                                                    </td>
+                                                    <td className="p-3 text-right font-bold">
+                                                        ${item.serviceSnapshotCost.toLocaleString()}
+                                                    </td>
+                                                    <td className="p-3 text-right text-red-500 font-medium">
+                                                        - ${item.outsourcingCost?.toLocaleString() || 0}
+                                                    </td>
+                                                    <td className="p-3 text-right text-emerald-600 font-bold">
+                                                        ${profit.toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={() => setIsDetailModalOpen(false)} variant="secondary">
+                                Cerrar Detalle
+                            </Button>
+                        </div>
+                    </div>
+                );
+            })()}
         </Modal>
 
     </div>

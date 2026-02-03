@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays, Moon, Sun, Activity, Workflow } from 'lucide-react';
+import { Calculator, LayoutGrid, CheckSquare, Briefcase, Menu, X, ArrowUpRight, Home, Globe, Palette, Users, Settings, MessageSquareMore, PieChart, Wallet, CreditCard, Rocket, Book, CalendarDays, Moon, Sun, Activity, Workflow, FileText } from 'lucide-react';
 import CalculatorPage from './pages/CalculatorPage';
 import ServicesPage from './pages/ServicesPage';
 import ProjectsPage from './pages/ProjectsPage';
@@ -36,6 +36,7 @@ const Sidebar = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }: { isOpen: bool
               { path: '/audit', icon: <Activity className="w-5 h-5" />, label: 'Auditoría', color: 'text-red-600 dark:text-red-400' },
               { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600 dark:text-emerald-400' },
               { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600 dark:text-gray-300' },
+              { path: '/quotations', icon: <FileText className="w-5 h-5" />, label: 'Presupuestos', color: 'text-pink-600 dark:text-pink-400' },
               { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-orange-600 dark:text-orange-400' },
               { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Equipo', color: 'text-purple-600 dark:text-purple-400' },
           ]

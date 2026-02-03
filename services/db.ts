@@ -584,11 +584,18 @@ export const db = {
         }
         return newProposal;
     },
+    // 1. Modifica getAll para traer los items
     getAll: async (): Promise<Proposal[]> => {
-         const { data, error } = await supabase.from('Proposal').select(`*, client:Client(*)`).order('createdAt', { ascending: false });
+         // Agregamos items:ProposalItem(*) a la consulta
+         const { data, error } = await supabase
+            .from('Proposal')
+            .select(`*, client:Client(*), items:ProposalItem(*)`) 
+            .order('createdAt', { ascending: false });
          if (error) throw error;
          return data as Proposal[];
     },
+
+    // 2. Asegúrate de tener la función approve completa que hicimos antes
     getItems: async (proposalId: string): Promise<ProposalItem[]> => {
         return handleResponse<ProposalItem>(supabase.from('ProposalItem').select('*').eq('proposalId', proposalId));
     },
@@ -626,24 +633,38 @@ export const db = {
         if (error) throw error;
     },
 
-    // ✅ NUEVA FUNCIÓN: Aprobar propuesta y activar cliente
+    // 1. Función para cambiar estado simple (ej: Rechazar o Poner en Espera)
+    updateStatus: async (id: string, status: string): Promise<void> => {
+        const { error } = await supabase
+            .from('Proposal')
+            .update({ status })
+            .eq('id', id);
+        if (error) throw error;
+    },
+
     approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}): Promise<void> => {
-        // 1. Obtener la propuesta
+        // A. Obtener propuesta
         const { data: proposal } = await supabase.from('Proposal').select('*, items:ProposalItem(*)').eq('id', proposalId).single();
         if (!proposal) throw new Error("Propuesta no encontrada");
 
-        // 2. Calcular el nuevo ingreso recurrente basado en lo aceptado
         const allItems = proposal.items || [];
-        const acceptedItems = allItems.filter((item: any) => acceptedItemIds.includes(item.id));
         
+        // B. Identificar rechazados y ELIMINARLOS
+        const rejectedItems = allItems.filter((item: any) => !acceptedItemIds.includes(item.id));
+        if (rejectedItems.length > 0) {
+            const rejectedIds = rejectedItems.map((i: any) => i.id);
+            await supabase.from('ProposalItem').delete().in('id', rejectedIds);
+        }
+
+        // C. Calcular nuevo total (Solo de lo aceptado)
+        const acceptedItems = allItems.filter((item: any) => acceptedItemIds.includes(item.id));
         const newRecurring = acceptedItems
             .filter((i: any) => i.serviceSnapshotType === 'RECURRING')
             .reduce((acc: number, curr: any) => acc + (curr.serviceSnapshotCost || 0), 0);
         
-        // Calcular costo total de outsourcing para este cliente
         let totalOutsourcing = 0;
 
-        // 3. GUARDAR ASIGNACIONES (Vincular a Gonzalo/Socios)
+        // D. Asignar Contratistas
         for (const itemId of acceptedItemIds) {
             const assign = assignments[itemId];
             if (assign && assign.contractorId) {
@@ -655,21 +676,21 @@ export const db = {
             }
         }
 
-        // 4. Actualizar Propuesta
+        // E. Actualizar Estado Propuesta
         const status = acceptedItemIds.length === allItems.length ? 'ACCEPTED' : 'PARTIALLY_ACCEPTED';
         await supabase.from('Proposal').update({ 
             status: status,
             totalRecurringPrice: newRecurring
         }).eq('id', proposalId);
 
-        // 5. ACTIVAR CLIENTE y actualizar Fecha de Inicio (hoy)
+        // F. Activar Cliente
         if (proposal.clientId) {
             await supabase.from('Client').update({
                 status: 'ACTIVE',
                 monthlyRevenue: newRecurring,
-                outsourcingCost: totalOutsourcing, // ✅ Guardamos cuánto le pagamos al equipo
-                lastContactDate: new Date().toISOString(), // Fecha de "Inicio" del contrato activo
-                billingDay: new Date().getDate() // El día de cobro pasa a ser hoy
+                outsourcingCost: totalOutsourcing,
+                lastContactDate: new Date().toISOString(),
+                billingDay: new Date().getDate()
             }).eq('id', proposal.clientId);
         }
     },
