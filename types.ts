@@ -85,6 +85,7 @@ export interface Project extends Client {
   // CRM Features
   healthScore?: ClientHealth;
   lastPaymentDate?: string;
+  contractEndDate?: string; // ✅ NUEVO: Fecha fin de contrato para auto-pause
   lastContactDate?: string;   // Ghosting Monitor
   resources?: ProjectResource[];
   contacts?: ProjectContact[];

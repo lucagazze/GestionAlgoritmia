@@ -144,7 +144,15 @@ export default function PaymentsPage() {
         e.preventDefault();
         e.stopPropagation();
         if (event.type !== 'IN') return; // Only for income
-        setContextMenu({ x: e.clientX, y: e.clientY, event });
+        
+        let x = e.clientX;
+        let y = e.clientY;
+
+        // Adjust position if too close to edges
+        if (x + 200 > window.innerWidth) x -= 200;
+        if (y + 250 > window.innerHeight) y -= 250;
+
+        setContextMenu({ x, y, event });
     };
 
     const handleMarkAsPaid = async (type: 'FULL' | 'PARTIAL') => {

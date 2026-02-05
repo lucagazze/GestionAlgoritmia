@@ -109,12 +109,14 @@ export default function ProjectsPage() {
       return 'OK';
   };
 
-  const filteredProjects = projects.filter(p => {
+  const filteredProjects = React.useMemo(() => {
+    return projects.filter(p => {
       if (!p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       // Filter out Sales statuses (Lead, Discovery, etc.) if they exist in DB
       const activeStages = [ProjectStatus.ONBOARDING, ProjectStatus.ACTIVE, ProjectStatus.PAUSED, ProjectStatus.COMPLETED];
       return activeStages.includes(p.status);
-  });
+    });
+  }, [projects, searchTerm]);
 
   const renderHealthBadge = (health: ClientHealth) => {
       switch(health) {

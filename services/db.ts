@@ -373,7 +373,7 @@ export const db = {
         if (current) {
           await db.audit.createSnapshot('PROJECT', id, 'UPDATE', current, data);
         }
-      } catch (e) {
+        } catch (e) {
         console.warn('Failed to create audit snapshot:', e);
       }
       
@@ -401,7 +401,7 @@ export const db = {
               }
           })();
       }
-      
+
       // Trigger Automation Engine (STATUS_CHANGE)
       if (data.status) {
           const { data: currentProject } = await supabase.from('Client').select('*').eq('id', id).single();
@@ -410,6 +410,40 @@ export const db = {
           }
       }
     },
+
+    // ✅ NUEVO: Chequeo de Espiración de Contratos
+    checkExpirations: async () => {
+        try {
+            const { data: projects } = await supabase
+                .from('Client')
+                .select('*')
+                .eq('status', ProjectStatus.ACTIVE);
+            
+            if (!projects) return;
+
+            const today = new Date();
+            let pausedCount = 0;
+
+            for (const p of projects) {
+                if (p.contractEndDate) {
+                    const endDate = new Date(p.contractEndDate);
+                    // Si ya pasó la fecha de fin (y no es hoy)
+                    if (endDate < today) {
+                        console.log(`⏸️ Pausando contrato vencido: ${p.name} (Venció: ${p.contractEndDate})`);
+                        await db.projects.update(p.id, { 
+                            status: ProjectStatus.PAUSED,
+                            notes: (p.notes || '') + `\n[SISTEMA] Contrato finalizado automáticamente el ${new Date().toLocaleDateString()}.`
+                        });
+                        pausedCount++;
+                    }
+                }
+            }
+            if (pausedCount > 0) console.log(`✅ ${pausedCount} contratos pausados automáticamente.`);
+        } catch (e) {
+            console.error("Error checking expirations:", e);
+        }
+    },
+
     delete: async (id: string): Promise<void> => {
         const { error } = await supabase.from('Client').delete().eq('id', id);
         if (error) throw error;
@@ -707,14 +741,19 @@ export const db = {
             durationMonths: finalDuration
         }).eq('id', proposalId);
 
-        // F. Activar Cliente
+        // F. Activar Cliente y CALCULAR FECHA FIN
         if (proposal.clientId) {
+            // Calcular fecha fin: Hoy + Duration (Meses)
+            const endDate = new Date();
+            endDate.setMonth(endDate.getMonth() + finalDuration);
+            
             await supabase.from('Client').update({
                 status: 'ACTIVE',
                 monthlyRevenue: newRecurring,
                 outsourcingCost: totalOutsourcing,
                 lastContactDate: new Date().toISOString(),
-                billingDay: new Date().getDate()
+                billingDay: new Date().getDate(),
+                contractEndDate: endDate.toISOString() // ✅ Guardar fecha fin
             }).eq('id', proposal.clientId);
         }
     },
