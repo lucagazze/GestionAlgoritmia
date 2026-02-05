@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../services/db';
+import { useProjects } from '../hooks/queries/useProjects';
 import { Project, ProjectStatus, Contractor, ClientHealth } from '../types';
 import { Badge, Button, Input, Modal, Label } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
@@ -13,9 +13,7 @@ import confetti from 'canvas-confetti';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [contractors, setContractors] = useState<Contractor[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { projects, isLoading, createProject, updateStatus, archiveProject } = useProjects();
   const [searchTerm, setSearchTerm] = useState('');
   
   // View States
@@ -28,40 +26,23 @@ export default function ProjectsPage() {
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project | null }>({ x: 0, y: 0, project: null });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    const [projData, contData] = await Promise.all([
-        db.projects.getAll(),
-        db.contractors.getAll()
-    ]);
-    const mappedProjects = projData
-        .filter(p => p.status !== ProjectStatus.ARCHIVED) // ✅ Filter archived (Soft Delete)
-        .map(p => {
-        const partner = contData.find(c => c.id === p.assignedPartnerId);
-        return { ...p, partnerName: partner ? partner.name : undefined };
-    });
-    setProjects(mappedProjects);
-    setContractors(contData);
-    setIsLoading(false);
-  };
-
   const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newProjectName) return;
-      const created = await db.projects.create({
-          name: newProjectName,
-          status: ProjectStatus.ONBOARDING,
-          monthlyRevenue: 0,
-          industry: '',
-          billingDay: 1
-      });
-      setNewProjectName('');
-      setIsCreateModalOpen(false);
-      navigate(`/projects/${created.id}`); // Jump straight to detail
+      try {
+        const created = await createProject({
+            name: newProjectName,
+            status: ProjectStatus.ONBOARDING,
+            monthlyRevenue: 0,
+            industry: '',
+            billingDay: 1
+        });
+        setNewProjectName('');
+        setIsCreateModalOpen(false);
+        navigate(`/projects/${created.id}`); // Jump straight to detail
+      } catch (error) {
+        console.error("Failed to create project", error);
+      }
   };
 
   const handleContextMenu = (e: React.MouseEvent, project: Project) => {
@@ -70,15 +51,17 @@ export default function ProjectsPage() {
   };
 
   const handleDragDropStatus = async (projectId: string, newStatus: ProjectStatus) => {
-      setProjects(prev => prev.map(p => p.id === projectId ? { ...p, status: newStatus } : p));
+      // Optimistic-like UI: The hook will invalidate and refresh. 
+      // For true optimistic UI, we would implement onMutate in the hook, 
+      // but usually Supabase is fast enough that the flicker is minimal.
+      // We keep the confetti for instant gratification.
       if (newStatus === ProjectStatus.ACTIVE) {
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#16a34a', '#dcfce7'] });
       }
       try {
-          await db.projects.update(projectId, { status: newStatus });
+          await updateStatus({ id: projectId, status: newStatus });
       } catch (error) {
-          console.error("Failed to update status, reverting", error);
-          loadData();
+          console.error("Failed to update status", error);
       }
   };
 
@@ -86,10 +69,8 @@ export default function ProjectsPage() {
       // Cambiamos el mensaje para que sea claro que se archiva
       if(confirm('¿Archivar este proyecto? Desaparecerá de la lista activa.')) {
           // ✅ Soft Delete: Actualizamos estado en vez de borrar
-          await db.projects.update(id, { status: ProjectStatus.ARCHIVED });
-          
-          // Actualizamos la lista local filtrando el archivado
-          setProjects(prev => prev.filter(p => p.id !== id));
+          await archiveProject(id);
+          // No need to manually update local state, Query will refetch
       }
   }
 
