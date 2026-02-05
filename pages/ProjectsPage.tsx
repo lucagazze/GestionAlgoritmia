@@ -227,8 +227,8 @@ export default function ProjectsPage() {
           <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex-1 flex flex-col min-h-0">
               <div className="overflow-auto flex-1 custom-scrollbar">
                   <table className="w-full text-sm text-left min-w-[800px]">
-                      <thead className="bg-gray-50/50 dark:bg-slate-800/50 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-800 uppercase text-xs tracking-wider sticky top-0 z-10 backdrop-blur-sm">
-                          <tr><th className="px-6 py-4">Cliente</th><th className="px-6 py-4">Estado</th><th className="px-6 py-4 text-right">Fee (Mes)</th><th className="px-6 py-4 text-center">Salud</th><th className="px-6 py-4 text-center">Pago</th><th className="px-6 py-4 text-center"></th></tr>
+                      <thead className="bg-gray-50/50 dark:bg-slate-800/50 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-800 uppercase text-[10px] tracking-wider sticky top-0 z-10 backdrop-blur-sm">
+                          <tr><th className="px-4 py-2">Cliente</th><th className="px-4 py-2">Estado</th><th className="px-4 py-2 text-right">Fee (Mes)</th><th className="px-4 py-2 text-center">Salud</th><th className="px-4 py-2 text-center">Pago</th><th className="px-4 py-2 text-center"></th></tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                           {isLoading ? (<tr><td colSpan={6} className="text-center py-20 text-gray-400"><div className="animate-pulse">Cargando...</div></td></tr>) : 
@@ -237,24 +237,24 @@ export default function ProjectsPage() {
                                   const ghostStatus = getGhostingStatus(p.lastContactDate);
                                   return (
                                       <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} onContextMenu={(e) => handleContextMenu(e, p)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group">
-                                          <td className="px-6 py-4">
+                                          <td className="px-4 py-2">
                                               <div className="flex flex-col">
                                                   <div className="flex items-center gap-2">
-                                                      <span className="font-bold text-gray-900 dark:text-white text-base">{p.name}</span>
+                                                      <span className="font-bold text-gray-900 dark:text-white text-sm">{p.name}</span>
                                                       {ghostStatus === 'GHOSTING' && <span title="Ghosting Alert: +7 días sin contacto" className="text-red-500 bg-red-50 dark:bg-red-900/30 p-0.5 rounded"><Ghost className="w-3 h-3"/></span>}
                                                   </div>
                                                   <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5"><User className="w-3 h-3"/> {p.partnerName || 'In-house'}</span>
                                               </div>
                                           </td>
-                                          <td className="px-6 py-4"><Badge variant={p.status === ProjectStatus.ACTIVE ? 'green' : 'outline'}>{p.status}</Badge></td>
-                                          <td className="px-6 py-4 text-right font-mono font-medium text-gray-700 dark:text-gray-300">${p.monthlyRevenue.toLocaleString()}</td>
-                                          <td className="px-6 py-4 text-center flex justify-center">{renderHealthBadge(p.healthScore || 'GOOD')}</td>
-                                          <td className="px-6 py-4 text-center">
-                                              <span className={`px-3 py-1 rounded-full text-xs font-bold border ${paid ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border-red-100 dark:border-red-800'}`}>
+                                          <td className="px-4 py-2"><Badge variant={p.status === ProjectStatus.ACTIVE ? 'green' : 'outline'} className="text-[10px] px-1.5 py-0">{p.status}</Badge></td>
+                                          <td className="px-4 py-2 text-right font-mono font-medium text-gray-700 dark:text-gray-300 text-xs">${p.monthlyRevenue.toLocaleString()}</td>
+                                          <td className="px-4 py-2 text-center flex justify-center scale-90">{renderHealthBadge(p.healthScore || 'GOOD')}</td>
+                                          <td className="px-4 py-2 text-center">
+                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${paid ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border-red-100 dark:border-red-800'}`}>
                                                   {paid ? 'PAGADO' : 'PENDIENTE'}
                                               </span>
                                           </td>
-                                          <td className="px-6 py-4 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-black dark:hover:text-white transition-all"><Edit2 className="w-4 h-4" /></button></td>
+                                          <td className="px-4 py-2 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-black dark:hover:text-white transition-all"><Edit2 className="w-3 h-3" /></button></td>
                                       </tr>
                                   );
                               })

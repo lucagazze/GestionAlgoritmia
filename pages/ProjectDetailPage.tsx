@@ -3,11 +3,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
-import { Project, ProjectStatus, Contractor, ClientNote, Task, TaskStatus, Deliverable, PortalMessage } from '../types';
-import { Badge, Button, Input, Label, Textarea, Card, Slider, Modal } from '../components/UIComponents';
+import { Project, ProjectStatus, Contractor, ClientNote, Task, TaskStatus, Deliverable, PortalMessage, Proposal, ProposalItem } from '../types';
+import { Badge, Button, Input, Label, Textarea, Card, CardContent, Slider, Modal } from '../components/UIComponents';
 import { 
   ArrowLeft, Mic2, ListTodo, Plus, Trash2, ExternalLink, Copy, 
-  Sparkles, Globe, Loader2, Save,
+  Sparkles, Globe, Loader2, Save, Layers,
   CheckCircle2, User, Wallet, Palette, FileText, UploadCloud, MessageSquare, Send, BarChart3,
   Phone, Briefcase, TrendingUp, Clock, MapPin, Building
 } from 'lucide-react';
@@ -26,7 +26,10 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'PROFILE' | 'ACTION_PLAN' | 'HISTORY'>('PROFILE');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PROFILE' | 'ACTION_PLAN' | 'HISTORY'>('OVERVIEW');
+
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [activeItems, setActiveItems] = useState<ProposalItem[]>([]);
 
   const [clientNotes, setClientNotes] = useState<ClientNote[]>([]);
   const [clientTasks, setClientTasks] = useState<Task[]>([]);
@@ -64,13 +67,14 @@ export default function ProjectDetailPage() {
   const loadProject = async () => {
       if (!id) return;
       setLoading(true);
-      const [proj, conts, notes, tasks, delivs, msgs] = await Promise.all([
+      const [proj, conts, notes, tasks, delivs, msgs, proposalsData] = await Promise.all([
           db.projects.getById(id),        // <--- CAMBIO CLAVE AQUÍ
           db.contractors.getAll(),
           db.clientNotes.getByClient(id),
           db.tasks.getByProjectId(id),    // <--- Asegúrate de haber agregado esto en el paso anterior
           db.portal.getDeliverables(id),
-          db.portal.getMessages(id)
+          db.portal.getMessages(id),
+          db.proposals.getAll() // Fetch proposals to find active services
       ]);
       
       if (proj) {
@@ -82,6 +86,16 @@ export default function ProjectDetailPage() {
       setClientTasks(tasks);
       setDeliverables(delivs);
       setPortalMessages(msgs);
+      
+      // Filter Active Services
+      // We look for accepted proposals for this client
+      const clientProposals = (proposalsData as Proposal[]).filter(p => p.clientId === id && (p.status === 'ACCEPTED' || p.status === 'PARTIALLY_ACCEPTED'));
+      setProposals(clientProposals);
+      
+      // Get all items from these proposals
+      const items = clientProposals.flatMap(p => p.items || []);
+      setActiveItems(items);
+
       setLoading(false);
   };
 
@@ -202,11 +216,11 @@ export default function ProjectDetailPage() {
 
         <div className="max-w-7xl mx-auto px-6 py-8">
             
-            {/* Tabs */}
             <div className="flex gap-1 mb-8 overflow-x-auto no-scrollbar pb-1">
                 {[
+                    { id: 'OVERVIEW', label: 'Resumen', icon: BarChart3 },
                     { id: 'PROFILE', label: 'Perfil', icon: User },
-                    { id: 'ACTION_PLAN', label: 'Plan de Acción', icon: TrendingUp },
+                    { id: 'ACTION_PLAN', label: 'Evolución', icon: TrendingUp },
                     { id: 'HISTORY', label: 'Historial', icon: ListTodo },
                 ].map(tab => {
                     const Icon = tab.icon;
@@ -232,6 +246,113 @@ export default function ProjectDetailPage() {
             {/* Content Area */}
             <div className="grid grid-cols-1 gap-6">
                 
+                {/* OVERVIEW TAB */}
+                {activeTab === 'OVERVIEW' && (
+                    <div className="animate-in fade-in space-y-6">
+                        {/* 1. STATUS CARDS */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-blue-500">
+                                <CardContent className="p-5">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Facturación</p>
+                                        <Wallet className="w-4 h-4 text-blue-500" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                                        ${formData.monthlyRevenue?.toLocaleString()} <span className="text-sm font-normal text-gray-400">/mes</span>
+                                    </h3>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <div className={`w-2 h-2 rounded-full ${formData.lastPaymentDate && new Date(formData.lastPaymentDate).getMonth() === new Date().getMonth() ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                        <p className="text-xs text-gray-500">
+                                            {formData.lastPaymentDate && new Date(formData.lastPaymentDate).getMonth() === new Date().getMonth() ? 'Pago al día' : 'Pago pendiente'}
+                                        </p>
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">Día de cobro: {formData.billingDay || 1}</p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-purple-500">
+                                <CardContent className="p-5">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Servicios Activos</p>
+                                        <Layers className="w-4 h-4 text-purple-500" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                                        {activeItems.length}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                        {activeItems.map(i => i.serviceSnapshotName).join(', ') || 'Sin servicios activos'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-orange-500">
+                                <CardContent className="p-5">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tareas Pendientes</p>
+                                        <ListTodo className="w-4 h-4 text-orange-500" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                                        {clientTasks.filter(t => t.status === 'TODO').length}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Próxima entrega: {clientTasks.find(t => t.status === 'TODO' && t.dueDate)?.dueDate ? new Date(clientTasks.find(t => t.status === 'TODO' && t.dueDate)!.dueDate!).toLocaleDateString() : 'Sin fecha'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* 2. SERVICES LIST */}
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-yellow-500"/> Servicios & Entregables
+                            </h3>
+                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden">
+                                {activeItems.length === 0 ? (
+                                    <div className="p-8 text-center text-gray-400">No hay servicios activados en este momento.</div>
+                                ) : (
+                                    <div className="divide-y divide-gray-50 dark:divide-slate-800">
+                                        {activeItems.map((item, i) => (
+                                            <div key={i} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                <div>
+                                                    <p className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{item.serviceSnapshotDescription}</p>
+                                                </div>
+                                                <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'outline'}>
+                                                    {item.serviceSnapshotType === 'RECURRING' ? 'Recurrente' : 'One Shot'}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                         {/* 3. RECENT DELIVERABLES */}
+                         {deliverables.length > 0 && (
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                    <ExternalLink className="w-4 h-4 text-blue-500"/> Entregables Recientes
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {deliverables.slice(0, 4).map(d => (
+                                        <a href={d.url} target="_blank" rel="noreferrer" key={d.id} className="block p-4 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                                                    <FileText className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-gray-900 dark:text-white text-sm">{d.name}</p>
+                                                    <p className="text-xs text-gray-500">{new Date(d.createdAt).toLocaleDateString()}</p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                         )}
+                    </div>
+                )} 
+
                 {/* PROFILE TAB */}
                 {activeTab === 'PROFILE' && (
                     <ProjectProfileTab formData={formData} setFormData={setFormData} />

@@ -3,8 +3,8 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
-import { Service, ServiceType, ProposalStatus, Contractor } from '../types';
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge, Textarea } from '../components/UIComponents';
+import { Service, ServiceType, ProposalStatus, Contractor, Project } from '../types';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge, Textarea, Select } from '../components/UIComponents';
 import { Check, Copy, Save, Wand2, User, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -28,6 +28,8 @@ export default function CalculatorPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [services, setServices] = useState<Service[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [clients, setClients] = useState<Project[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [rewritingServiceId, setRewritingServiceId] = useState<string | null>(null);
@@ -81,14 +83,16 @@ export default function CalculatorPage() {
 
   useEffect(() => {
     const init = async () => {
-      const [servicesData, contractorsData, proposalsData] = await Promise.all([
+      const [servicesData, contractorsData, proposalsData, clientsData] = await Promise.all([
         db.services.getAll(),
         db.contractors.getAll(),
-        db.proposals.getAll()
+        db.proposals.getAll(),
+        db.projects.getAll()
       ]);
       setServices(servicesData);
       setContractors(contractorsData);
       setProposals(proposalsData);
+      setClients(clientsData.filter(c => c.status !== 'ARCHIVED')); // Only active clients
       setIsLoading(false);
     };
     init();
@@ -369,6 +373,7 @@ export default function CalculatorPage() {
       setActiveProposalId(null);
       setIsReadOnly(false); // Reset read only
       setClientInfo({ name: '', industry: '', targetAudience: '', currentSituation: '', objective: '' });
+      setSelectedClientId(null);
       setSelectedServiceIds([]);
       setCustomPrices({});
       setCustomDescriptions({});
@@ -377,6 +382,27 @@ export default function CalculatorPage() {
       setOutsourcingCosts({});
       setCurrentStep(1);
       setViewMode('CALCULATOR');
+  };
+
+  const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const clientId = e.target.value;
+      if (!clientId) {
+          setSelectedClientId(null);
+          setClientInfo(prev => ({ ...prev, name: '', industry: '' }));
+          return;
+      }
+      
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+          setSelectedClientId(clientId);
+          setClientInfo({
+              name: client.name,
+              industry: client.industry || '',
+              targetAudience: clientInfo.targetAudience || '',
+              currentSituation: clientInfo.currentSituation || '',
+              objective: clientInfo.objective || ''
+          });
+      }
   };
 
   // ... (rest of code)
@@ -1036,8 +1062,21 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                           <CardContent className="space-y-6">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div>
-                                      <Label>Nombre de Empresa / Cliente</Label>
-                                      <Input value={clientInfo.name} onChange={e => setClientInfo({...clientInfo, name: e.target.value})} placeholder="Ej: TechSolutions Inc" autoFocus />
+                                      <Label>Cliente</Label>
+                                      {isReadOnly ? (
+                                          <Input value={clientInfo.name} disabled className="bg-gray-100 dark:bg-slate-800" />
+                                      ) : (
+                                          <Select 
+                                            value={selectedClientId || ''} 
+                                            onChange={handleClientSelect}
+                                            autoFocus
+                                          >
+                                              <option value="">Seleccionar Cliente...</option>
+                                              {clients.map(c => (
+                                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                              ))}
+                                          </Select>
+                                      )}
                                   </div>
                                   <div>
                                       <Label>Rubro / Industria</Label>

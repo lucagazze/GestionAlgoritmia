@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -949,6 +949,23 @@ export const db = {
              throw error;
         }
         return data || [];
+    },
+    create: async (data: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment> => {
+        const { data: created, error } = await supabase.from('Payment').insert({
+            ...data,
+            createdAt: new Date().toISOString()
+        }).select().single();
+        
+        if (error) throw error;
+
+        // Update Client's last payment date
+        if (data.clientId) {
+            await supabase.from('Client').update({ 
+                lastPaymentDate: new Date().toISOString() 
+            }).eq('id', data.clientId);
+        }
+
+        return created;
     },
   },
 

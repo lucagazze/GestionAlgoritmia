@@ -3,8 +3,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight } from 'lucide-react';
-import { Card, Button, Modal, Badge } from '../components/UIComponents';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare } from 'lucide-react';
+import { Card, Button, Modal, Badge, Input, Label } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function PaymentsPage() {
@@ -16,6 +16,19 @@ export default function PaymentsPage() {
     const [viewMode, setViewMode] = useState<'CALENDAR' | 'FORECAST' | 'HISTORY'>('CALENDAR');
     const [selectedPayment, setSelectedPayment] = useState<any>(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    
+    // NEW: Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, event: any } | null>(null);
+    const [isPartialPaymentModalOpen, setIsPartialPaymentModalOpen] = useState(false);
+    const [partialAmount, setPartialAmount] = useState('');
+    const [selectedEventForPayment, setSelectedEventForPayment] = useState<any>(null);
+
+    // Close context menu on click elsewhere
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        window.addEventListener('click', handleClick);
+        return () => window.removeEventListener('click', handleClick);
+    }, []);
 
     useEffect(() => {
         const load = async () => {
@@ -54,13 +67,31 @@ export default function PaymentsPage() {
     const getEventsForDate = (date: Date) => {
         if (!date) return [];
         const day = date.getDate();
-        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string }[] = [];
+        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number }[] = [];
 
         // Incoming: Client Billings
         activeProjects.forEach(p => {
             const billDay = p.billingDay || 1;
             if (billDay === day) {
-                events.push({ type: 'IN', label: p.name, amount: p.monthlyRevenue, projectId: p.id });
+                // Check if paid in this month
+                const payment = payments.find(pay => 
+                    pay.clientId === p.id && 
+                    new Date(pay.date).getMonth() === month &&
+                    new Date(pay.date).getFullYear() === year
+                );
+
+                const isPaid = !!payment;
+                const paidAmount = payment ? payment.amount : 0;
+                
+                events.push({ 
+                    type: 'IN', 
+                    label: p.name, 
+                    amount: p.monthlyRevenue, 
+                    projectId: p.id,
+                    paid: isPaid,
+                    paymentId: payment?.id,
+                    paymentAmount: paidAmount
+                });
             }
         });
 
@@ -107,7 +138,69 @@ export default function PaymentsPage() {
             });
         }
         return data;
-    }, [activeProjects]);
+    }, [activeProjects, payments]); // Update dependency
+
+    const handleContextMenu = (e: React.MouseEvent, event: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (event.type !== 'IN') return; // Only for income
+        setContextMenu({ x: e.clientX, y: e.clientY, event });
+    };
+
+    const handleMarkAsPaid = async (type: 'FULL' | 'PARTIAL') => {
+        if (!contextMenu?.event) return;
+        const evt = contextMenu.event;
+        
+        if (type === 'FULL') {
+            await db.payments.create({
+                clientId: evt.projectId,
+                amount: evt.amount,
+                date: new Date().toISOString(),
+                type: 'FULL'
+            });
+            // Reload
+            const paymentsData = await db.payments.getAll();
+            setPayments(paymentsData);
+        } else {
+            setSelectedEventForPayment(evt);
+            setIsPartialPaymentModalOpen(true);
+        }
+        setContextMenu(null);
+    };
+
+    const handlePartialPaymentSubmit = async () => {
+        if (!selectedEventForPayment || !partialAmount) return;
+        
+        await db.payments.create({
+            clientId: selectedEventForPayment.projectId,
+            amount: parseFloat(partialAmount),
+            date: new Date().toISOString(),
+            type: 'PARTIAL'
+        });
+
+        const paymentsData = await db.payments.getAll();
+        setPayments(paymentsData);
+        setIsPartialPaymentModalOpen(false);
+        setPartialAmount('');
+        setSelectedEventForPayment(null);
+    };
+
+    const handleWhatsAppReminder = () => {
+        if (!contextMenu?.event) return;
+        const evt = contextMenu.event;
+        const project = projects.find(p => p.id === evt.projectId);
+        if (!project || !project.phone) {
+             alert("El cliente no tiene teléfono registrado.");
+             return;
+        }
+
+        const monthName = referenceDate.toLocaleDateString('es-ES', { month: 'long' });
+        const message = `Hola! Te hago un recordatorio por el pago del mes de ${monthName}. Quedo atento, gracias!`;
+        const url = `https://wa.me/${project.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+        setContextMenu(null);
+    };
+
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 h-full flex flex-col">
@@ -199,15 +292,19 @@ export default function PaymentsPage() {
                                             {events.map((evt, idx) => (
                                                 <div 
                                                     key={idx} 
-                                                    onClick={() => evt.projectId && navigate(`/projects/${evt.projectId}?tab=PROFILE`)}
+                                                    onContextMenu={(e) => handleContextMenu(e, evt)}
                                                     className={`
-                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors
+                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors relative
                                                         ${evt.type === 'IN' 
-                                                            ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' 
+                                                            ? evt.paid 
+                                                                ? (evt.paymentAmount && evt.paymentAmount < evt.amount 
+                                                                    ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800' // Partial
+                                                                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800') // Full
+                                                                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' // Pending (Standard)
                                                             : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-800'
                                                         }
                                                     `}
-                                                    title={`${evt.label}: $${evt.amount}`}
+                                                    title={`${evt.label}: $${evt.amount} ${evt.paid ? `(Pagado: $${evt.paymentAmount})` : ''}`}
                                                 >
                                                     <span className="truncate flex-1">{evt.label}</span>
                                                     <span className="font-bold ml-1">${evt.amount.toLocaleString()}</span>
@@ -400,6 +497,59 @@ export default function PaymentsPage() {
                         </div>
                     </div>
                 )}
+            </Modal>
+            {/* NEW: Context Menu */}
+            {contextMenu && (
+                <div 
+                    className="fixed z-50 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 py-1 w-48 animate-in fade-in zoom-in-95 duration-100"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 mb-1">
+                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{contextMenu.event.label}</p>
+                        <p className="text-[10px] text-gray-500">Acciones de Pago</p>
+                    </div>
+                    
+                    <button onClick={() => handleMarkAsPaid('FULL')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2">
+                        <Check className="w-4 h-4" /> Pagó Completo
+                    </button>
+                    <button onClick={() => handleMarkAsPaid('PARTIAL')} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex items-center gap-2">
+                        <DollarSign className="w-4 h-4" /> Pagó Parcial...
+                    </button>
+                    <button onClick={() => handleMarkAsPaid('FULL')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
+                        <X className="w-4 h-4" /> No Pagó (Pendiente)
+                    </button>
+                    <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                    <button onClick={handleWhatsAppReminder} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" /> Enviar Recordatorio
+                    </button>
+                </div>
+            )}
+
+            {/* NEW: Partial Payment Modal */}
+            <Modal
+                isOpen={isPartialPaymentModalOpen}
+                onClose={() => setIsPartialPaymentModalOpen(false)}
+                title="Registrar Pago Parcial"
+            >
+                <div className="space-y-4">
+                    <div>
+                        <Label>Monto Pagado</Label>
+                        <Input 
+                            type="number" 
+                            value={partialAmount} 
+                            onChange={e => setPartialAmount(e.target.value)}
+                            placeholder="Ej: 500"
+                            autoFocus
+                        />
+                         {selectedEventForPayment && (
+                            <p className="text-xs text-gray-500 mt-1">Total esperado: ${selectedEventForPayment.amount.toLocaleString()}</p>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsPartialPaymentModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handlePartialPaymentSubmit} disabled={!partialAmount}>Registrar</Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

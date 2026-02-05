@@ -244,3 +244,14 @@ export interface PortalMessage {
 }
 
 export type ServiceCategory = 'Web & Tech' | 'Branding' | 'Contenido' | 'Ads / Tráfico' | 'Automatización' | 'Consultoría';
+
+export interface Payment {
+    id: string;
+    clientId: string;
+    client?: Client;
+    amount: number;
+    date: string;
+    notes?: string;
+    type?: 'FULL' | 'PARTIAL';
+    createdAt: string;
+}
