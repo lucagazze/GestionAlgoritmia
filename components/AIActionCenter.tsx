@@ -6,7 +6,7 @@ import { ai } from '../services/ai';
 import { db } from '../services/db';
 import { useWakeWord } from '../hooks/useWakeWord';
 import { sounds } from '../services/sounds';
-import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus } from '../types';
+import { AIChatLog, AIChatSession, TaskStatus, ProjectStatus, ProposalStatus } from '../types';
 import { Sparkles, Loader2, CornerDownLeft, Mic, StopCircle, ChevronUp, AlertTriangle, Check, RotateCcw, Trash2, History, MessageSquare, Plus, Clock, MousePointerClick, Square, UserPlus, ListTodo, Lightbulb, AudioWaveform, ExternalLink, Info } from 'lucide-react';
 import { ActionDetailsModal } from './ActionDetailsModal';
 
