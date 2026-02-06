@@ -341,6 +341,48 @@ export const AIActionCenter = () => {
                 return { success: true, undo: { undoType: 'DELETE_PROJECT', data: { id: newProject.id }, description: 'Borrar proyecto' } };
             }
             
+            // 💰 PROPOSAL / BUDGET ACTIONS
+            if (actionType === 'CREATE_PROPOSAL') {
+                // Prepare items payload
+                const itemsToCreate = (payload.items || []).map((item: any) => ({
+                    // We need a Service ID. Ideally AI sends it, otherwise we might leave it empty or map it.
+                    // For now, if AI didn't find one, we use a generic placeholder or first service in list as fallback 
+                    // (Real implementation should search service by name here)
+                    serviceId: item.serviceId || 'GENERIC', 
+                    serviceSnapshotName: item.serviceName || "Servicio",
+                    serviceSnapshotDescription: item.description || "",
+                    serviceSnapshotType: item.serviceType || 'RECURRING',
+                    serviceSnapshotCost: item.cost || 0,
+                    outsourcingCost: 0
+                }));
+                
+                const totalRecurring = itemsToCreate
+                    .filter((i:any) => i.serviceSnapshotType === 'RECURRING')
+                    .reduce((acc:any, curr:any) => acc + curr.serviceSnapshotCost, 0);
+                    
+                const totalOneTime = itemsToCreate
+                    .filter((i:any) => i.serviceSnapshotType === 'ONE_TIME')
+                    .reduce((acc:any, curr:any) => acc + curr.serviceSnapshotCost, 0);
+
+                const duration = payload.durationMonths || 12;
+
+                const newProposal = await db.proposals.create({
+                    status: ProposalStatus.ACCEPTED, // Unless specified otherwise
+                    objective: payload.objective || "Aumentar ventas",
+                    durationMonths: duration,
+                    totalRecurringPrice: totalRecurring,
+                    totalOneTimePrice: totalOneTime,
+                    totalContractValue: totalOneTime + (totalRecurring * duration),
+                    aiPromptGenerated: "Creado por AI Chat",
+                    items: itemsToCreate
+                }, payload.clientName, payload.industry);
+                
+                return { 
+                    success: true, 
+                    message: `✅ Creé el Presupuesto para **${payload.clientName}** por **$${(totalOneTime + totalRecurring).toLocaleString()}**`
+                };
+            }
+            
             // 💰 FINANCE ACTIONS
             if (actionType === 'ADD_CLIENT_NOTE') {
                 await db.clientNotes.create({
