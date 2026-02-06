@@ -24,6 +24,7 @@ import PaymentsPage from '../../pages/PaymentsPage';
 import AuditPage from '../../pages/AuditPage';
 import AutomationsPage from '../../pages/AutomationsPage';
 import QuotationsPage from '../../pages/QuotationsPage';
+import RolesPage from '../../pages/RolesPage';
 
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -81,6 +82,7 @@ export const MainLayout = () => {
               <Route path="/partners" element={<PartnersPage />} />
               <Route path="/partners/:id" element={<ContractorDetailPage />} />
               <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/roles" element={<RolesPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/quotations" element={<QuotationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />

@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -200,6 +200,26 @@ export const db = {
           }).select().single();
           if (error) throw error;
           return created;
+      }
+  },
+
+  // --- ROLES & RESPONSIBILITIES ---
+  roles: {
+      getAll: async (): Promise<Role[]> => {
+          return handleResponse<Role>(supabase.from('Role').select('*').order('department', { ascending: true }));
+      },
+      create: async (data: Omit<Role, 'id'>): Promise<Role> => {
+          const { data: created, error } = await supabase.from('Role').insert(data).select().single();
+          if (error) throw error;
+          return created;
+      },
+      update: async (id: string, data: Partial<Role>): Promise<void> => {
+          const { error } = await supabase.from('Role').update(data).eq('id', id);
+          if (error) throw error;
+      },
+      delete: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('Role').delete().eq('id', id);
+          if (error) throw error;
       }
   },
 

@@ -256,3 +256,14 @@ export interface Payment {
     type?: 'FULL' | 'PARTIAL';
     createdAt: string;
 }
+
+export interface Role {
+    id: string;
+    department: 'DIRECCIÓN' | 'VENTAS' | 'OPERACIONES' | 'DESARROLLO' | 'MARKETING' | 'CONTENIDO' | 'ADMIN';
+    roleName: string;
+    description: string; // ¿Para qué sirve? (La Meta)
+    tasks: string; // Tareas del Día a Día
+    currentOwner: string; // ¿Quién lo hace HOY?
+    hiringTrigger: string; // ¿Cuándo contratar? (Señal de Alerta)
+    priority?: 'ALTA' | 'MEDIA' | 'BAJA';
+}
