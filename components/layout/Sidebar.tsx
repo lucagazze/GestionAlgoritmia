@@ -21,7 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
           title: "PRINCIPAL",
           items: [
               { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio', color: 'text-gray-900 dark:text-white' },
-              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes (Ops)', color: 'text-blue-600 dark:text-blue-400' },
+              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes', color: 'text-blue-600 dark:text-blue-400' },
               { path: '/audit', icon: <Activity className="w-5 h-5" />, label: 'Auditoría', color: 'text-red-600 dark:text-red-400' },
               { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600 dark:text-emerald-400' },
               { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600 dark:text-gray-300' },
