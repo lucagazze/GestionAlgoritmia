@@ -60,10 +60,16 @@ export default function ContentIdeaDetailPage() {
       // Esto ayuda a depurar si el estado se está perdiendo
       console.log("Saving Idea Data:", formData);
 
+      // Sanitize data specifically for timestamps
+      const sanitizedData = {
+          ...formData,
+          scheduledDate: formData.scheduledDate === '' ? null : formData.scheduledDate
+      };
+
       if (id && id !== 'new') {
-        await db.contentIdeas.update(id, formData);
+        await db.contentIdeas.update(id, sanitizedData);
       } else {
-        await db.contentIdeas.create(formData as any);
+        await db.contentIdeas.create(sanitizedData as any);
       }
       showToast("Idea guardada correctamente", "success");
       navigate('/content-ideas');
