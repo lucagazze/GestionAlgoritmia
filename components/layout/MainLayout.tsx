@@ -25,6 +25,8 @@ import AuditPage from '../../pages/AuditPage';
 import AutomationsPage from '../../pages/AutomationsPage';
 import QuotationsPage from '../../pages/QuotationsPage';
 import RolesPage from '../../pages/RolesPage';
+import ContentIdeasPage from '../../pages/ContentIdeasPage';
+import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage'; // ✅ ADDED
 
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -82,6 +84,8 @@ export const MainLayout = () => {
               <Route path="/partners" element={<PartnersPage />} />
               <Route path="/partners/:id" element={<ContractorDetailPage />} />
               <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/content-ideas" element={<ContentIdeasPage />} />
+              <Route path="/content-ideas/:id" element={<ContentIdeaDetailPage />} /> {/* ✅ ADDED */}
               <Route path="/roles" element={<RolesPage />} />
               <Route path="/services" element={<ServicesPage />} />
               <Route path="/quotations" element={<QuotationsPage />} />

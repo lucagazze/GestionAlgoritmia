@@ -267,3 +267,17 @@ export interface Role {
     hiringTrigger: string; // ¿Cuándo contratar? (Señal de Alerta)
     priority?: 'ALTA' | 'MEDIA' | 'BAJA';
 }
+
+export interface ContentIdea {
+  id: string;
+  title: string;
+  concept: string; // Contexto / Idea general
+  hook?: string; // Gancho (3 seg)
+  script?: string; // Guion desarrollado
+  visuals?: string; // Descripción visual
+  platform?: 'Instagram' | 'TikTok' | 'YouTube' | 'LinkedIn';
+  contentType: 'POST' | 'AD'; // ✅ NUEVO: Publicidad o Posteo
+  status: 'IDEA' | 'SCRIPTED' | 'FILMED' | 'EDITED' | 'POSTED';
+  scheduledDate?: string;
+  createdAt: string;
+}

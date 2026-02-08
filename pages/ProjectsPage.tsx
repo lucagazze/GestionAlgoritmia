@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { db } from '../services/db';
 import { useProjects } from '../hooks/queries/useProjects';
 import { Project, ProjectStatus, Contractor, ClientHealth } from '../types';
 import { Badge, Button, Input, Modal, Label } from '../components/UIComponents';
@@ -22,6 +23,20 @@ export default function ProjectsPage() {
   // Create Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  
+  // ✅ New Client Fields
+  const [newClientData, setNewClientData] = useState({
+      industry: '',
+      location: '',
+      email: '',
+      phone: ''
+  });
+  
+  const [newClientContext, setNewClientContext] = useState({
+      targetAudience: '',
+      currentSituation: '', // problem
+      objective: ''        // objectives
+  });
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project | null }>({ x: 0, y: 0, project: null });
@@ -30,14 +45,32 @@ export default function ProjectsPage() {
       e.preventDefault();
       if (!newProjectName) return;
       try {
+        // 1. Create Client
         const created = await createProject({
             name: newProjectName,
             status: ProjectStatus.ONBOARDING,
             monthlyRevenue: 0,
-            industry: '',
-            billingDay: 1
+            industry: newClientData.industry,
+            billingDay: 1,
+            email: newClientData.email,
+            phone: newClientData.phone,
+            notes: newClientData.location ? `Ubicación: ${newClientData.location}` : '' // Fallback for location
         });
+
+        // 2. Create Profile (Context)
+        if (newClientContext.targetAudience || newClientContext.currentSituation || newClientContext.objective) {
+            await db.clientProfiles.upsert(created.id, {
+                targetAudience: newClientContext.targetAudience,
+                problem: newClientContext.currentSituation,
+                objectives: newClientContext.objective
+            });
+        }
+
+        // Reset
         setNewProjectName('');
+        setNewClientData({ industry: '', location: '', email: '', phone: '' });
+        setNewClientContext({ targetAudience: '', currentSituation: '', objective: '' });
+        
         setIsCreateModalOpen(false);
         navigate(`/projects/${created.id}`); // Jump straight to detail
       } catch (error) {
@@ -257,13 +290,55 @@ export default function ProjectsPage() {
       />
 
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nuevo Cliente">
-          <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                  <Label>Nombre de la Empresa</Label>
-                  <Input value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="Ej: Acme Corp" autoFocus />
+          <form onSubmit={handleCreate} className="space-y-4 max-h-[80vh] overflow-y-auto px-1">
+              
+              <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                      <Label>Nombre de la Empresa *</Label>
+                      <Input value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="Ej: Acme Corp" autoFocus required />
+                  </div>
+                  
+                  <div>
+                      <Label>Rubro / Industria</Label>
+                      <Input value={newClientData.industry} onChange={e => setNewClientData({...newClientData, industry: e.target.value})} placeholder="Ej: SaaS, Inmobiliaria" />
+                  </div>
+                  <div>
+                      <Label>Ubicación</Label>
+                      <Input value={newClientData.location} onChange={e => setNewClientData({...newClientData, location: e.target.value})} placeholder="Ej: Buenos Aires, AR" />
+                  </div>
+                  
+                  <div>
+                      <Label>Email de Contacto</Label>
+                      <Input type="email" value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} placeholder="contacto@cliente.com" />
+                  </div>
+                  <div>
+                      <Label>Teléfono</Label>
+                      <Input type="tel" value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} placeholder="+54 9 11..." />
+                  </div>
               </div>
+
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                  <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
+                      <ShieldAlert className="w-3 h-3 text-blue-500"/> Contexto Estratégico
+                  </h3>
+                  <div className="space-y-3">
+                      <div>
+                          <Label>Público Objetivo</Label>
+                          <Input value={newClientContext.targetAudience} onChange={e => setNewClientContext({...newClientContext, targetAudience: e.target.value})} placeholder="¿A quién le venden? Ej: Dueños de PyMEs..." />
+                      </div>
+                      <div>
+                          <Label>Situación Actual (Dolores)</Label>
+                          <Input value={newClientContext.currentSituation} onChange={e => setNewClientContext({...newClientContext, currentSituation: e.target.value})} placeholder="¿Qué problemas tienen hoy?" />
+                      </div>
+                      <div>
+                          <Label>Objetivo Principal</Label>
+                          <Input value={newClientContext.objective} onChange={e => setNewClientContext({...newClientContext, objective: e.target.value})} placeholder="¿Qué quieren lograr?" />
+                      </div>
+                  </div>
+              </div>
+
               <div className="flex justify-end pt-2">
-                  <Button type="submit">Crear y Abrir</Button>
+                  <Button type="submit">Crear Cliente</Button>
               </div>
           </form>
       </Modal>

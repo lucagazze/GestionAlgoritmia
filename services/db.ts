@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role, ContentIdea } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -483,6 +483,18 @@ export const db = {
       }
   },
 
+  clientProfiles: {
+      getByClientId: async (clientId: string): Promise<any | null> => {
+          const { data, error } = await supabase.from('ClientProfile').select('*').eq('clientId', clientId).maybeSingle();
+          if (error && error.code !== 'PGRST205') console.error("Error getting client profile:", error);
+          return data;
+      },
+      upsert: async (clientId: string, data: Partial<any>): Promise<void> => {
+          const { error } = await supabase.from('ClientProfile').upsert({ clientId, ...data, updatedAt: new Date().toISOString() }, { onConflict: 'clientId' });
+          if (error) throw error;
+      }
+  },
+
   tasks: {
     getAll: async (): Promise<Task[]> => {
       const { data, error } = await supabase.from('Task').select('*, assignee:Contractor(*)').order('created_at', { ascending: false });
@@ -777,6 +789,74 @@ export const db = {
             }).eq('id', proposal.clientId);
         }
     },
+  },
+
+  contentIdeas: {
+      getAll: async (): Promise<ContentIdea[]> => {
+          const { data, error } = await supabase.from('contentidea').select('*').order('createdat', { ascending: false });
+          if (error) {
+             if (error.code === 'PGRST205') return [];
+             console.error('Error fetching ideas:', error);
+             return [];
+          }
+          // Map DB lowercase to Frontend camelCase
+          return (data || []).map((item: any) => ({
+              ...item,
+              scheduledDate: item.scheduleddate, // Map back
+              contentType: item.content_type || 'POST', // Map back (default to POST)
+              createdAt: item.createdat,
+              updatedAt: item.updatedat
+          }));
+      },
+      create: async (data: Omit<ContentIdea, 'id' | 'createdAt'>): Promise<ContentIdea> => {
+          // Map Frontend camelCase to DB lowercase
+          const dbPayload = {
+              title: data.title,
+              concept: data.concept,
+              hook: data.hook,
+              script: data.script,
+              visuals: data.visuals,
+              platform: data.platform,
+              content_type: data.contentType, // Map to DB
+              status: data.status,
+              scheduleddate: data.scheduledDate, // Map to DB
+              createdat: new Date().toISOString(),
+              updatedat: new Date().toISOString()
+          };
+
+          const { data: created, error } = await supabase.from('contentidea').insert(dbPayload).select().single();
+          if (error) throw error;
+          
+          return {
+              ...created,
+              contentType: created.content_type,
+              scheduledDate: created.scheduleddate,
+              createdAt: created.createdat,
+              updatedAt: created.updatedat
+          };
+      },
+      update: async (id: string, data: Partial<ContentIdea>): Promise<void> => {
+           // Map Partial Data
+           const dbPayload: any = {};
+           if (data.title !== undefined) dbPayload.title = data.title;
+           if (data.concept !== undefined) dbPayload.concept = data.concept;
+           if (data.hook !== undefined) dbPayload.hook = data.hook;
+           if (data.script !== undefined) dbPayload.script = data.script;
+           if (data.visuals !== undefined) dbPayload.visuals = data.visuals;
+           if (data.platform !== undefined) dbPayload.platform = data.platform;
+           if (data.status !== undefined) dbPayload.status = data.status;
+           if (data.scheduledDate !== undefined) dbPayload.scheduleddate = data.scheduledDate;
+           if (data.contentType !== undefined) dbPayload.content_type = data.contentType;
+           
+           dbPayload.updatedat = new Date().toISOString();
+
+          const { error } = await supabase.from('contentidea').update(dbPayload).eq('id', id);
+          if (error) throw error;
+      },
+      delete: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('contentidea').delete().eq('id', id);
+          if (error) throw error;
+      }
   },
 
   contractors: {

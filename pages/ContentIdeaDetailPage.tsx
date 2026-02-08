@@ -1,0 +1,233 @@
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { db } from '../services/db';
+import { ContentIdea } from '../types';
+import { Button, Input, Textarea, Select, Badge } from '../components/UIComponents';
+import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2 } from 'lucide-react';
+
+export default function ContentIdeaDetailPage() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(!!id && id !== 'new');
+  const [saving, setSaving] = useState(false);
+
+  const [formData, setFormData] = useState<Partial<ContentIdea>>({
+    title: '',
+    concept: '',
+    hook: '',
+    script: '',
+    visuals: '',
+    platform: 'Instagram',
+    contentType: 'POST',
+    status: 'IDEA',
+    scheduledDate: ''
+  });
+
+  useEffect(() => {
+    if (id && id !== 'new') {
+      loadData(id);
+    }
+  }, [id]);
+
+  const loadData = async (ideaId: string) => {
+    try {
+      const ideas = await db.contentIdeas.getAll();
+      const idea = ideas.find(i => i.id === ideaId);
+      if (idea) {
+        setFormData(idea);
+      } else {
+        navigate('/content-ideas');
+      }
+    } catch (err) {
+      console.error("Failed to load idea", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.title) {
+        alert("El título es obligatorio");
+        return;
+    }
+    setSaving(true);
+    try {
+      if (id && id !== 'new') {
+        await db.contentIdeas.update(id, formData);
+      } else {
+        await db.contentIdeas.create(formData as any);
+      }
+      navigate('/content-ideas');
+    } catch (error) {
+      console.error("Error saving idea:", error);
+      alert("Error al guardar la idea.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (id && id !== 'new' && confirm('¿Estás seguro de eliminar esta idea?')) {
+      await db.contentIdeas.delete(id);
+      navigate('/content-ideas');
+    }
+  };
+
+  if (loading) {
+     return (
+        <div className="flex justify-center items-center h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+     );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50/50 dark:bg-slate-950/50 p-6 md:p-10">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between sticky top-0 z-10 bg-gray-50/90 dark:bg-slate-950/90 backdrop-blur-md py-4 mb-8 border-b border-gray-200/50 dark:border-slate-800/50">
+           <div className="flex items-center gap-4 w-full md:w-auto flex-1">
+               <button 
+                  onClick={() => navigate('/content-ideas')}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full transition-colors flex-shrink-0"
+                >
+                   <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+               </button>
+               <input
+                  type="text"
+                  value={formData.title}
+                  onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="Título de la Propuesta / Idea"
+                  className="text-2xl md:text-3xl font-bold bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-300 w-full"
+               />
+           </div>
+
+           <div className="flex items-center gap-3 w-full md:w-auto flex-shrink-0">
+               <Select
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full md:w-48 font-semibold border-none shadow-sm bg-white dark:bg-slate-900"
+                >
+                    <option value="IDEA">💡 En Idea</option>
+                    <option value="SCRIPTED">📝 Guionizado</option>
+                    <option value="FILMED">🎥 Grabado</option>
+                    <option value="EDITED">🎬 Editado</option>
+                    <option value="POSTED">✅ Publicado</option>
+                </Select>
+
+               <Button onClick={handleSave} disabled={saving} className="whitespace-nowrap flex items-center gap-2">
+                   <Save className="w-4 h-4" />
+                   {saving ? 'Guardando...' : 'Guardar'}
+               </Button>
+               
+               {id !== 'new' && (
+                   <Button variant="destructive" onClick={handleDelete} className="p-3">
+                       <Trash2 className="w-4 h-4" />
+                   </Button>
+               )}
+           </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
+            
+            {/* Sidebar / Metadata (Lighter Column) */}
+            <div className="lg:col-span-4 space-y-6">
+                
+                {/* Platform & Type */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                       <Video className="w-4 h-4 text-blue-500" /> Plataforma & Tipo
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase">Plataforma</label>
+                            <Select
+                                value={formData.platform}
+                                onChange={e => setFormData({ ...formData, platform: e.target.value as any })}
+                            >
+                                <option value="Instagram">Instagram</option>
+                                <option value="TikTok">TikTok</option>
+                                <option value="YouTube">YouTube</option>
+                                <option value="LinkedIn">LinkedIn</option>
+                            </Select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase">Tipo</label>
+                            <Select
+                                value={formData.contentType || 'POST'}
+                                onChange={e => setFormData({ ...formData, contentType: e.target.value as any })}
+                                className={formData.contentType === 'AD' ? 'bg-purple-50 text-purple-700 font-bold' : 'bg-blue-50 text-blue-700 font-bold'}
+                            >
+                                <option value="POST">Post</option>
+                                <option value="AD">Ad / Anuncio</option>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Concept & Hook */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-6">
+                    <div className="space-y-2">
+                         <label className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-sm">
+                            <Sparkles className="w-4 h-4 text-yellow-500" /> Concepto
+                        </label>
+                        <Input 
+                            value={formData.concept}
+                            onChange={e => setFormData({ ...formData, concept: e.target.value })}
+                            placeholder="¿De qué trata? Contexto general..."
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-sm">
+                            🎯 Hook (3-5 seg)
+                        </label>
+                        <Textarea 
+                            value={formData.hook}
+                            onChange={e => setFormData({ ...formData, hook: e.target.value })}
+                            placeholder="Los primeros 3 segundos que atrapan..."
+                            className="bg-red-50/50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30 min-h-[100px] text-lg font-medium text-red-900 dark:text-red-200 placeholder-red-300"
+                        />
+                    </div>
+                </div>
+
+                {/* Visuals */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                       <Video className="w-4 h-4 text-green-500" /> Visuals / Escenas
+                    </h3>
+                    <Textarea 
+                        value={formData.visuals}
+                        onChange={e => setFormData({ ...formData, visuals: e.target.value })}
+                        placeholder="Descripción de la parte visual, b-roll, overlays..."
+                        className="h-32"
+                    />
+                </div>
+            </div>
+
+            {/* Main Script Editor (Wider Column) */}
+            <div className="lg:col-span-8 flex flex-col h-full">
+                <div className="flex-1 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-md flex flex-col gap-4 min-h-[600px] lg:min-h-[calc(100vh-200px)]">
+                    <div className="flex items-center justify-between">
+                         <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-2">
+                            <FileText className="w-6 h-6 text-blue-600" /> Guion (Script)
+                        </h3>
+                         <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Documento Principal</span>
+                    </div>
+                   
+                    <textarea
+                        value={formData.script}
+                        onChange={e => setFormData({ ...formData, script: e.target.value })}
+                        placeholder="Escribe el guion aquí... Tienes todo el espacio."
+                        className="flex-1 w-full p-6 bg-gray-50 dark:bg-slate-800/50 border-0 rounded-xl focus:ring-0 resize-none text-lg leading-relaxed dark:text-white font-serif placeholder-gray-400"
+                        style={{ outline: "none" }}
+                    />
+                </div>
+            </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}

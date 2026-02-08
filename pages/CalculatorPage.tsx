@@ -359,6 +359,15 @@ export default function CalculatorPage() {
           } as any, clientInfo.name, clientInfo.industry); // Accessing internal create type structure
           alert("¡Propuesta Guardada!");
       }
+
+      // ✅ SAVE CLIENT CONTEXT (Profile)
+      if (selectedClientId) {
+          await db.clientProfiles.upsert(selectedClientId, {
+              targetAudience: clientInfo.targetAudience,
+              problem: clientInfo.currentSituation, // Mapping currentSituation -> problem
+              objectives: clientInfo.objective      // Mapping objective -> objectives
+          });
+      }
       
       handleRefreshHistory();
     } catch (error) {
@@ -384,7 +393,7 @@ export default function CalculatorPage() {
       setViewMode('CALCULATOR');
   };
 
-  const handleClientSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleClientSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const clientId = e.target.value;
       if (!clientId) {
           setSelectedClientId(null);
@@ -395,13 +404,29 @@ export default function CalculatorPage() {
       const client = clients.find(c => c.id === clientId);
       if (client) {
           setSelectedClientId(clientId);
-          setClientInfo({
+          
+          // 1. Set basic info from Client table
+          const newInfo = {
               name: client.name,
               industry: client.industry || '',
-              targetAudience: clientInfo.targetAudience || '',
-              currentSituation: clientInfo.currentSituation || '',
-              objective: clientInfo.objective || ''
-          });
+              targetAudience: '',
+              currentSituation: '',
+              objective: ''
+          };
+
+          // 2. Try to fetch extended profile (Context)
+          try {
+              const profile = await db.clientProfiles.getByClientId(clientId);
+              if (profile) {
+                  newInfo.targetAudience = profile.targetAudience || '';
+                  newInfo.currentSituation = profile.problem || ''; // Mapping problem -> currentSituation
+                  newInfo.objective = profile.objectives || '';     // Mapping objectives -> objective
+              }
+          } catch (error) {
+              console.error("Error fetching client profile:", error);
+          }
+
+          setClientInfo(newInfo);
       }
   };
 
