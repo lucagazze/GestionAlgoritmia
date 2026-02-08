@@ -14,41 +14,27 @@ import {
   Linkedin, 
   FileText, 
   Calendar,
-  Sparkles,
-  CheckCircle2
+  Sparkles
 } from 'lucide-react';
 
 export default function ContentIdeasPage() {
+  const navigate = useNavigate();
   const [ideas, setIdeas] = useState<ContentIdea[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'UNPUBLISHED'>('ALL');
-  const [typeFilter, setTypeFilter] = useState<'ALL' | 'POST' | 'AD'>('ALL'); // ✅ NUEVO Filter
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'POST' | 'AD'>('ALL');
   const [sortOrder, setSortOrder] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
 
-  const [formData, setFormData] = useState<Partial<ContentIdea>>({
-    title: '',
-    concept: '',
-    hook: '',
-    script: '',
-    visuals: '',
-    platform: 'Instagram',
-    contentType: 'POST', // ✅ Default to POST
-    status: 'IDEA',
-    scheduledDate: ''
-  });
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, id: string } | null>(null);
 
   useEffect(() => {
     loadData();
-    // Close context menu on global click
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
-
-  // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, id: string } | null>(null);
 
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -76,49 +62,11 @@ export default function ContentIdeasPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title) return;
-
-    try {
-      if (formData.id) {
-        await db.contentIdeas.update(formData.id, formData);
-      } else {
-        await db.contentIdeas.create(formData as any);
-      }
-      setIsModalOpen(false);
-      resetForm();
-      loadData();
-    } catch (error) {
-      console.error("Error saving idea:", error);
-      alert("Error al guardar la idea.");
-    }
-  };
-
   const handleDelete = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar esta idea?')) {
       await db.contentIdeas.delete(id);
       loadData();
     }
-  };
-
-  const handleEdit = (idea: ContentIdea) => {
-    setFormData({ ...idea });
-    setIsModalOpen(true);
-  };
-
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      concept: '',
-      hook: '',
-      script: '',
-      visuals: '',
-      platform: 'Instagram',
-      contentType: 'POST',
-      status: 'IDEA',
-      scheduledDate: ''
-    });
   };
 
   const filteredIdeas = ideas.filter(idea => {
@@ -129,11 +77,10 @@ export default function ContentIdeasPage() {
     if (statusFilter === 'PUBLISHED') matchesStatus = idea.status === 'POSTED';
     if (statusFilter === 'UNPUBLISHED') matchesStatus = idea.status !== 'POSTED';
 
-    const matchesType = typeFilter === 'ALL' || idea.contentType === typeFilter; // ✅ Filter logic
+    const matchesType = typeFilter === 'ALL' || idea.contentType === typeFilter;
 
     return matchesSearch && matchesStatus && matchesType;
   }).sort((a, b) => {
-    // ... (existing sort code)
       const dateA = new Date(a.createdAt).getTime();
       const dateB = new Date(b.createdAt).getTime();
       return sortOrder === 'NEWEST' ? dateB - dateA : dateA - dateB;
@@ -162,12 +109,31 @@ export default function ContentIdeasPage() {
   return (
     <div className="h-full flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       
-      {/* ... (Header) ... */}
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 md:px-8 pb-0 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Generador de Ideas</h1>
+          <p className="text-gray-500 dark:text-gray-400">Gestiona y organiza tu contenido para redes sociales.</p>
+        </div>
+        <Button onClick={() => navigate('/content-ideas/new')} className="shadow-lg shadow-blue-500/20">
+          <Plus className="w-4 h-4 mr-2" /> Nueva Idea
+        </Button>
+      </div>
 
       {/* Filters */}
       <div className="p-6 md:px-8 py-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         
-        {/* ... (Search) ... */}
+        {/* Search */}
+        <div className="relative w-full md:w-64">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input 
+            type="text" 
+            placeholder="Buscar ideas..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+          />
+        </div>
         
         <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
             
@@ -195,7 +161,6 @@ export default function ContentIdeasPage() {
 
             {/* Status Filter */}
             <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto bg-white dark:bg-slate-900 p-1 rounded-xl border border-gray-100 dark:border-slate-800">
-             {/* ... (existing status buttons) */}
              {[
                 { id: 'ALL', label: 'Todos' },
                 { id: 'UNPUBLISHED', label: 'No Publicado' },
@@ -216,7 +181,6 @@ export default function ContentIdeasPage() {
             </div>
 
             {/* Sort Order */}
-             {/* ... (existing sort buttons) */}
              <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-gray-100 dark:border-slate-800">
                 <button
                     onClick={() => setSortOrder('NEWEST')}
@@ -252,8 +216,9 @@ export default function ContentIdeasPage() {
             {filteredIdeas.map(idea => (
               <div 
                 key={idea.id} 
+                onClick={() => navigate(`/content-ideas/${idea.id}`)}
                 onContextMenu={(e) => handleContextMenu(e, idea.id)}
-                className="group bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1 relative cursor-context-menu"
+                className="group bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1 relative cursor-pointer"
               >
                 {/* Card Header */}
                 <div className="flex items-start justify-between mb-4">
@@ -261,7 +226,6 @@ export default function ContentIdeasPage() {
                     <span className="p-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
                       {getPlatformIcon(idea.platform)}
                     </span>
-                    {/* Content Type Badge */}
                     {idea.contentType === 'AD' && (
                         <Badge className="bg-purple-100 text-purple-700 border-purple-200">AD 📢</Badge>
                     )}
@@ -271,10 +235,16 @@ export default function ContentIdeasPage() {
                     <Badge className={getStatusColor(idea.status)}>{idea.status}</Badge>
                   </div>
                   <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                    <button onClick={() => handleEdit(idea)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-blue-500 transition-colors">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); navigate(`/content-ideas/${idea.id}`); }}
+                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-blue-500 transition-colors"
+                    >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => handleDelete(idea.id)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-red-500 transition-colors">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(idea.id); }}
+                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-red-500 transition-colors"
+                    >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -367,6 +337,6 @@ export default function ContentIdeasPage() {
           </div>
         )}
       </div>
-
+    </div>
   );
 }

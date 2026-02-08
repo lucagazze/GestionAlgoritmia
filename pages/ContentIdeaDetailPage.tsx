@@ -1,15 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
+import { ai } from '../services/ai';
 import { ContentIdea } from '../types';
 import { Button, Input, Textarea, Select, Badge } from '../components/UIComponents';
-import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2, Wand2 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 
 export default function ContentIdeaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(!!id && id !== 'new');
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const [formData, setFormData] = useState<Partial<ContentIdea>>({
     title: '',
@@ -47,20 +51,31 @@ export default function ContentIdeaDetailPage() {
 
   const handleSave = async () => {
     if (!formData.title) {
-        alert("El título es obligatorio");
+        showToast("El título es obligatorio", "error");
         return;
     }
     setSaving(true);
     try {
+      // Validar si contentType existe en el objeto antes de guardar
+      // Esto ayuda a depurar si el estado se está perdiendo
+      console.log("Saving Idea Data:", formData);
+
       if (id && id !== 'new') {
         await db.contentIdeas.update(id, formData);
       } else {
         await db.contentIdeas.create(formData as any);
       }
+      showToast("Idea guardada correctamente", "success");
       navigate('/content-ideas');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving idea:", error);
-      alert("Error al guardar la idea.");
+      
+      // Manejo específico del error de columna faltante
+      if (error?.message?.includes("Could not find the 'content_type' column")) {
+          alert("⚠️ ERROR DE BASE DE DATOS: Falta la columna 'content_type'.\n\nPor favor, ve a Supabase > SQL Editor y ejecuta el script de migración '20240208_add_content_type.sql'.");
+      } else {
+          showToast(`Error al guardar: ${error.message || 'Intente nuevamente'}`, "error");
+      }
     } finally {
       setSaving(false);
     }
@@ -72,6 +87,61 @@ export default function ContentIdeaDetailPage() {
       navigate('/content-ideas');
     }
   };
+
+  const handleGenerateScript = async () => {
+    if (!formData.title && !formData.concept) {
+        showToast("Escribe al menos un Título o Concepto para generar", "error");
+        return;
+    }
+
+    setGenerating(true);
+    try {
+        const script = await ai.generateContentScript('SCRIPT', {
+            platform: formData.platform,
+            title: formData.title,
+            concept: formData.concept,
+            hook: formData.hook
+        });
+
+        if (script) {
+            setFormData(prev => ({ ...prev, script }));
+            showToast("✨ Guion generado con IA", "success");
+        } else {
+            showToast("No se pudo generar el guion", "error");
+        }
+    } catch (error) {
+        console.error("AI Gen Error", error);
+        showToast("Error al conectar con la IA", "error");
+    } finally {
+        setGenerating(false);
+    }
+  };
+
+  const handleGenerateIdeas = async () => {
+      // Esta función podría usarse para generar ideas desde cero (títulos/conceptos)
+      // Por ahora la dejamos preparada o la integramos si el usuario lo pide explícitamente en otro flujo
+      // Implementamos autocompletado de HOOK si está vacío
+      if (!formData.concept) return;
+      
+      setGenerating(true);
+      try {
+          const ideas = await ai.generateContentScript('IDEA', {
+              platform: formData.platform,
+              topic: formData.concept,
+              context: "El objetivo es educar y vender servicios de desarrollo de software."
+          });
+          
+          if (ideas) {
+              setFormData(prev => ({ ...prev, script: prev.script + "\n\n--- IDEAS GENERADAS ---\n" + ideas }));
+              showToast("✨ Ideas generadas y añadidas al editor", "success");
+          }
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setGenerating(false);
+      }
+  };
+
 
   if (loading) {
      return (
@@ -178,6 +248,15 @@ export default function ContentIdeaDetailPage() {
                             onChange={e => setFormData({ ...formData, concept: e.target.value })}
                             placeholder="¿De qué trata? Contexto general..."
                         />
+                         <div className="flex justify-end">
+                              <button 
+                                onClick={handleGenerateIdeas}
+                                disabled={generating || !formData.concept}
+                                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 font-semibold disabled:opacity-50"
+                              >
+                                  <Wand2 className="w-3 h-3" /> Generar Ideas relacionadas
+                              </button>
+                         </div>
                     </div>
                     <div className="space-y-2">
                         <label className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-sm">
@@ -213,13 +292,24 @@ export default function ContentIdeaDetailPage() {
                          <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-2">
                             <FileText className="w-6 h-6 text-blue-600" /> Guion (Script)
                         </h3>
-                         <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Documento Principal</span>
+                         <div className="flex items-center gap-2">
+                             <Button 
+                                onClick={handleGenerateScript} 
+                                disabled={generating}
+                                variant="secondary"
+                                className="h-8 text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
+                             >
+                                 <Wand2 className="w-3 h-3 mr-1" />
+                                 {generating ? 'Escribiendo...' : 'Mejorar con IA'}
+                             </Button>
+                             <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Documento Principal</span>
+                         </div>
                     </div>
                    
                     <textarea
                         value={formData.script}
                         onChange={e => setFormData({ ...formData, script: e.target.value })}
-                        placeholder="Escribe el guion aquí... Tienes todo el espacio."
+                        placeholder="Escribe el guion aquí... Tienes todo el espacio. O usa 'Mejorar con IA' para generar una base."
                         className="flex-1 w-full p-6 bg-gray-50 dark:bg-slate-800/50 border-0 rounded-xl focus:ring-0 resize-none text-lg leading-relaxed dark:text-white font-serif placeholder-gray-400"
                         style={{ outline: "none" }}
                     />

@@ -215,6 +215,57 @@ export const ai = {
       }
   },
 
+  /**
+   * Genera ideas o guiones específicos para Redes Sociales
+   */
+  generateContentScript: async (type: 'IDEA' | 'SCRIPT', data: any) => {
+    try {
+        const client = await getClient();
+        let prompt = "";
+
+        if (type === 'IDEA') {
+            prompt = `
+            ACTÚA COMO: Un Estratega de Contenidos Viral (MrBeast / Hormozi).
+            OBJETIVO: Generar 3 ideas de contenido de alto impacto para "${data.platform}" sobre el tema "${data.topic}".
+            CONTEXTO: ${data.context || 'Sin contexto adicional'}
+            
+            FORMATO REQUERIDO:
+            1. Título Llamativo (Clickbait ético)
+            2. Concepto Central (En 1 frase)
+            3. Hook Visual (Qué se ve en los primeros 3 seg)
+            `;
+        } else {
+            prompt = `
+            ACTÚA COMO: Un Guionista de TikTok/Reels Experto en Retención.
+            OBJETIVO: Escribir un guion palabra por palabra para un video de "${data.platform}".
+            TÍTULO: "${data.title}"
+            CONCEPTO: "${data.concept}"
+            HOOK ACTUAL: "${data.hook || 'N/A'}"
+            
+            ESTRUCTURA OBLIGATORIA:
+            1. HOOK (0-3s): La frase exacta para atrapar.
+            2. RETENCION (3-15s): Desarrolla el problema/curiosidad.
+            3. CUERPO (15-45s): La solución/historia rápida.
+            4. CTA (45-60s): Llamado a la acción claro.
+            
+            FORMATO: Usa un tono conversacional, dinámico y directo. Separa por bloques visuales.
+            `;
+        }
+
+        const response = await client.models.generateContent({
+            model: MODEL_NAME,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        });
+
+        return response.text;
+    } catch (error) {
+        console.error("Content Gen Error:", error);
+        return null;
+    }
+  },
+
+
+
   agent: async (
       userInput: string | { mimeType: string; data: string },
       contextHistory: any[] = [],
