@@ -121,11 +121,12 @@ export default function PaymentsPage() {
             const billDay = p.billingDay || 1;
             if (billDay === day) {
                 // Check if paid in this month
-                const payment = payments.find(pay => 
-                    pay.clientId === p.id && 
-                    new Date(pay.date).getMonth() === month &&
-                    new Date(pay.date).getFullYear() === year
-                );
+                const payment = payments.find(pay => {
+                    const payDate = new Date(pay.date);
+                    const isSameMonth = payDate.getMonth() === month && payDate.getFullYear() === year;
+                    const isSameClient = (pay.clientId === p.id) || (pay.client_id === p.id);
+                    return isSameClient && isSameMonth;
+                });
 
                 const isPaid = !!payment;
                 const paidAmount = payment ? payment.amount : 0;
@@ -577,9 +578,6 @@ export default function PaymentsPage() {
 
 
 
-    return (
-        <div className="space-y-6 pb-20 relative min-h-screen">
-             {/* ... (Rest of format) ... */}
 
              {/* MODAL DETALLE PAGO */}
              <Modal isOpen={isPaymentDetailModalOpen} onClose={() => setIsPaymentDetailModalOpen(false)} title="Detalle del Pago">

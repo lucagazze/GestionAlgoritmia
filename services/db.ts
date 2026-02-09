@@ -1149,7 +1149,11 @@ export const db = {
              }
              throw error;
         }
-        return data || [];
+        return (data || []).map((p: any) => ({
+            ...p,
+            clientId: p.client_id || p.projectId || p.clientId, // Prefer client_id (standard)
+            createdAt: p.created_at || p.createdAt // Map snake_case to camelCase
+        }));
     },
     create: async (data: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment> => {
         // 1. Try to fetch active proposal details to snapshot
@@ -1178,9 +1182,13 @@ export const db = {
         }
 
         const { data: created, error } = await supabase.from('Payment').insert({
-            ...data,
+            client_id: data.clientId, // Standardized on client_id
+            amount: data.amount,
+            date: data.date,
+            notes: data.notes,
+            type: data.type,
             metadata: metadata,
-            createdAt: new Date().toISOString()
+            created_at: new Date().toISOString() // Map to created_at (snake_case)
         }).select().single();
         
         if (error) throw error;
