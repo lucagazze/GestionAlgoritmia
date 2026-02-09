@@ -346,6 +346,10 @@ export const db = {
     getById: async (id: string): Promise<Project | null> => {
          const { data, error } = await supabase.from('Client').select('*').eq('id', id).maybeSingle();
          if (error || !data) return null;
+
+         // ✅ NUEVO: Traer también el perfil estratégico
+         const { data: profile } = await supabase.from('ClientProfile').select('*').eq('clientId', id).maybeSingle();
+
          return {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
@@ -366,7 +370,12 @@ export const db = {
             assignedPartnerId: data.assignedPartnerId || null,
             proposalUrl: data.proposalUrl || '',
             lastPaymentDate: data.lastPaymentDate || null,
-            lastContactDate: data.lastContactDate || null
+            lastContactDate: data.lastContactDate || null,
+            
+            // ✅ NUEVO: Mapear datos del perfil al proyecto
+            targetAudience: profile?.targetAudience || '',
+            contextProblem: profile?.problem || '',      // 'problem' en DB -> 'contextProblem' en App
+            contextObjectives: profile?.objectives || '', // 'objectives' en DB -> 'contextObjectives' en App
          };
     },
     create: async (data: Partial<Project>): Promise<Project> => {
@@ -397,8 +406,27 @@ export const db = {
         console.warn('Failed to create audit snapshot:', e);
       }
       
-      const { error } = await supabase.from('Client').update(data).eq('id', id);
+      // 1. Separar los datos que van a la tabla Client (Proyecto)
+      const clientData = { ...data };
+      // Eliminamos los campos que no existen en la tabla Client para evitar errores
+      delete clientData.targetAudience;
+      delete clientData.contextProblem;
+      delete clientData.contextObjectives;
+
+      // Actualizar tabla Client
+      const { error } = await supabase.from('Client').update(clientData).eq('id', id);
       if (error) throw error;
+
+      // 2. ✅ NUEVO: Actualizar tabla ClientProfile si hay datos de contexto
+      if (data.targetAudience !== undefined || data.contextProblem !== undefined || data.contextObjectives !== undefined) {
+           const profileUpdate: any = {};
+           if (data.targetAudience !== undefined) profileUpdate.targetAudience = data.targetAudience;
+           if (data.contextProblem !== undefined) profileUpdate.problem = data.contextProblem; // Mapeo inverso
+           if (data.contextObjectives !== undefined) profileUpdate.objectives = data.contextObjectives; // Mapeo inverso
+           
+           // Usamos upsert para crear el perfil si no existía (clientId es la PK o Unique Key)
+           await db.clientProfiles.upsert(id, profileUpdate);
+      }
       
       // 🧠 CEREBRO DE LA AGENCIA (NUEVO): Detectar cierre de proyecto
       if (current && data.status === ProjectStatus.COMPLETED && current.status !== ProjectStatus.COMPLETED) {

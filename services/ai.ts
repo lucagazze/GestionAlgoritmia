@@ -266,6 +266,50 @@ export const ai = {
 
 
 
+  /**
+   * Genera contexto estratégico del proyecto basado en Nombre e Industria
+   */
+  generateProjectContext: async (projectName: string, industry: string) => {
+      try {
+          const client = await getClient();
+          const prompt = `
+            ACTÚA COMO: Un Estratega de Negocios Senior y Consultor de Crecimiento.
+            OBJETIVO: Definir el contexto estratégico inicial para un nuevo cliente: "${projectName}" del rubro "${industry}".
+            
+            GENERA 4 BLOQUES DE TEXTO CONCISOS Y PROFESIONALES (Sin markdown, solo texto plano):
+            
+            1. PÚBLICO OBJETIVO: ¿Quién es su cliente ideal? (Buyer Persona).
+            2. DOLORES (SITUACIÓN ACTUAL): ¿Qué problemas tienen sus clientes o qué desafíos enfrenta el negocio hoy?
+            3. OBJETIVOS (PUNTO B): ¿Qué busca lograr este negocio al contratarnos? (Aumentar ventas, posicionamiento, etc).
+            4. ESTRATEGIA (MACRO): ¿Cuál debería ser el enfoque general para crecer?
+            
+            FORMATO JSON (IMPORTANTE):
+            Responde SOLO con un JSON válido con esta estructura:
+            {
+              "targetAudience": "...",
+              "problem": "...",
+              "objectives": "...",
+              "strategy": "..."
+            }
+          `;
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+               config: { responseMimeType: 'application/json' }
+          });
+
+          const text = response.text;
+          if (!text) return null;
+          
+          return JSON.parse(text);
+      } catch (error) {
+          console.error("Context Gen Error:", error);
+          return null;
+      }
+  },
+
+  
   agent: async (
       userInput: string | { mimeType: string; data: string },
       contextHistory: any[] = [],

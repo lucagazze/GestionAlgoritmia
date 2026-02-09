@@ -126,19 +126,62 @@ export function ProjectProfileTab({ formData, setFormData }: Props) {
                 </Card>
             </div>
 
-            {/* 3. CONTEXT & CONTACT */}
+            {/* 3. CONTEXTO ESTRATÉGICO & CONTACTO */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                     <Card className="h-full p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
-                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-4 block">Estrategia de Crecimiento</Label>
+                
+                {/* COLUMNA IZQUIERDA: EL CEREBRO DEL CLIENTE */}
+                <div className="space-y-6">
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                        <Label className="uppercase text-xs font-bold text-indigo-500 tracking-wider mb-4 flex items-center gap-2">
+                            <span className="bg-indigo-100 dark:bg-indigo-900/30 p-1 rounded">🎯</span> El Norte Estratégico
+                        </Label>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <Label className="text-xs text-gray-500 mb-1">Objetivo Principal</Label>
+                                <Textarea 
+                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[80px] text-sm font-medium" 
+                                    placeholder="¿Qué quieren lograr? (Punto B)"
+                                    value={formData.contextObjectives || ''} // ✅ Lee del estado
+                                    onChange={e => setFormData({...formData, contextObjectives: e.target.value})} // ✅ Escribe al estado
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs text-gray-500 mb-1">Situación Actual (Dolores)</Label>
+                                <Textarea 
+                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[80px] text-sm" 
+                                    placeholder="¿Qué les duele hoy? (Punto A)"
+                                    value={formData.contextProblem || ''}
+                                    onChange={e => setFormData({...formData, contextProblem: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                     </Card>
+
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
+                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Público Objetivo</Label>
+                        <Input 
+                            className="bg-gray-50 dark:bg-slate-800 border-none font-medium"
+                            placeholder="¿A quién le venden?"
+                            value={formData.targetAudience || ''}
+                            onChange={e => setFormData({...formData, targetAudience: e.target.value})}
+                        />
+                     </Card>
+
+                     {/* Mantenemos la Estrategia de Crecimiento que ya tenías */}
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
+                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Estrategia Macro</Label>
                         <Textarea 
-                            className="bg-gray-50 dark:bg-slate-800 border-none resize-none h-40 text-sm leading-relaxed" 
-                            placeholder="Describe la estrategia a largo plazo..."
+                            className="bg-gray-50 dark:bg-slate-800 border-none resize-none h-24 text-sm leading-relaxed" 
+                            placeholder="Roadmap a largo plazo..."
                             value={formData.growthStrategy || ''}
                             onChange={e => setFormData({...formData, growthStrategy: e.target.value})}
                         />
                      </Card>
                 </div>
+
+                {/* COLUMNA DERECHA: CONTACTO & BRAND (Lo que ya tenías) */}
                 <div className="space-y-6">
                     {/* CONTACT INFO */}
                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
@@ -152,7 +195,7 @@ export function ProjectProfileTab({ formData, setFormData }: Props) {
                                     className="bg-transparent border-none shadow-none font-medium"
                                     value={formData.phone || ''} 
                                     onChange={e => setFormData({...formData, phone: e.target.value})} 
-                                    placeholder="+54 9 11 1234 5678" 
+                                    placeholder="+54 9 11..." 
                                 />
                             </div>
                             <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
@@ -163,7 +206,7 @@ export function ProjectProfileTab({ formData, setFormData }: Props) {
                                     className="bg-transparent border-none shadow-none font-medium"
                                     value={formData.email || ''} 
                                      onChange={e => setFormData({...formData, email: e.target.value})} 
-                                    placeholder="contacto@empresa.com" 
+                                    placeholder="email@..." 
                                 />
                             </div>
                         </div>
@@ -180,7 +223,6 @@ export function ProjectProfileTab({ formData, setFormData }: Props) {
                                         className="w-12 h-12 rounded-full shadow-sm border border-black/5 dark:border-white/10 transition-transform hover:scale-110 absolute inset-0"
                                         style={{backgroundColor: color}}
                                     ></div>
-                                    {/* Input invisible que cubre el círculo */}
                                     <input 
                                         type="color" 
                                         value={color}

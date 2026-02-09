@@ -102,6 +102,11 @@ export interface Project extends Client {
   // Growth
   growthStrategy?: string;      // Texto de estrategia
   serviceDetails?: string;      // Detalle del servicio (ej: "Community Manager + Ads")
+
+  // ✅ NUEVO: Contexto Estratégico (Vienen de ClientProfile)
+  targetAudience?: string;    // Público Objetivo
+  contextProblem?: string;    // Situación Actual (Dolores)
+  contextObjectives?: string; // Objetivo Principal
 }
 
 export interface Contractor {
