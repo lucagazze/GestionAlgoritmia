@@ -38,6 +38,7 @@ export default function QuotationsPage() {
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<Record<string, { contractorId: string, cost: number }>>({});
   const [approvedDuration, setApprovedDuration] = useState<number>(1);
+  const [approvedStartDate, setApprovedStartDate] = useState<string>(''); // NEW
 
   useEffect(() => {
     loadData();
@@ -129,6 +130,7 @@ export default function QuotationsPage() {
       setSelectedItemIds(items.map(i => i.id));
       setAssignments({});
       setApprovedDuration(propWithItems.durationMonths || 1);
+      setApprovedStartDate(new Date().toISOString().split('T')[0]); // Default today
       setIsApproveModalOpen(true);
       setContextMenu({ ...contextMenu, visible: false });
   };
@@ -136,7 +138,7 @@ export default function QuotationsPage() {
   const confirmApprovalModal = async () => {
       if (!selectedProposal) return;
       try {
-          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments, approvedDuration);
+          await db.proposals.approve(selectedProposal.id, selectedItemIds, assignments, approvedDuration, approvedStartDate);
           showToast("Gestión completada con éxito", "success");
           setIsApproveModalOpen(false);
           loadData();
@@ -334,14 +336,11 @@ export default function QuotationsPage() {
         {contextMenu.visible && (
             <div className="fixed bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}>
                 <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones Rápidas</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones</p>
                 </div>
                 <div className="p-1 space-y-0.5">
-                    <button onClick={handleQuickApprove} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4"/> Aprobar Totalmente
-                    </button>
-                    <button onClick={handleApprovePartial} className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4"/> Aprobar Parcial / Modificar
+                    <button onClick={handleApprovePartial} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4"/> Aprobar / Configurar
                     </button>
                     <button onClick={handleSetWaiting} className="w-full text-left px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2">
                         <Clock className="w-4 h-4"/> En Espera
@@ -406,7 +405,7 @@ export default function QuotationsPage() {
         </Modal>
 
         {/* Modal de Aprobación (Mismo código que tenías) */}
-        <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Modificar Condiciones & Aprobar">
+        <Modal isOpen={isApproveModalOpen} onClose={() => setIsApproveModalOpen(false)} title="Confirmar Contrato & Fecha de Inicio">
              {selectedProposal && (() => {
                  const previewFin = calculateFinancials(selectedProposal, approvedDuration, selectedItemIds);
                  return (
@@ -429,6 +428,16 @@ export default function QuotationsPage() {
                                 </div>
                             </div>
                         </div>
+
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
+                             <Label className="mb-2 block font-bold">Fecha de Inicio (Cobro)</Label>
+                             <div className="flex items-center gap-2">
+                                <Calendar className="w-5 h-5 text-gray-500"/>
+                                <Input type="date" value={approvedStartDate} onChange={e => setApprovedStartDate(e.target.value)} />
+                             </div>
+                             <p className="text-xs text-gray-400 mt-2">Esta fecha determinará el día de cobro mensual.</p>
+                        </div>
+
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                             <Label className="font-bold">Servicios Incluidos</Label>
                             {selectedProposal.items?.map(item => {

@@ -1,14 +1,26 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Project } from '../../types';
-import { Card, Input, Label, Textarea } from '../UIComponents';
+import { Card, Input, Label, Textarea, Button } from '../UIComponents';
 import { Building, MapPin, Wallet, BarChart3, Clock, Phone, User, Palette, Plus, ExternalLink, Globe, Trash2 } from 'lucide-react';
 
 interface Props {
     formData: Partial<Project>;
     setFormData: (data: Partial<Project>) => void;
+    // We might need to bubble up the save event or handle it here if ProjectProfileTab is responsible for it
+    // The previous code passed formData/setFormData which suggests the parent handles the save or it's done on unmount/blur?
+    // Let's assume for now we just update the parent's state and letting the parent handle the actual DB save if that's how it works, 
+    // OR we pass a save handler.
+    // Looking at the original file, it doesn't seem to have a save button, so it likely auto-saves or saves on blur?
+    // The user wants "Editar Perfil" to open a modal. 
+    // The modal has a "Guardar" button.
+    // We need to pass a way to save to the modal.
+    // The previous implementation of ProjectProfileTab received { project } in the snippets, but here it receives { formData, setFormData }.
+    // I need to adapt.
+    project?: Project; // We need the full project object or at least ID to save to DB.
+    onSave?: (data: Partial<Project>) => Promise<void>;
 }
 
-export function ProjectProfileTab({ formData, setFormData }: Props) {
+export function ProjectProfileTab({ formData, setFormData, project, onSave }: Props) {
     
     // Funciones auxiliares
     const handleColorChange = (index: number, newColor: string) => {
@@ -30,14 +42,16 @@ export function ProjectProfileTab({ formData, setFormData }: Props) {
                     <Card className="h-full p-8 border-none shadow-xl bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-800/50 rounded-3xl relative overflow-hidden group">
                         <div className="absolute top-0 right-0 p-32 bg-blue-500/5 dark:bg-blue-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                         <div className="relative z-10 space-y-6">
-                            <div>
-                                <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Cliente / Proyecto</Label>
-                                <Input 
-                                    className="text-3xl md:text-4xl font-black bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 mt-2 text-gray-900 dark:text-white placeholder:text-gray-200" 
-                                    value={formData.name || ''} 
-                                    onChange={e => setFormData({...formData, name: e.target.value})} 
-                                    placeholder="Nombre del Cliente" 
-                                />
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Cliente / Proyecto</Label>
+                                    <Input 
+                                        className="text-3xl md:text-4xl font-black bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 mt-2 text-gray-900 dark:text-white placeholder:text-gray-200" 
+                                        value={formData.name || ''} 
+                                        onChange={e => setFormData({...formData, name: e.target.value})} 
+                                        placeholder="Nombre del Cliente" 
+                                    />
+                                </div>
                             </div>
                             <div>
                                 <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Industria</Label>

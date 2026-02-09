@@ -267,15 +267,20 @@ export const ai = {
 
 
   /**
-   * Genera contexto estratégico del proyecto basado en Nombre e Industria
+   * Genera contexto estratégico del proyecto basado en Nombre, Industria y Descripción opcional
    */
-  generateProjectContext: async (projectName: string, industry: string) => {
+  generateProjectContext: async (projectName: string, industry: string, description?: string) => {
       try {
           const client = await getClient();
           const prompt = `
             ACTÚA COMO: Un Estratega de Negocios Senior y Consultor de Crecimiento.
             OBJETIVO: Definir el contexto estratégico inicial para un nuevo cliente: "${projectName}" del rubro "${industry}".
             
+            ${description ? `CONTEXTO ADICIONAL (INFORMACIÓN BRUTA DEL CLIENTE):
+            "${description}"
+            Usa esta información para ser MUCHO más preciso y específico en tu análisis.
+            ` : ''}
+
             GENERA 4 BLOQUES DE TEXTO CONCISOS Y PROFESIONALES (Sin markdown, solo texto plano):
             
             1. PÚBLICO OBJETIVO: ¿Quién es su cliente ideal? (Buyer Persona).

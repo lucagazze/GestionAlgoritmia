@@ -294,6 +294,31 @@ export const db = {
     }
   },
   
+  clients: {
+      getActiveProposal: async (clientId: string) => {
+          const { data, error } = await supabase
+              .from('Proposal')
+              .select(`
+                  *,
+                  items:ProposalItem(
+                      *,
+                      contractor:assignedContractorId(id, name)
+                  )
+              `)
+              .eq('clientId', clientId)
+              .eq('status', 'ACCEPTED')
+              .order('createdAt', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+          
+          if (error) {
+              console.warn("Error fetching active proposal:", error);
+              return null;
+          }
+          return data;
+      }
+  },
+  
   projects: {
     getAll: async (): Promise<Project[]> => {
       const { data, error } = await supabase.from('Client').select('*');
@@ -750,12 +775,13 @@ export const db = {
         if (error) throw error;
     },
 
-    approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}, durationMonths?: number): Promise<void> => {
+    approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}, durationMonths?: number, startDate?: string): Promise<void> => {
         // A. Obtener propuesta
         const { data: proposal } = await supabase.from('Proposal').select('*, items:ProposalItem(*)').eq('id', proposalId).single();
         if (!proposal) throw new Error("Propuesta no encontrada");
 
         const allItems = proposal.items || [];
+
         
         // B. Identificar rechazados y ELIMINARLOS
         const rejectedItems = allItems.filter((item: any) => !acceptedItemIds.includes(item.id));
@@ -803,17 +829,25 @@ export const db = {
 
         // F. Activar Cliente y CALCULAR FECHA FIN
         if (proposal.clientId) {
-            // Calcular fecha fin: Hoy + Duration (Meses)
-            const endDate = new Date();
+            // Calcular fecha fin: StartDate (o Hoy) + Duration (Meses)
+            const start = startDate ? new Date(startDate) : new Date();
+            const endDate = new Date(start);
             endDate.setMonth(endDate.getMonth() + finalDuration);
             
+            // Concatenate service names
+            const serviceNames = allItems
+                .filter((i: any) => acceptedItemIds.includes(i.id))
+                .map((i: any) => i.serviceSnapshotName)
+                .join(', ');
+
             await supabase.from('Client').update({
                 status: 'ACTIVE',
                 monthlyRevenue: newRecurring,
                 outsourcingCost: totalOutsourcing,
                 lastContactDate: new Date().toISOString(),
-                billingDay: new Date().getDate(),
-                contractEndDate: endDate.toISOString() // ✅ Guardar fecha fin
+                billingDay: start.getDate(),
+                contractEndDate: endDate.toISOString(),
+                serviceDetails: serviceNames // ✅ Save service names
             }).eq('id', proposal.clientId);
         }
     },
@@ -1118,8 +1152,34 @@ export const db = {
         return data || [];
     },
     create: async (data: Omit<Payment, 'id' | 'createdAt'>): Promise<Payment> => {
+        // 1. Try to fetch active proposal details to snapshot
+        let metadata = {};
+        try {
+            if (data.clientId) {
+                const proposal = await db.clients.getActiveProposal(data.clientId);
+                if (proposal) {
+                    metadata = {
+                        snapshot_date: new Date().toISOString(),
+                        proposal_id: proposal.id,
+                        total_contract_value: proposal.totalContractValue,
+                        items: proposal.items?.map((i: any) => ({
+                            name: i.serviceSnapshotName,
+                            cost: i.serviceSnapshotCost,
+                            type: i.serviceSnapshotType,
+                            outsourcing_cost: i.outsourcingCost,
+                            partner_name: i.contractor?.name || null,
+                            partner_id: i.assignedContractorId || null
+                        })) || []
+                    };
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to snapshot proposal for payment:", e);
+        }
+
         const { data: created, error } = await supabase.from('Payment').insert({
             ...data,
+            metadata: metadata,
             createdAt: new Date().toISOString()
         }).select().single();
         
@@ -1134,6 +1194,10 @@ export const db = {
 
         return created;
     },
+    update: async (id: string, data: Partial<Payment>): Promise<void> => {
+        const { error } = await supabase.from('Payment').update(data).eq('id', id);
+        if (error) throw error;
+    }
   },
 
   // --- VECTOR MEMORY (RAG) ---

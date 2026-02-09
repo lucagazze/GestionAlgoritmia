@@ -2,13 +2,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
+import { ai } from '../services/ai';
 import { useProjects } from '../hooks/queries/useProjects';
 import { Project, ProjectStatus, Contractor, ClientHealth } from '../types';
-import { Badge, Button, Input, Modal, Label } from '../components/UIComponents';
+import { Badge, Button, Input, Modal, Label, Textarea } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
 import { 
   Plus, Edit2, User, Search, Trash2, Columns, Table as TableIcon, Heart, 
-  AlertTriangle, ShieldAlert, Ghost, Info
+  AlertTriangle, ShieldAlert, Ghost, Info, Sparkles, Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -29,7 +30,8 @@ export default function ProjectsPage() {
       industry: '',
       location: '',
       email: '',
-      phone: ''
+      phone: '',
+      description: '' // ✅ NEW AI INPUT
   });
   
   const [newClientContext, setNewClientContext] = useState({
@@ -40,6 +42,32 @@ export default function ProjectsPage() {
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project | null }>({ x: 0, y: 0, project: null });
+
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateContext = async () => {
+      if (!newProjectName || !newClientData.industry) {
+          alert("Por favor ingresa Nombre e Industria primero.");
+          return;
+      }
+
+      setIsGenerating(true);
+      try {
+          const context = await ai.generateProjectContext(newProjectName, newClientData.industry, newClientData.description);
+          if (context) {
+              setNewClientContext({
+                  targetAudience: context.targetAudience,
+                  currentSituation: context.problem,
+                  objective: context.objectives
+              });
+          }
+      } catch (error) {
+          console.error("Error generating context:", error);
+          alert("Error al generar contexto con IA.");
+      } finally {
+          setIsGenerating(false);
+      }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -54,7 +82,7 @@ export default function ProjectsPage() {
             billingDay: 1,
             email: newClientData.email,
             phone: newClientData.phone,
-            notes: newClientData.location ? `Ubicación: ${newClientData.location}` : '' // Fallback for location
+            notes: (newClientData.location ? `Ubicación: ${newClientData.location}\n` : '') + (newClientData.description ? `Descripción: ${newClientData.description}` : '') 
         });
 
         // 2. Create Profile (Context)
@@ -68,7 +96,7 @@ export default function ProjectsPage() {
 
         // Reset
         setNewProjectName('');
-        setNewClientData({ industry: '', location: '', email: '', phone: '' });
+        setNewClientData({ industry: '', location: '', email: '', phone: '', description: '' });
         setNewClientContext({ targetAudience: '', currentSituation: '', objective: '' });
         
         setIsCreateModalOpen(false);
@@ -315,24 +343,62 @@ export default function ProjectsPage() {
                       <Label>Teléfono</Label>
                       <Input type="tel" value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} placeholder="+54 9 11..." />
                   </div>
+                  
+                  {/* AI Input */}
+                  <div className="col-span-2">
+                       <Label className="text-indigo-600 font-bold">Descripción del Negocio (Para la IA)</Label>
+                       <Textarea 
+                            value={newClientData.description} 
+                            onChange={e => setNewClientData({...newClientData, description: e.target.value})} 
+                            placeholder="Pega aquí info bruta: descripción, qué venden, quiénes son, web, instagram..."
+                            className="h-20 bg-indigo-50/50 border-indigo-100 dark:bg-indigo-900/10 dark:border-indigo-900/30"
+                       />
+                       <p className="text-[10px] text-gray-400 mt-1">Cuanta más info pegues aquí, mejor será el autocompletado.</p>
+                  </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4 mt-4">
-                  <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
-                      <ShieldAlert className="w-3 h-3 text-blue-500"/> Contexto Estratégico
-                  </h3>
+              <div className="border-t border-gray-100 dark:border-slate-800 pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          <ShieldAlert className="w-3 h-3 text-blue-500"/> Contexto Estratégico
+                      </h3>
+                      <button 
+                          type="button"
+                          onClick={handleGenerateContext}
+                          disabled={isGenerating || !newProjectName || !newClientData.industry}
+                          className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[10px] font-bold rounded-full shadow hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                          {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                          {isGenerating ? 'Generando...' : 'Completar con IA'}
+                      </button>
+                  </div>
                   <div className="space-y-3">
                       <div>
                           <Label>Público Objetivo</Label>
-                          <Input value={newClientContext.targetAudience} onChange={e => setNewClientContext({...newClientContext, targetAudience: e.target.value})} placeholder="¿A quién le venden? Ej: Dueños de PyMEs..." />
+                          <Textarea 
+                              value={newClientContext.targetAudience} 
+                              onChange={e => setNewClientContext({...newClientContext, targetAudience: e.target.value})} 
+                              placeholder="¿A quién le venden? Ej: Dueños de PyMEs..."
+                              className="h-20 min-h-[80px]" 
+                          />
                       </div>
                       <div>
                           <Label>Situación Actual (Dolores)</Label>
-                          <Input value={newClientContext.currentSituation} onChange={e => setNewClientContext({...newClientContext, currentSituation: e.target.value})} placeholder="¿Qué problemas tienen hoy?" />
+                          <Textarea 
+                              value={newClientContext.currentSituation} 
+                              onChange={e => setNewClientContext({...newClientContext, currentSituation: e.target.value})} 
+                              placeholder="¿Qué problemas tienen hoy?"
+                              className="h-20 min-h-[80px]" 
+                          />
                       </div>
                       <div>
                           <Label>Objetivo Principal</Label>
-                          <Input value={newClientContext.objective} onChange={e => setNewClientContext({...newClientContext, objective: e.target.value})} placeholder="¿Qué quieren lograr?" />
+                          <Textarea 
+                              value={newClientContext.objective} 
+                              onChange={e => setNewClientContext({...newClientContext, objective: e.target.value})} 
+                              placeholder="¿Qué quieren lograr?"
+                              className="h-20 min-h-[80px]" 
+                          />
                       </div>
                   </div>
               </div>

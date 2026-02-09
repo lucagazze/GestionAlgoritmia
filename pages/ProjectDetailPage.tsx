@@ -14,6 +14,8 @@ import {
 import jsPDF from 'jspdf';
 import { useToast } from '../components/Toast';
 import { ProjectProfileTab } from '../components/tabs/ProjectProfileTab';
+import { EditProjectModal } from '../components/modals/EditProjectModal';
+import { Edit } from 'lucide-react';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -42,6 +44,7 @@ export default function ProjectDetailPage() {
 
   // Estados para UX mejorada (Paso 3)
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newProgressNote, setNewProgressNote] = useState('');
 
   // Deliverable Form
@@ -204,6 +207,9 @@ export default function ProjectDetailPage() {
                 <div>
                     <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         {formData.name} 
+                        <button onClick={() => setIsEditModalOpen(true)} className="p-1 text-gray-400 hover:text-indigo-500 transition-colors">
+                            <Edit className="w-4 h-4" />
+                        </button>
                         <Badge variant={formData.status === 'ACTIVE' ? 'green' : 'outline'}>{formData.status}</Badge>
                     </h1>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{formData.industry || 'Sin rubro'} • Fee: ${formData.monthlyRevenue?.toLocaleString()}/mes</p>
@@ -440,6 +446,22 @@ export default function ProjectDetailPage() {
                 </div>
             </form>
         </Modal>
+
+        {/* Modal Editar Proyecto Global */}
+        {project && (
+            <EditProjectModal 
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                project={formData as Project} 
+                onSave={async (updatedData) => {
+                    if (!id) return;
+                    await db.projects.update(id, updatedData);
+                    setFormData({ ...formData, ...updatedData }); 
+                    loadProject();
+                    showToast("Proyecto actualizado", "success");
+                }}
+            />
+        )}
 
     </div>
   );

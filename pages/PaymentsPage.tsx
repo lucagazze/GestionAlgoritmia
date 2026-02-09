@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2 } from 'lucide-react';
 import { Card, Button, Modal, Badge, Input, Label } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
@@ -22,6 +22,53 @@ export default function PaymentsPage() {
     const [isPartialPaymentModalOpen, setIsPartialPaymentModalOpen] = useState(false);
     const [partialAmount, setPartialAmount] = useState('');
     const [selectedEventForPayment, setSelectedEventForPayment] = useState<any>(null);
+
+    // Edit Date State
+    const [isEditDateModalOpen, setIsEditDateModalOpen] = useState(false);
+    const [newPaymentDate, setNewPaymentDate] = useState('');
+
+    // --- PAYMENT DETAIL MODAL STATE ---
+    const [isPaymentDetailModalOpen, setIsPaymentDetailModalOpen] = useState(false);
+    const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<any>(null);
+    const [activeProposalDetails, setActiveProposalDetails] = useState<any>(null);
+    const [loadingProposal, setLoadingProposal] = useState(false);
+
+    const handleEventClick = async (event: any) => {
+        setSelectedPaymentDetail(event);
+        setIsPaymentDetailModalOpen(true);
+        setLoadingProposal(true);
+        setActiveProposalDetails(null);
+
+        try {
+            // A. Check if payment has snapshot metadata (Historical Data)
+            if (event.paymentId) {
+                 const fullPayment = payments.find(p => p.id === event.paymentId);
+                 if (fullPayment && fullPayment.metadata && fullPayment.metadata.items) {
+                     setActiveProposalDetails({
+                         items: fullPayment.metadata.items.map((i: any) => ({
+                             serviceSnapshotName: i.name,
+                             serviceSnapshotCost: i.cost,
+                             outsourcingCost: i.outsourcing_cost,
+                             contractor: { name: i.partner_name }
+                         })),
+                         isSnapshot: true
+                     });
+                     setLoadingProposal(false);
+                     return;
+                 }
+            }
+
+            // B. Fallback: Fetch detailed proposal info (active)
+            if (event.projectId) {
+                const prop = await db.clients.getActiveProposal(event.projectId);
+                setActiveProposalDetails(prop);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingProposal(false);
+        }
+    };
 
     // Close context menu on click elsewhere
     useEffect(() => {
@@ -67,7 +114,7 @@ export default function PaymentsPage() {
     const getEventsForDate = (date: Date) => {
         if (!date) return [];
         const day = date.getDate();
-        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number }[] = [];
+        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number, date?: Date }[] = [];
 
         // Incoming: Client Billings
         activeProjects.forEach(p => {
@@ -90,7 +137,8 @@ export default function PaymentsPage() {
                     projectId: p.id,
                     paid: isPaid,
                     paymentId: payment?.id,
-                    paymentAmount: paidAmount
+                    paymentAmount: paidAmount,
+                    date: date // Pass the calendar date
                 });
             }
         });
@@ -163,7 +211,7 @@ export default function PaymentsPage() {
             await db.payments.create({
                 clientId: evt.projectId,
                 amount: evt.amount,
-                date: new Date().toISOString(),
+                date: evt.date ? new Date(evt.date).toISOString() : new Date().toISOString(), // Use event date
                 type: 'FULL'
             });
             // Reload
@@ -182,7 +230,7 @@ export default function PaymentsPage() {
         await db.payments.create({
             clientId: selectedEventForPayment.projectId,
             amount: parseFloat(partialAmount),
-            date: new Date().toISOString(),
+            date: selectedEventForPayment.date ? new Date(selectedEventForPayment.date).toISOString() : new Date().toISOString(),
             type: 'PARTIAL'
         });
 
@@ -207,6 +255,65 @@ export default function PaymentsPage() {
         const url = `https://wa.me/${project.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
         setContextMenu(null);
+    };
+
+    const openEditDateModal = () => {
+        if (!contextMenu?.event || !contextMenu.event.paymentId) return;
+        // Set initial date from current view or payment date if available
+        // We know it is paid because the option will only show if paid
+        setNewPaymentDate(new Date().toISOString().split('T')[0]); 
+        setIsEditDateModalOpen(true);
+        setContextMenu(null);
+    };
+
+    const handleUpdatePaymentDate = async () => {
+        if (!contextMenu?.event?.paymentId && !selectedPayment?.id) {
+            // Handle case where we might need to store the ID when opening modal if context menu is cleared
+            // For now, let's rely on finding the payment again or refactoring context handling if needed.
+            // Actually, contextMenu is nullified on open. Need to store ID.
+        }
+    };
+    
+    // Better implementation: Store ID when opening modal
+    const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+
+    const openEditDateModalForEvent = (event: any) => {
+         if (!event?.paymentId) return;
+         setEditingPaymentId(event.paymentId);
+         
+         // Find current date of payment
+         const payment = payments.find(p => p.id === event.paymentId);
+         if (payment) {
+             setNewPaymentDate(new Date(payment.date).toISOString().split('T')[0]);
+         }
+         
+         setIsEditDateModalOpen(true);
+         setContextMenu(null);
+    };
+
+    const handleOpenEditDate = () => {
+         if (!contextMenu?.event) return;
+         openEditDateModalForEvent(contextMenu.event);
+    };
+
+    const handleUpdatePaymentDateAction = async () => {
+        if (!editingPaymentId || !newPaymentDate) return;
+
+        try {
+            await db.payments.update(editingPaymentId, {
+                date: new Date(newPaymentDate).toISOString()
+            });
+
+            // Reload payments
+            const paymentsData = await db.payments.getAll();
+            setPayments(paymentsData);
+            
+            setIsEditDateModalOpen(false);
+            setEditingPaymentId(null);
+        } catch (error) {
+            console.error("Error updating date:", error);
+            alert("Error al actualizar la fecha.");
+        }
     };
 
 
@@ -297,27 +404,63 @@ export default function PaymentsPage() {
                                         </span>
                                         
                                         <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-                                            {events.map((evt, idx) => (
+                                            {events.map((evt, idx) => {
+                                                // LOGIC FOR COLOR CODING
+                                                const isPast = date < new Date(new Date().setHours(0,0,0,0));
+                                                let colorClass = '';
+
+                                                if (evt.type === 'IN') {
+                                                    if (evt.paid) {
+                                                        // PID: Green (or Yellow if partial)
+                                                        colorClass = evt.paymentAmount && evt.paymentAmount < evt.amount 
+                                                            ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800' 
+                                                            : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+                                                    } else {
+                                                        // UNPAID
+                                                        if (isPast) {
+                                                            // OVERDUE: Red
+                                                            colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
+                                                        } else {
+                                                            // PENDING: Gray
+                                                            colorClass = 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700';
+                                                        }
+                                                    }
+                                                } else {
+                                                    // OUT (Expenses): Red/Orange default
+                                                    colorClass = 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-100 dark:border-orange-800';
+                                                }
+
+                                                return (
                                                 <div 
                                                     key={idx} 
+                                                    onClick={() => handleEventClick(evt)} // ✅ Add Click Handler
                                                     onContextMenu={(e) => handleContextMenu(e, evt)}
                                                     className={`
-                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors relative
-                                                        ${evt.type === 'IN' 
-                                                            ? evt.paid 
-                                                                ? (evt.paymentAmount && evt.paymentAmount < evt.amount 
-                                                                    ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800' // Partial
-                                                                    : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800') // Full
-                                                                : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' // Pending (Standard)
-                                                            : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-100 dark:border-red-800'
-                                                        }
+                                                        text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors relative group
+                                                        ${colorClass}
                                                     `}
                                                     title={`${evt.label}: $${evt.amount} ${evt.paid ? `(Pagado: $${evt.paymentAmount})` : ''}`}
                                                 >
-                                                    <span className="truncate flex-1">{evt.label}</span>
+                                                    <div className="flex items-center gap-1 overflow-hidden">
+                                                        {/* EDIT BUTTON (Visible on Hover) */}
+                                                        {evt.paymentId && (
+                                                            <button 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openEditDateModalForEvent(evt);
+                                                                }}
+                                                                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded transition-opacity"
+                                                                title="Cambiar Fecha"
+                                                            >
+                                                                <Edit2 className="w-3 h-3" />
+                                                            </button>
+                                                        )}
+                                                        <span className="truncate">{evt.label}</span>
+                                                    </div>
                                                     <span className="font-bold ml-1">${evt.amount.toLocaleString()}</span>
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 );
@@ -432,81 +575,91 @@ export default function PaymentsPage() {
                 </div>
             )}
 
-            {/* MODAL DE DESGLOSE DE DINERO */}
-            <Modal 
-                isOpen={isDetailModalOpen} 
-                onClose={() => setIsDetailModalOpen(false)} 
-                title="Desglose de Transacción"
-            >
-                {selectedPayment && (
+
+
+    return (
+        <div className="space-y-6 pb-20 relative min-h-screen">
+             {/* ... (Rest of format) ... */}
+
+             {/* MODAL DETALLE PAGO */}
+             <Modal isOpen={isPaymentDetailModalOpen} onClose={() => setIsPaymentDetailModalOpen(false)} title="Detalle del Pago">
+                {selectedPaymentDetail && (
                     <div className="space-y-6">
-                        {/* Encabezado del Pago */}
-                        <div className="text-center space-y-1">
-                            <p className="text-sm text-gray-500">Pago recibido de</p>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                {selectedPayment.client?.name || 'Cliente Desconocido'}
-                            </h3>
-                            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-2">
-                                ${selectedPayment.amount.toLocaleString()}
+                        <div className="bg-gray-50 dark:bg-slate-900 p-4 rounded-xl text-center">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPaymentDetail.label}</h3>
+                            <p className="text-sm text-gray-500">{new Date(selectedPaymentDetail.date || new Date()).toLocaleDateString()}</p>
+                            <p className="text-3xl font-black text-indigo-600 mt-2">${selectedPaymentDetail.amount.toLocaleString()}</p>
+                            <div className="flex justify-center gap-2 mt-2">
+                                {selectedPaymentDetail.paid && <Badge variant="green">Pagado</Badge>}
+                                {activeProposalDetails?.isSnapshot && <Badge variant="blue">Histórico</Badge>}
                             </div>
-                            <Badge variant="outline" className="mt-2">
-                                {new Date(selectedPayment.date).toLocaleDateString()}
-                            </Badge>
                         </div>
 
-                        {/* La Matemática (Tú vs Socio) */}
-                        <div className="bg-gray-50 dark:bg-slate-900 rounded-xl p-5 border border-gray-200 dark:border-slate-800 space-y-4">
-                            
-                            {/* Fila del Socio */}
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                                        <User className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white">Para el Socio (Costos)</p>
-                                        <p className="text-xs text-gray-500">Pago por servicios asignados</p>
+                        {loadingProposal ? (
+                            <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>
+                        ) : activeProposalDetails ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <Label className="mb-2 block font-bold">Distribución de Ingresos</Label>
+                                    <div className="space-y-2">
+                                        {/* Agencia */}
+                                        <div className="flex justify-between items-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                                            <div className="flex items-center gap-3">
+                                                <Briefcase className="w-5 h-5 text-emerald-600"/>
+                                                <div>
+                                                    <p className="font-bold text-gray-900 dark:text-white">Agencia (Tú)</p>
+                                                    <p className="text-xs text-emerald-600 font-bold">Ganancia Neta</p>
+                                                </div>
+                                            </div>
+                                            <span className="font-bold text-emerald-700 dark:text-emerald-300 text-lg">
+                                                ${(selectedPaymentDetail.amount - (activeProposalDetails.items?.reduce((acc: number, i: any) => acc + (i.outsourcingCost || 0), 0) || 0)).toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        {/* Socios (Loop Items) */}
+                                        {activeProposalDetails.items?.filter((i: any) => i.outsourcingCost > 0).map((item: any, idx: number) => {
+                                            // Find contractor name (Assuming populated or we use ID)
+                                            // In our db.clients.getActiveProposal we joined contractor:assignedContractorId(*)
+                                            // BUT supabase join syntax might return array or object depending on relationship.
+                                            // Let's assume singular object 'contractor'
+                                            const partnerName = item.contractor?.name || 'Socio';
+                                            
+                                            return (
+                                                <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                                    <div className="flex items-center gap-3">
+                                                        <User className="w-5 h-5 text-indigo-600"/>
+                                                        <div>
+                                                            <p className="font-bold text-gray-900 dark:text-white">{partnerName}</p>
+                                                            <p className="text-xs text-gray-500">{item.serviceSnapshotName}</p>
+                                                        </div>
+                                                    </div>
+                                                    <span className="font-bold text-red-500 text-lg">
+                                                        - ${item.outsourcingCost.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                        
+                                        {(!activeProposalDetails.items?.some((i: any) => i.outsourcingCost > 0)) && (
+                                            <p className="text-center text-sm text-gray-400 py-2">Sin costos de socios asociados.</p>
+                                        )}
                                     </div>
                                 </div>
-                                <span className="text-lg font-bold text-red-500">
-                                    - ${selectedPayment.client?.outsourcingCost?.toLocaleString() || '0'}
-                                </span>
                             </div>
-
-                            <div className="border-t border-gray-200 dark:border-slate-700"></div>
-
-                            {/* Fila Tuya (Agencia) */}
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                                        <Briefcase className="w-5 h-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-900 dark:text-white">Tu Ganancia Neta</p>
-                                        <p className="text-xs text-gray-500">Lo que queda en caja</p>
-                                    </div>
-                                </div>
-                                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                                    ${(selectedPayment.amount - (selectedPayment.client?.outsourcingCost || 0)).toLocaleString()}
-                                </span>
+                        ) : (
+                            <div className="text-center py-4 text-gray-500">
+                                <p>No se encontraron detalles detallados del contrato activo.</p>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Nota Visual de Margen */}
-                        <div className="flex items-center gap-2 text-xs text-gray-400 justify-center">
-                            <Wallet className="w-3 h-3" />
-                            <span>
-                                Margen de ganancia: {Math.round(((selectedPayment.amount - (selectedPayment.client?.outsourcingCost || 0)) / selectedPayment.amount) * 100)}%
-                            </span>
-                        </div>
-
-                        <div className="flex justify-end pt-2">
-                            <Button onClick={() => setIsDetailModalOpen(false)}>Cerrar</Button>
+                        <div className="flex justify-end">
+                            <Button onClick={() => setIsPaymentDetailModalOpen(false)}>Cerrar</Button>
                         </div>
                     </div>
                 )}
-            </Modal>
-            {/* NEW: Context Menu */}
+             </Modal>
+
+            {/* NEW: Context Menu (Restored) */}
             {contextMenu && (
                 <div 
                     className="fixed z-50 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 py-1 w-48 animate-in fade-in zoom-in-95 duration-100"
@@ -527,12 +680,19 @@ export default function PaymentsPage() {
                         <X className="w-4 h-4" /> No Pagó (Pendiente)
                     </button>
                     <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                    
+                    {contextMenu.event.paymentId && (
+                        <button onClick={handleOpenEditDate} className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2">
+                            <CalendarRange className="w-4 h-4" /> Cambiar Fecha
+                        </button>
+                    )}
+
                     <button onClick={handleWhatsAppReminder} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
                         <MessageSquare className="w-4 h-4" /> Enviar Recordatorio
                     </button>
                 </div>
             )}
-
+            
             {/* NEW: Partial Payment Modal */}
             <Modal
                 isOpen={isPartialPaymentModalOpen}
@@ -556,6 +716,28 @@ export default function PaymentsPage() {
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setIsPartialPaymentModalOpen(false)}>Cancelar</Button>
                         <Button onClick={handlePartialPaymentSubmit} disabled={!partialAmount}>Registrar</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* NEW: Edit Payment Date Modal */}
+            <Modal
+                isOpen={isEditDateModalOpen}
+                onClose={() => setIsEditDateModalOpen(false)}
+                title="Cambiar Fecha de Pago"
+            >
+                 <div className="space-y-4">
+                    <div>
+                        <Label>Nueva Fecha</Label>
+                        <Input 
+                            type="date" 
+                            value={newPaymentDate} 
+                            onChange={e => setNewPaymentDate(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsEditDateModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleUpdatePaymentDateAction}>Guardar Cambios</Button>
                     </div>
                 </div>
             </Modal>

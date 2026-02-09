@@ -259,6 +259,7 @@ export interface Payment {
     date: string;
     notes?: string;
     type?: 'FULL' | 'PARTIAL';
+    metadata?: any; // Stores snapshot of services/proposal at time of payment
     createdAt: string;
 }
 
