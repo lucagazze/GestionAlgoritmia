@@ -6,7 +6,7 @@ import { Button, Input, Card, Badge, Modal, Label } from '../components/UICompon
 import { 
   FileText, Plus, CheckCircle2, XCircle, Clock, 
   Search, MoreVertical, Send, AlertCircle, Loader2, 
-  Wallet, User, Calendar, Briefcase, Edit, ArrowRight, Eye // Importamos Eye
+  Wallet, User, Calendar, Briefcase, Edit, ArrowRight, Eye, Trash2 // Importamos Trash2
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
@@ -22,6 +22,7 @@ export default function QuotationsPage() {
   // Filtros
   const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
 
   // Menú Contextual
   const [contextMenu, setContextMenu] = useState<{ visible: boolean, x: number, y: number, proposal: Proposal | null }>({
@@ -163,6 +164,25 @@ export default function QuotationsPage() {
       loadData();
   };
 
+  const handleDeleteProposal = async (id: string, e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
+      // First confirmation
+      if (confirm("¿Estás seguro de que quieres eliminar este presupuesto?")) {
+          // Second confirmation (double check as requested)
+          if (confirm("Esta acción no se puede deshacer. ¿Confirmas la eliminación definitiva?")) {
+              try {
+                  await db.proposals.delete(id);
+                  showToast("🗑️ Presupuesto eliminado", "success");
+                  loadData();
+                  setContextMenu({ ...contextMenu, visible: false });
+              } catch (error) {
+                  console.error(error);
+                  showToast("Error al eliminar", "error");
+              }
+          }
+      }
+  };
+
   // --- HELPERS VISUALES ---
   const getStatusBadge = (status: ProposalStatus) => {
       switch (status) {
@@ -176,11 +196,20 @@ export default function QuotationsPage() {
 
   const filteredProposals = proposals.filter(p => {
       const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase());
+      
       let matchesTab = true;
       if (activeTab === 'WAITING') matchesTab = p.status === ProposalStatus.SENT || p.status === ProposalStatus.DRAFT;
       if (activeTab === 'APPROVED') matchesTab = p.status === ProposalStatus.ACCEPTED || p.status === ProposalStatus.PARTIALLY_ACCEPTED;
       if (activeTab === 'REJECTED') matchesTab = p.status === ProposalStatus.REJECTED;
-      return matchesSearch && matchesTab;
+
+      let matchesMonth = true;
+      if (filterMonth) {
+          const date = new Date(p.createdAt);
+          const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          matchesMonth = monthStr === filterMonth;
+      }
+
+      return matchesSearch && matchesTab && matchesMonth;
   });
 
   return (
@@ -221,115 +250,146 @@ export default function QuotationsPage() {
                     </button>
                 ))}
              </div>
-             <div className="relative md:w-64">
-                 <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                 <Input 
-                    placeholder="Buscar cliente..." 
-                    className="pl-9 bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                 />
+             <div className="flex gap-2 w-full md:w-auto">
+                 <div className="relative flex-1 md:w-48">
+                     <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                     <Input 
+                        placeholder="Buscar cliente..." 
+                        className="pl-9 bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                     />
+                 </div>
+                 <div className="w-40">
+                    <Input 
+                        type="month" 
+                        value={filterMonth}
+                        onChange={e => setFilterMonth(e.target.value)}
+                        className="bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
+                    />
+                 </div>
              </div>
         </div>
 
-        {/* Lista de Tarjetas */}
-        <div className="grid grid-cols-1 gap-4">
+        {/* Lista en Tabla */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden shadow-sm">
             {loading && <div className="text-center py-10"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>}
             
-            {!loading && filteredProposals.map((proposal) => {
-                const finance = calculateFinancials(proposal);
-                
-                return (
-                    <div 
-                        key={proposal.id}
-                        onContextMenu={(e) => {
-                            e.preventDefault();
-                            setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
-                        }}
-                        onDoubleClick={() => handleOpenDetail(proposal)}
-                    >
-                        <Card className="group hover:shadow-md transition-all border-l-4 border-l-transparent hover:border-l-indigo-500 cursor-pointer select-none relative">
-                            <div className="p-5 flex flex-col md:flex-row justify-between gap-6">
-                                <div className="flex-1 space-y-2">
-                                    <div className="flex items-center gap-3 mb-1">
-                                        {getStatusBadge(proposal.status)}
-                                        <span className="text-xs text-gray-400 font-mono flex items-center gap-1">
-                                            <Clock className="w-3 h-3"/> {new Date(proposal.createdAt).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                        {proposal.client?.name || 'Cliente Potencial'}
-                                    </h3>
-                                    
-                                    {/* Lista de Servicios */}
-                                    {proposal.items && proposal.items.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 mt-2">
-                                            {proposal.items.map((item: any) => (
-                                                <span 
-                                                    key={item.id}
-                                                    className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-medium border border-indigo-100 dark:border-indigo-800"
-                                                >
-                                                    {item.serviceSnapshotName}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                    
-                                    <div className="flex gap-4 mt-2 text-xs">
-                                        <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">
-                                            <Wallet className="w-3.5 h-3.5" />
-                                            Ganancia: ${finance.netProfit.toLocaleString()}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-red-500 dark:text-red-400 font-medium bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                                            <User className="w-3.5 h-3.5" />
-                                            Gastos: ${finance.totalContractCost.toLocaleString()}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col items-end justify-center border-l pl-4 border-gray-100 dark:border-slate-800 min-w-[120px]">
-                                    <span className="text-xl font-black text-gray-900 dark:text-white">
-                                        ${finance.totalContractRevenue.toLocaleString()}
-                                    </span>
-                                    <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Valor Contrato</span>
-                                    <span className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded mt-1">
-                                        {finance.duration} meses
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* ✅ BOTÓN ACTUALIZADO: VER DETALLE */}
-                            <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity md:block hidden">
-                                <Button 
-                                    size="sm" 
-                                    variant="secondary"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewInCopilot(proposal);
-                                    }}
-                                    className="shadow-sm border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-indigo-600 font-bold"
-                                >
-                                    <Eye className="w-4 h-4 mr-2"/> Ver Detalle
-                                </Button>
-                            </div>
-                            
-                             <div className="md:hidden flex justify-end px-5 pb-4">
-                                <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewInCopilot(proposal);
-                                    }}
-                                    className="w-full"
-                                >
-                                    <Eye className="w-4 h-4 mr-2"/> Ver Detalle
-                                </Button>
-                            </div>
-                        </Card>
-                    </div>
-                );
-            })}
+            {!loading && (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-bold text-xs">
+                            <tr>
+                                <th className="px-6 py-4">Fecha</th>
+                                <th className="px-6 py-4">Cliente</th>
+                                <th className="px-6 py-4">Estado</th>
+                                <th className="px-6 py-4 hidden md:table-cell">Servicios</th>
+                                <th className="px-6 py-4 text-right">Valor Total</th>
+                                <th className="px-6 py-4 text-right">Profit</th>
+                                <th className="px-6 py-4 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                            {filteredProposals.map((proposal) => {
+                                const finance = calculateFinancials(proposal);
+                                return (
+                                    <tr 
+                                        key={proposal.id}
+                                        className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                        onContextMenu={(e) => {
+                                            e.preventDefault();
+                                            setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
+                                        }}
+                                        onDoubleClick={() => handleOpenDetail(proposal)}
+                                    >
+                                        <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                                            {new Date(proposal.createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900 dark:text-white">{proposal.client?.name || 'Cliente Potencial'}</div>
+                                            {proposal.client?.industry && <div className="text-xs text-gray-400">{proposal.client.industry}</div>}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {getStatusBadge(proposal.status)}
+                                        </td>
+                                        <td className="px-6 py-4 hidden md:table-cell">
+                                            <div className="flex -space-x-2">
+                                                {(proposal.items || []).slice(0, 3).map((item, idx) => (
+                                                    <div key={idx} className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 border-2 border-white dark:border-slate-800 flex items-center justify-center text-[10px] font-bold text-indigo-600" title={item.serviceSnapshotName}>
+                                                        {item.serviceSnapshotName.charAt(0)}
+                                                    </div>
+                                                ))}
+                                                {(proposal.items || []).length > 3 && (
+                                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-slate-800 border-2 border-white dark:border-slate-800 flex items-center justify-center text-[8px] font-bold text-gray-500">
+                                                        +{proposal.items.length - 3}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="font-black text-gray-900 dark:text-white text-base">
+                                                ${finance.totalContractRevenue.toLocaleString()}
+                                            </div>
+                                            <div className="text-xs text-indigo-500 font-medium">
+                                                {finance.duration} meses
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                                                ${finance.netProfit.toLocaleString()}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 flex justify-center gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost" 
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenDetail(proposal);
+                                                }}
+                                            >
+                                                <Eye className="w-4 h-4 text-gray-400 hover:text-indigo-600" />
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost" 
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleViewInCopilot(proposal);
+                                                }}
+                                            >
+                                                <Edit className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost" 
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
+                                                }}
+                                            >
+                                                <MoreVertical className="w-4 h-4 text-gray-400" />
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost" 
+                                                className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                onClick={(e) => handleDeleteProposal(proposal.id, e)}
+                                                title="Eliminar"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
 
         {/* ... (Menú Contextual y Modales se mantienen igual) ... */}
@@ -347,6 +407,10 @@ export default function QuotationsPage() {
                     </button>
                     <button onClick={handleReject} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
                         <XCircle className="w-4 h-4"/> Rechazar
+                    </button>
+                    <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
+                    <button onClick={() => contextMenu.proposal && handleDeleteProposal(contextMenu.proposal.id)} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                        <Trash2 className="w-4 h-4"/> Eliminar Definitivamente
                     </button>
                 </div>
             </div>

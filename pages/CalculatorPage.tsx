@@ -5,7 +5,7 @@ import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { Service, ServiceType, ProposalStatus, Contractor, Project } from '../types';
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge, Textarea, Select } from '../components/UIComponents';
-import { Check, Copy, Save, Wand2, User, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, Sparkles, RefreshCw, TrendingUp } from 'lucide-react';
+import { Check, Copy, Save, Wand2, User, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, Sparkles, RefreshCw, TrendingUp, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -68,6 +68,11 @@ export default function CalculatorPage() {
   // --- STEP 3: REVIEW & AI ---
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
+  const [includeStrategicPlan, setIncludeStrategicPlan] = useState(true);
+
+  // --- HISTORY FILTERS ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
 
   // --- AI CHAT --
 
@@ -144,6 +149,22 @@ export default function CalculatorPage() {
     });
     return grouped;
   }, [services]);
+
+  const filteredProposals = useMemo(() => {
+      return proposals.filter(p => {
+          const clientName = (p.client?.name || '').toLowerCase();
+          const matchesSearch = clientName.includes(searchTerm.toLowerCase());
+          
+          let matchesMonth = true;
+          if (filterMonth) {
+              const date = new Date(p.createdAt);
+              const monthStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+              matchesMonth = monthStr === filterMonth;
+          }
+
+          return matchesSearch && matchesMonth;
+      }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [proposals, searchTerm, filterMonth]);
 
 
   const calculations = useMemo(() => {
@@ -259,9 +280,10 @@ export default function CalculatorPage() {
               // ✅ LOAD CONTRACTOR ASSIGNMENTS
               if (item.assignedContractorId) {
                   newAssignedContractors[item.serviceId] = item.assignedContractorId;
-              }
-              if (item.outsourcingCost) {
-                  newOutsourcingCosts[item.serviceId] = item.outsourcingCost;
+                  // Only load cost if a partner is assigned
+                  if (item.outsourcingCost) {
+                      newOutsourcingCosts[item.serviceId] = item.outsourcingCost;
+                  }
               }
           });
           setSelectedServiceIds(serviceIds);
@@ -615,7 +637,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       // -- CONTEXT & TRANSFORMATION (Persuasive) --
       let yPos = 70;
       
-      if (clientInfo.objective || clientInfo.currentSituation) {
+      if (includeStrategicPlan && (clientInfo.objective || clientInfo.currentSituation)) {
            doc.setFontSize(10);
            doc.setFont("helvetica", "bold");
            doc.setTextColor(0);
@@ -997,48 +1019,87 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       </div>
 
       {viewMode === 'HISTORY' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-               {proposals.length === 0 ? (
+           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+               {/* FILTERS */}
+               <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm">
+                   <div className="flex-1">
+                       <Label>Buscar Cliente</Label>
+                       <Input 
+                           placeholder="Nombre del cliente..." 
+                           value={searchTerm}
+                           onChange={e => setSearchTerm(e.target.value)}
+                           className="bg-gray-50 dark:bg-slate-950"
+                       />
+                   </div>
+                   <div className="w-full md:w-48">
+                       <Label>Filtrar por Mes</Label>
+                       <Input 
+                           type="month" 
+                           value={filterMonth}
+                           onChange={e => setFilterMonth(e.target.value)}
+                           className="bg-gray-50 dark:bg-slate-950"
+                       />
+                   </div>
+                   <div className="flex items-end">
+                        <Button variant="ghost" onClick={() => {setSearchTerm(''); setFilterMonth('');}} className="text-gray-400 hover:text-gray-600">
+                            Limpiar
+                        </Button>
+                   </div>
+               </div>
+
+               {filteredProposals.length === 0 ? (
                    <div className="text-center py-20 bg-gray-50 dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-800">
-                       <p className="text-gray-400 font-medium">No hay cotizaciones guardadas aún.</p>
+                       <p className="text-gray-400 font-medium">No se encontraron cotizaciones.</p>
                        <Button variant="ghost" onClick={handleNewProposal}>Crear Nueva</Button>
                    </div>
                ) : (
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                       {proposals.map(p => (
-                           <Card key={p.id} className="border-none shadow-lg shadow-black/5 hover:shadow-xl transition-all hover:-translate-y-1 bg-white dark:bg-slate-900 overflow-hidden group">
-                               <div className="h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
-                               <CardContent className="p-6 space-y-4">
-                                   <div className="flex justify-between items-start">
-                                       <div>
-                                           <h3 className="font-bold text-lg text-gray-900 dark:text-white">{p.client?.name || 'Cliente sin nombre'}</h3>
-                                           <p className="text-xs text-gray-500">{p.client?.industry || 'Sin industria'} • {new Date(p.createdAt).toLocaleDateString()}</p>
-                                       </div>
-                                      <Badge variant={p.status === 'DRAFT' ? 'outline' : 'blue'}>{p.status}</Badge>
-                                   </div>
-                                   
-                                   <div className="space-y-2 pt-2">
-                                       <div className="flex justify-between text-sm">
-                                           <span className="text-gray-500">Recurrente</span>
-                                           <span className="font-bold dark:text-white">${p.totalRecurringPrice?.toLocaleString()}</span>
-                                       </div>
-                                        <div className="flex justify-between text-sm">
-                                           <span className="text-gray-500">Setup</span>
-                                           <span className="font-bold dark:text-white">${p.totalOneTimePrice?.toLocaleString()}</span>
-                                       </div>
-                                       <div className="pt-2 border-t border-gray-100 dark:border-slate-800 flex justify-between items-center">
-                                           <span className="text-xs font-bold uppercase text-gray-400">Total Contrato</span>
-                                           <span className="text-xl font-black text-blue-600 dark:text-blue-400">${p.totalContractValue?.toLocaleString()}</span>
-                                       </div>
-                                   </div>
-    
-                                   <div className="pt-4 flex gap-2">
-                                       <Button variant="outline" className="flex-1 text-xs h-8" onClick={() => handleLoadProposal(p)}>Ver Detalles</Button>
-                                       <Button variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleDeleteProposal(p.id, e)}><div className="w-4 h-4"><X /></div></Button>
-                                   </div>
-                               </CardContent>
-                           </Card>
-                       ))}
+                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                       <table className="w-full text-sm text-left">
+                           <thead className="bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-bold text-xs">
+                               <tr>
+                                   <th className="px-6 py-4">Fecha</th>
+                                   <th className="px-6 py-4">Cliente</th>
+                                   <th className="px-6 py-4">Estado</th>
+                                   <th className="px-6 py-4 text-right">Valor Total</th>
+                                   <th className="px-6 py-4 text-right">Mensual</th>
+                                   <th className="px-6 py-4 text-center">Acciones</th>
+                               </tr>
+                           </thead>
+                           <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                               {filteredProposals.map(p => (
+                                   <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer" onClick={() => handleLoadProposal(p)}>
+                                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
+                                           {new Date(p.createdAt).toLocaleDateString()}
+                                       </td>
+                                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                           <div>{p.client?.name || 'Cliente sin nombre'}</div>
+                                           <div className="text-xs text-gray-400 font-normal">{p.client?.industry}</div>
+                                       </td>
+                                       <td className="px-6 py-4">
+                                           <Badge variant={p.status === 'DRAFT' ? 'outline' : p.status === 'ACCEPTED' ? 'green' : p.status === 'REJECTED' ? 'red' : 'blue'}>
+                                               {p.status === 'DRAFT' ? 'Borrador' : p.status === 'ACCEPTED' ? 'Aprobado' : p.status === 'REJECTED' ? 'Rechazado' : p.status}
+                                           </Badge>
+                                       </td>
+                                       <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
+                                           ${p.totalContractValue?.toLocaleString()}
+                                       </td>
+                                       <td className="px-6 py-4 text-right text-gray-500">
+                                           ${p.totalRecurringPrice?.toLocaleString()}
+                                       </td>
+                                       <td className="px-6 py-4 flex justify-center gap-2" onClick={e => e.stopPropagation()}>
+                                           <Button variant="ghost" size="sm" onClick={() => handleLoadProposal(p)} className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50">
+                                               <ChevronRight className="w-4 h-4"/>
+                                           </Button>
+                                           {(p.status !== ProposalStatus.ACCEPTED && p.status !== ProposalStatus.PARTIALLY_ACCEPTED) && (
+                                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleDeleteProposal(p.id, e)}>
+                                                   <Trash2 className="w-4 h-4" />
+                                               </Button>
+                                           )}
+                                       </td>
+                                   </tr>
+                               ))}
+                           </tbody>
+                       </table>
                    </div>
                )}
           </div>
@@ -1183,8 +1244,14 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                                   const pid = e.target.value;
                                                                   const partner = contractors.find(c => c.id === pid);
                                                                   setAssignedContractors({...assignedContractors, [s.id]: pid});
-                                                                  // Auto-fill outsourcing cost based on partner's hourly rate
-                                                                  if (partner && partner.hourlyRate > 0) {
+                                                                  
+                                                                  if (!pid) {
+                                                                      // If internal, clear cost
+                                                                      const newCosts = {...outsourcingCosts};
+                                                                      delete newCosts[s.id];
+                                                                      setOutsourcingCosts(newCosts);
+                                                                  } else if (partner && partner.hourlyRate > 0) {
+                                                                      // Auto-fill outsourcing cost based on partner's hourly rate
                                                                       setOutsourcingCosts(prev => ({...prev, [s.id]: partner.hourlyRate}));
                                                                   }
                                                               }}
@@ -1391,10 +1458,22 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                 </div>
       
                                 <div className="p-6 bg-gray-50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex gap-3">
-                                    <Button variant="outline" className="flex-1 bg-white dark:bg-slate-800" onClick={generatePDF}>
-                                        <FileDown className="w-4 h-4 mr-2" /> PDF
-                                    </Button>
-                                    <Button onClick={saveProposal} disabled={isSaving} className="flex-[2] text-base shadow-xl shadow-black/10 hover:scale-[1.02] transition-transform">
+                                    <div className="flex flex-col gap-2 flex-1">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <input 
+                                                type="checkbox" 
+                                                id="includeStrategicPlan" 
+                                                checked={includeStrategicPlan} 
+                                                onChange={e => setIncludeStrategicPlan(e.target.checked)}
+                                                className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                            />
+                                            <label htmlFor="includeStrategicPlan" className="text-xs text-gray-500 cursor-pointer select-none">Incluir Plan Estratégico</label>
+                                        </div>
+                                        <Button variant="outline" className="w-full bg-white dark:bg-slate-800" onClick={generatePDF}>
+                                            <FileDown className="w-4 h-4 mr-2" /> PDF
+                                        </Button>
+                                    </div>
+                                    <Button onClick={saveProposal} disabled={isSaving} className="flex-[2] text-base shadow-xl shadow-black/10 hover:scale-[1.02] transition-transform self-end">
                                         {isSaving ? <Loader2 className="animate-spin" /> : <><Save className="w-5 h-5 mr-2" /> Finalizar y Guardar</>}
                                     </Button>
                                 </div>

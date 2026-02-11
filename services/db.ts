@@ -1205,6 +1205,11 @@ export const db = {
     update: async (id: string, data: Partial<Payment>): Promise<void> => {
         const { error } = await supabase.from('Payment').update(data).eq('id', id);
         if (error) throw error;
+    },
+    
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase.from('Payment').delete().eq('id', id);
+        if (error) throw error;
     }
   },
 

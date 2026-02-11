@@ -107,23 +107,35 @@ export default function PaymentsPage() {
         return null; 
     });
 
-    const totalIn = activeProjects.reduce((acc, p) => acc + (p.monthlyRevenue || 0), 0);
-    const totalOut = activeProjects.reduce((acc, p) => acc + (p.outsourcingCost || 0) + (p.internalCost || 0), 0);
-    const net = totalIn - totalOut;
-
+    // Define getEventsForDate BEFORE monthlyTotals
     const getEventsForDate = (date: Date) => {
         if (!date) return [];
         const day = date.getDate();
+        const eventMonth = date.getMonth();
+        const eventYear = date.getFullYear();
         const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number, date?: Date }[] = [];
 
         // Incoming: Client Billings
         activeProjects.forEach(p => {
+            // 1. Check Project Duration
+            const projectStart = new Date(p.createdAt);
+            projectStart.setHours(0, 0, 0, 0); // Normalize to start of day
+
+            const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
+            if (projectEnd) projectEnd.setHours(23, 59, 59, 999); // Normalize to end of day
+
+            // If date is before project start, skip
+            if (date < projectStart) return;
+
+            // If date is after project end, skip
+            if (projectEnd && date > projectEnd) return;
+
             const billDay = p.billingDay || 1;
             if (billDay === day) {
                 // Check if paid in this month
                 const payment = payments.find(pay => {
                     const payDate = new Date(pay.date);
-                    const isSameMonth = payDate.getMonth() === month && payDate.getFullYear() === year;
+                    const isSameMonth = payDate.getMonth() === eventMonth && payDate.getFullYear() === eventYear;
                     const isSameClient = (pay.clientId === p.id) || (pay.client_id === p.id);
                     return isSameClient && isSameMonth;
                 });
@@ -147,15 +159,30 @@ export default function PaymentsPage() {
         // Outgoing: Partner Payments (Estimated on day 5)
         if (day === 5) {
             activeProjects.forEach(p => {
+                // Check Project Duration for Outgoing too
+                const projectStart = new Date(p.createdAt);
+                projectStart.setHours(0, 0, 0, 0);
+
+                const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
+                if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
+
+                if (date < projectStart) return;
+                if (projectEnd && date > projectEnd) return;
+
                 if (p.outsourcingCost && p.outsourcingCost > 0) {
-                    events.push({ type: 'OUT', label: `Socio (${p.name})`, amount: p.outsourcingCost });
+                    events.push({ 
+                        type: 'OUT', 
+                        label: `Socio (${p.name})`, 
+                        amount: p.outsourcingCost,
+                        date: date 
+                    });
                 }
             });
         }
         
-        // Internal Costs (Estimated on day 1)
+        // Internal Costs (Day 1)
         if (day === 1) {
-             activeProjects.forEach(p => {
+            activeProjects.forEach(p => {
                 if (p.internalCost && p.internalCost > 0) {
                     events.push({ type: 'OUT', label: `Interno (${p.name})`, amount: p.internalCost });
                 }
@@ -165,6 +192,36 @@ export default function PaymentsPage() {
         return events;
     };
 
+    // Calculate monthly totals based on the displayed month
+    const monthlyTotals = useMemo(() => {
+        let totalIn = 0;
+        let totalOut = 0;
+
+        // Iterate through all days in the displayed month
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const events = getEventsForDate(date);
+            
+            events.forEach(evt => {
+                if (evt.type === 'IN') {
+                    totalIn += evt.amount;
+                } else if (evt.type === 'OUT') {
+                    totalOut += evt.amount;
+                }
+            });
+        }
+
+        return {
+            totalIn,
+            totalOut,
+            net: totalIn - totalOut
+        };
+    }, [year, month, daysInMonth, activeProjects, payments]);
+
+    const totalIn = monthlyTotals.totalIn;
+    const totalOut = monthlyTotals.totalOut;
+    const net = monthlyTotals.net;
+        
     // --- FORECAST LOGIC (90 DAYS) ---
     const forecastData = useMemo(() => {
         const data = [];
@@ -240,6 +297,17 @@ export default function PaymentsPage() {
         setIsPartialPaymentModalOpen(false);
         setPartialAmount('');
         setSelectedEventForPayment(null);
+    };
+
+    const handleDeletePayment = async () => {
+        if (!contextMenu?.event?.paymentId) return;
+        
+        if (!confirm('¿Desmarcar este pago? Se eliminará el registro.')) return;
+        
+        await db.payments.delete(contextMenu.event.paymentId);
+        const paymentsData = await db.payments.getAll();
+        setPayments(paymentsData);
+        setContextMenu(null);
     };
 
     const handleWhatsAppReminder = () => {
@@ -407,18 +475,27 @@ export default function PaymentsPage() {
                                         <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
                                             {events.map((evt, idx) => {
                                                 // LOGIC FOR COLOR CODING
-                                                const isPast = date < new Date(new Date().setHours(0,0,0,0));
                                                 let colorClass = '';
 
                                                 if (evt.type === 'IN') {
                                                     if (evt.paid) {
-                                                        // PID: Green (or Yellow if partial)
-                                                        colorClass = evt.paymentAmount && evt.paymentAmount < evt.amount 
-                                                            ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800' 
-                                                            : 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+                                                        // Check if PARTIAL or FULL payment
+                                                        const payment = payments.find(p => p.id === evt.paymentId);
+                                                        if (payment?.type === 'PARTIAL') {
+                                                            // PARTIAL: Yellow
+                                                            colorClass = 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800';
+                                                        } else {
+                                                            // FULL: Green
+                                                            colorClass = 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
+                                                        }
                                                     } else {
-                                                        // UNPAID
-                                                        if (isPast) {
+                                                        // UNPAID: Check if overdue
+                                                        const today = new Date();
+                                                        today.setHours(0, 0, 0, 0);
+                                                        const eventDate = new Date(date);
+                                                        eventDate.setHours(0, 0, 0, 0);
+                                                        
+                                                        if (eventDate < today) {
                                                             // OVERDUE: Red
                                                             colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
                                                         } else {
@@ -440,7 +517,13 @@ export default function PaymentsPage() {
                                                         text-[10px] px-2 py-1 rounded-md border truncate font-medium flex justify-between items-center cursor-pointer transition-colors relative group
                                                         ${colorClass}
                                                     `}
-                                                    title={`${evt.label}: $${evt.amount} ${evt.paid ? `(Pagado: $${evt.paymentAmount})` : ''}`}
+                                                    title={
+                                                        evt.paid 
+                                                            ? (evt.paymentAmount && evt.paymentAmount < evt.amount 
+                                                                ? `${evt.label}: $${evt.amount}\nPagado: $${evt.paymentAmount}\nFalta: $${evt.amount - evt.paymentAmount}` 
+                                                                : `${evt.label}: $${evt.amount} (Pagado Completo)`)
+                                                            : `${evt.label}: $${evt.amount} (Pendiente)`
+                                                    }
                                                 >
                                                     <div className="flex items-center gap-1 overflow-hidden">
                                                         {/* EDIT BUTTON (Visible on Hover) */}
@@ -593,6 +676,26 @@ export default function PaymentsPage() {
                             </div>
                         </div>
 
+                        {/* PARTIAL PAYMENT BREAKDOWN */}
+                        {selectedPaymentDetail.paid && selectedPaymentDetail.paymentAmount && selectedPaymentDetail.paymentAmount < selectedPaymentDetail.amount && (
+                            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <DollarSign className="w-5 h-5 text-yellow-600" />
+                                    <h4 className="font-bold text-gray-900 dark:text-white">Pago Parcial</h4>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Pagado</p>
+                                        <p className="text-xl font-bold text-green-600">${selectedPaymentDetail.paymentAmount.toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
+                                        <p className="text-xs text-gray-500 mb-1">Falta</p>
+                                        <p className="text-xl font-bold text-red-600">${(selectedPaymentDetail.amount - selectedPaymentDetail.paymentAmount).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {loadingProposal ? (
                             <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>
                         ) : activeProposalDetails ? (
@@ -674,15 +777,17 @@ export default function PaymentsPage() {
                     <button onClick={() => handleMarkAsPaid('PARTIAL')} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex items-center gap-2">
                         <DollarSign className="w-4 h-4" /> Pagó Parcial...
                     </button>
-                    <button onClick={() => handleMarkAsPaid('FULL')} className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2">
-                        <X className="w-4 h-4" /> No Pagó (Pendiente)
-                    </button>
                     <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
                     
                     {contextMenu.event.paymentId && (
-                        <button onClick={handleOpenEditDate} className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2">
-                            <CalendarRange className="w-4 h-4" /> Cambiar Fecha
-                        </button>
+                        <>
+                            <button onClick={handleOpenEditDate} className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 flex items-center gap-2">
+                                <CalendarRange className="w-4 h-4" /> Cambiar Fecha
+                            </button>
+                            <button onClick={handleDeletePayment} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
+                                <X className="w-4 h-4" /> Desmarcar Pago
+                            </button>
+                        </>
                     )}
 
                     <button onClick={handleWhatsAppReminder} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
