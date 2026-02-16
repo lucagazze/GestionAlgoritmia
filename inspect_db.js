@@ -1,6 +1,6 @@
 
-require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
+import 'dotenv/config';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
@@ -12,25 +12,23 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function inspectTable() {
-  console.log('Inspecting Payment table...');
-  const { data, error } = await supabase.from('Payment').select('*').limit(1);
+async function inspectTables() {
+  console.log('Inspecting Tables...');
   
-  if (data && data.length > 0) {
-      console.log('Found record keys:', Object.keys(data[0]));
-  } else if (error) {
-      console.error('Error selecting from Payment:', error);
-  } else {
-      console.log('No records found. Attempting to insert dummy to see error...');
-      const { error: insertError } = await supabase.from('Payment').insert({
-          amount: 1,
-          date: new Date().toISOString(),
-          dummy_column: 'test' // Intentional error to list columns if PG returns them
-      });
-      if (insertError) {
-          console.log('Insert error (might reveal columns):', insertError);
+  // Try to select from Contractor to see if it works with different casings
+  const casings = ['Contractor', 'contractor', 'CONTRACTOR', 'Contractors', 'contractors'];
+  
+  for (const table of casings) {
+      const { data, error } = await supabase.from(table).select('id').limit(1);
+      if (!error) {
+          console.log(`✅ Table found: "${table}"`);
+          return;
+      } else {
+          console.log(`❌ Table not found as "${table}": ${error.message} (${error.code})`);
       }
   }
+
+  console.log('Trying to query directly via RPC if available or just guessing standard supabase casing.');
 }
 
-inspectTable();
+inspectTables();

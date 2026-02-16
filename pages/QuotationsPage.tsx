@@ -17,11 +17,12 @@ export default function QuotationsPage() {
   // --- ESTADOS ---
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [clients, setClients] = useState<any[]>([]); // Added clients state
   const [loading, setLoading] = useState(true);
   
   // Filtros
-  const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING' | 'APPROVED' | 'REJECTED'>('ALL');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'EXPIRED'>('ALL');
+  const [selectedClientId, setSelectedClientId] = useState<string>('ALL'); // Changed from searchTerm
   const [filterMonth, setFilterMonth] = useState('');
 
   // Menú Contextual
@@ -50,12 +51,14 @@ export default function QuotationsPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [propsData, contsData] = await Promise.all([
+    const [propsData, contsData, clientsData] = await Promise.all([
         db.proposals.getAll(),
-        db.contractors.getAll()
+        db.contractors.getAll(),
+        db.clients.getAll()
     ]);
     setProposals(propsData);
     setContractors(contsData);
+    setClients(clientsData);
     setLoading(false);
   };
 
@@ -194,13 +197,16 @@ export default function QuotationsPage() {
       }
   };
 
-  const filteredProposals = proposals.filter(p => {
-      const matchesSearch = (p.client?.name || 'Cliente').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesClient = selectedClientId === 'ALL' || p.clientId === selectedClientId;
       
       let matchesTab = true;
       if (activeTab === 'WAITING') matchesTab = p.status === ProposalStatus.SENT || p.status === ProposalStatus.DRAFT;
       if (activeTab === 'APPROVED') matchesTab = p.status === ProposalStatus.ACCEPTED || p.status === ProposalStatus.PARTIALLY_ACCEPTED;
       if (activeTab === 'REJECTED') matchesTab = p.status === ProposalStatus.REJECTED;
+      if (activeTab === 'EXPIRED') {
+          const daysOld = (new Date().getTime() - new Date(p.createdAt).getTime()) / (1000 * 3600 * 24);
+          matchesTab = daysOld > 15 && p.status !== ProposalStatus.ACCEPTED && p.status !== ProposalStatus.PARTIALLY_ACCEPTED && p.status !== ProposalStatus.REJECTED;
+      }
 
       let matchesMonth = true;
       if (filterMonth) {
@@ -209,7 +215,7 @@ export default function QuotationsPage() {
           matchesMonth = monthStr === filterMonth;
       }
 
-      return matchesSearch && matchesTab && matchesMonth;
+      return matchesClient && matchesTab && matchesMonth;
   });
 
   return (
@@ -235,7 +241,8 @@ export default function QuotationsPage() {
                     { id: 'ALL', label: 'Todos' },
                     { id: 'APPROVED', label: 'Aprobados' },
                     { id: 'WAITING', label: 'En Espera' },
-                    { id: 'REJECTED', label: 'No Aprobados' }
+                    { id: 'REJECTED', label: 'No Aprobados' },
+                    { id: 'EXPIRED', label: 'Vencidos' }
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -251,14 +258,17 @@ export default function QuotationsPage() {
                 ))}
              </div>
              <div className="flex gap-2 w-full md:w-auto">
-                 <div className="relative flex-1 md:w-48">
-                     <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                     <Input 
-                        placeholder="Buscar cliente..." 
-                        className="pl-9 bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                     />
+                 <div className="relative flex-1 md:w-64">
+                     <select
+                        className="w-full bg-gray-50 dark:bg-slate-800/50 border-transparent rounded-lg h-full px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                        value={selectedClientId}
+                        onChange={e => setSelectedClientId(e.target.value)}
+                     >
+                        <option value="ALL">Todos los Clientes</option>
+                        {clients.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                     </select>
                  </div>
                  <div className="w-40">
                     <Input 

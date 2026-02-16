@@ -165,6 +165,7 @@ export interface Proposal {
   targetAudience?: string;
   currentSituation?: string;
   durationMonths: number;
+  validityPeriod?: number; // Days valid from createdAt (default 15)
   totalOneTimePrice: number;
   totalRecurringPrice: number;
   totalContractValue: number;
@@ -286,4 +287,14 @@ export interface ContentIdea {
   status: 'IDEA' | 'SCRIPTED' | 'FILMED' | 'EDITED' | 'POSTED';
   scheduledDate?: string;
   createdAt: string;
+}
+
+export interface ContractorPayment {
+    id: string;
+    contractor_id: string;
+    client_id?: string;
+    amount: number;
+    date: string;
+    description?: string;
+    created_at: string;
 }

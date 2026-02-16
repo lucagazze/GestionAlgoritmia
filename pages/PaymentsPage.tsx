@@ -2,15 +2,18 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
-import { Project, Contractor, ProjectStatus } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2 } from 'lucide-react';
-import { Card, Button, Modal, Badge, Input, Label } from '../components/UIComponents';
+import { Project, Contractor, ProjectStatus, ContractorPayment } from '../types';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users } from 'lucide-react';
+import { Card, Button, Modal, Badge, Input, Label, Select } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 export default function PaymentsPage() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [payments, setPayments] = useState<any[]>([]); // Real payments
+    const [contractors, setContractors] = useState<Contractor[]>([]);
+    const [contractorPayments, setContractorPayments] = useState<ContractorPayment[]>([]);
+
     const [referenceDate, setReferenceDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'CALENDAR' | 'FORECAST' | 'HISTORY'>('CALENDAR');
@@ -23,6 +26,11 @@ export default function PaymentsPage() {
     const [partialAmount, setPartialAmount] = useState('');
     const [selectedEventForPayment, setSelectedEventForPayment] = useState<any>(null);
 
+    // Contractor Payment Modal
+    const [isContractorPaymentModalOpen, setIsContractorPaymentModalOpen] = useState(false);
+    const [selectedContractorId, setSelectedContractorId] = useState('');
+    const [contractorPaymentAmount, setContractorPaymentAmount] = useState('');
+
     // Edit Date State
     const [isEditDateModalOpen, setIsEditDateModalOpen] = useState(false);
     const [newPaymentDate, setNewPaymentDate] = useState('');
@@ -32,6 +40,61 @@ export default function PaymentsPage() {
     const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<any>(null);
     const [activeProposalDetails, setActiveProposalDetails] = useState<any>(null);
     const [loadingProposal, setLoadingProposal] = useState(false);
+
+    // Manual Transaction Modal State
+    const [isManualTransactionModalOpen, setIsManualTransactionModalOpen] = useState(false);
+    const [manualType, setManualType] = useState<'IN' | 'OUT'>('IN');
+    const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+    const [manualAmount, setManualAmount] = useState('');
+    const [manualDescription, setManualDescription] = useState('');
+    const [manualEntityId, setManualEntityId] = useState(''); // ClientId or ContractorId
+
+    const handleOpenManualTransaction = (type: 'IN' | 'OUT') => {
+        setManualType(type);
+        setManualDate(new Date().toISOString().split('T')[0]);
+        setManualAmount('');
+        setManualDescription('');
+        setManualEntityId('');
+        setIsManualTransactionModalOpen(true);
+    };
+
+    const submitManualTransaction = async () => {
+        if (!manualAmount || !manualEntityId) return;
+
+        try {
+            if (manualType === 'IN') {
+                 // Creating Payment (Income)
+                 await db.payments.create({
+                     clientId: manualEntityId,
+                     amount: parseFloat(manualAmount),
+                     date: new Date(manualDate).toISOString(),
+                     notes: manualDescription,
+                     type: 'FULL' // Assume full for manual entry or generic
+                 });
+            } else {
+                // Creating ContractorPayment (Expense)
+                await db.contractorPayments.create({
+                    contractor_id: manualEntityId,
+                    amount: parseFloat(manualAmount),
+                    date: new Date(manualDate).toISOString(),
+                    description: manualDescription
+                    // client_id optional, skipping for generic manual entry
+                });
+            }
+
+            // Reload Data
+            const [paymentsData, contractorPaymentsData] = await Promise.all([
+                db.payments.getAll(),
+                db.contractorPayments.getAll()
+            ]);
+            setPayments(paymentsData);
+            setContractorPayments(contractorPaymentsData);
+            setIsManualTransactionModalOpen(false);
+        } catch (e) {
+            console.error(e);
+            alert("Error al crear transacción");
+        }
+    };
 
     const handleEventClick = async (event: any) => {
         setSelectedPaymentDetail(event);
@@ -70,6 +133,7 @@ export default function PaymentsPage() {
         }
     };
 
+
     // Close context menu on click elsewhere
     useEffect(() => {
         const handleClick = () => setContextMenu(null);
@@ -79,12 +143,16 @@ export default function PaymentsPage() {
 
     useEffect(() => {
         const load = async () => {
-            const [projectsData, paymentsData] = await Promise.all([
+            const [projectsData, paymentsData, contractorsData, contractorPaymentsData] = await Promise.all([
                 db.projects.getAll(),
-                db.payments.getAll()
+                db.payments.getAll(),
+                db.contractors.getAll(),
+                db.contractorPayments.getAll()
             ]);
             setProjects(projectsData);
             setPayments(paymentsData);
+            setContractors(contractorsData);
+            setContractorPayments(contractorPaymentsData);
             setLoading(false);
         };
         load();
@@ -115,54 +183,88 @@ export default function PaymentsPage() {
         const eventYear = date.getFullYear();
         const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number, date?: Date }[] = [];
 
-        // Incoming: Client Billings
+        // 1. ACTUAL PAYMENTS (IN) - Show on specific date
+        payments.forEach(pay => {
+            const payDate = new Date(pay.date);
+            if (payDate.getDate() === day && payDate.getMonth() === eventMonth && payDate.getFullYear() === eventYear) {
+                const clientName = pay.client?.name || projects.find(p => p.id === pay.client_id || p.id === pay.clientId)?.name || 'Cliente';
+                events.push({
+                    type: 'IN',
+                    label: clientName,
+                    amount: pay.amount,
+                    projectId: pay.client_id || pay.clientId,
+                    paid: true,
+                    paymentId: pay.id,
+                    paymentAmount: pay.amount,
+                    date: date
+                });
+            }
+        });
+
+        // 2. ACTUAL EXPENSES (OUT) - Show on specific date
+        contractorPayments.forEach(cp => {
+            const cpDate = new Date(cp.date);
+            if (cpDate.getDate() === day && cpDate.getMonth() === eventMonth && cpDate.getFullYear() === eventYear) {
+                 const contractorName = contractors.find(c => c.id === cp.contractor_id)?.name || 'Socio';
+                 events.push({
+                     type: 'OUT',
+                     label: contractorName,
+                     amount: cp.amount,
+                     projectId: cp.client_id, // Might be null
+                     paid: true,
+                     paymentId: cp.id,
+                     paymentAmount: cp.amount,
+                     date: date
+                 });
+            }
+        });
+
+        // 3. PROJECTED INCOME (IN) - Only show if NOT paid fully
         activeProjects.forEach(p => {
-            // 1. Check Project Duration
+            // Check Dates
             const projectStart = new Date(p.createdAt);
-            projectStart.setHours(0, 0, 0, 0); // Normalize to start of day
-
+            projectStart.setHours(0, 0, 0, 0);
             const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
-            if (projectEnd) projectEnd.setHours(23, 59, 59, 999); // Normalize to end of day
+            if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
 
-            // If date is before project start, skip
             if (date < projectStart) return;
-
-            // If date is after project end, skip
             if (projectEnd && date > projectEnd) return;
 
+            // Billing Day
             const billDay = p.billingDay || 1;
             if (billDay === day) {
-                // Check if paid in this month
-                const payment = payments.find(pay => {
-                    const payDate = new Date(pay.date);
-                    const isSameMonth = payDate.getMonth() === eventMonth && payDate.getFullYear() === eventYear;
-                    const isSameClient = (pay.clientId === p.id) || (pay.client_id === p.id);
-                    return isSameClient && isSameMonth;
-                });
+                // Check valid payments for this month
+                const paidAmount = payments
+                    .filter(pay => {
+                        const payDate = new Date(pay.date);
+                        return (pay.clientId === p.id || pay.client_id === p.id) && payDate.getMonth() === eventMonth && payDate.getFullYear() === eventYear;
+                    })
+                    .reduce((acc, pay) => acc + pay.amount, 0);
+                
+                // If fully paid, DON'T show projection (Actuals are already shown)
+                // If partially paid, show remainder? 
+                // Let's simpler: If Paid Amount >= Monthly Revenue, don't show projection.
+                if (paidAmount >= p.monthlyRevenue) return;
 
-                const isPaid = !!payment;
-                const paidAmount = payment ? payment.amount : 0;
+                const remaining = p.monthlyRevenue - paidAmount;
                 
                 events.push({ 
                     type: 'IN', 
-                    label: p.name, 
-                    amount: p.monthlyRevenue, 
+                    label: `${p.name} (Pendiente)`, 
+                    amount: remaining, 
                     projectId: p.id,
-                    paid: isPaid,
-                    paymentId: payment?.id,
+                    paid: false,
                     paymentAmount: paidAmount,
                     date: date // Pass the calendar date
                 });
             }
         });
 
-        // Outgoing: Partner Payments (Estimated on day 5)
+        // 4. PROJECTED EXPENSES (OUT) - Only show if NOT paid
         if (day === 5) {
             activeProjects.forEach(p => {
-                // Check Project Duration for Outgoing too
                 const projectStart = new Date(p.createdAt);
                 projectStart.setHours(0, 0, 0, 0);
-
                 const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
                 if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
 
@@ -170,17 +272,31 @@ export default function PaymentsPage() {
                 if (projectEnd && date > projectEnd) return;
 
                 if (p.outsourcingCost && p.outsourcingCost > 0) {
+                     const paidAmount = contractorPayments
+                        .filter(cp => {
+                            const cpDate = new Date(cp.date);
+                            return cp.client_id === p.id && cpDate.getMonth() === eventMonth && cpDate.getFullYear() === eventYear;
+                        })
+                        .reduce((sum, cp) => sum + cp.amount, 0);
+
+                    if (paidAmount >= p.outsourcingCost) return;
+
+                    const remaining = p.outsourcingCost - paidAmount;
+
                     events.push({ 
                         type: 'OUT', 
-                        label: `Socio (${p.name})`, 
-                        amount: p.outsourcingCost,
+                        label: `Socio (${p.name}) (Pendiente)`, 
+                        amount: remaining,
+                        projectId: p.id,
+                        paid: false,
+                        paymentAmount: paidAmount,
                         date: date 
                     });
                 }
             });
         }
         
-        // Internal Costs (Day 1)
+        // Internal Costs (Day 1) - Keep as is (Projections)
         if (day === 1) {
             activeProjects.forEach(p => {
                 if (p.internalCost && p.internalCost > 0) {
@@ -249,7 +365,8 @@ export default function PaymentsPage() {
     const handleContextMenu = (e: React.MouseEvent, event: any) => {
         e.preventDefault();
         e.stopPropagation();
-        if (event.type !== 'IN') return; // Only for income
+        // Allow context menu for both IN and OUT if they have paymentId (Manual/Actual transactions)
+        if (!event.paymentId && event.type !== 'IN') return; 
         
         let x = e.clientX;
         let y = e.clientY;
@@ -302,11 +419,24 @@ export default function PaymentsPage() {
     const handleDeletePayment = async () => {
         if (!contextMenu?.event?.paymentId) return;
         
-        if (!confirm('¿Desmarcar este pago? Se eliminará el registro.')) return;
+        if (!confirm('¿Eliminar esta transacción? Esta acción no se puede deshacer.')) return;
         
-        await db.payments.delete(contextMenu.event.paymentId);
-        const paymentsData = await db.payments.getAll();
-        setPayments(paymentsData);
+        try {
+            if (contextMenu.event.type === 'IN') {
+                 await db.payments.delete(contextMenu.event.paymentId);
+                 const paymentsData = await db.payments.getAll();
+                 setPayments(paymentsData);
+                 alert("Ingreso eliminado");
+            } else {
+                 await db.contractorPayments.delete(contextMenu.event.paymentId);
+                  const contractorPaymentsData = await db.contractorPayments.getAll();
+                 setContractorPayments(contractorPaymentsData);
+                 alert("Gasto eliminado");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error al eliminar");
+        }
         setContextMenu(null);
     };
 
@@ -386,6 +516,60 @@ export default function PaymentsPage() {
     };
 
 
+
+    const handleMarkContractorPaid = () => {
+        if (!contextMenu?.event) return;
+        const evt = contextMenu.event;
+        
+        // Pre-fill amount
+        setContractorPaymentAmount(evt.amount.toString());
+        // Try to find if there is only one contractor assigned, otherwise empty
+        setSelectedContractorId('');
+        
+        setIsContractorPaymentModalOpen(true);
+        setContextMenu(null);
+    };
+
+    const openContractorPaymentModal = () => {
+         if (!contextMenu?.event) return;
+         setSelectedEventForPayment(contextMenu.event);
+         // Calculate remaining amount
+         const remaining = contextMenu.event.amount - (contextMenu.event.paymentAmount || 0);
+         setContractorPaymentAmount(remaining > 0 ? remaining.toString() : '0');
+         setIsContractorPaymentModalOpen(true);
+         setContextMenu(null);
+    };
+
+    const submitContractorPayment = async () => {
+        if (!selectedContractorId || !contractorPaymentAmount || !selectedEventForPayment) return;
+
+        try {
+            await db.contractorPayments.create({
+                contractor_id: selectedContractorId,
+                client_id: selectedEventForPayment.projectId,
+                amount: parseFloat(contractorPaymentAmount),
+                date: selectedEventForPayment.date ? new Date(selectedEventForPayment.date).toISOString() : new Date().toISOString(),
+                description: 'Pago a cuenta de proyecto'
+            });
+
+            // Reload
+            const [paymentsData, contractorPaymentsData] = await Promise.all([
+                db.payments.getAll(),
+                db.contractorPayments.getAll()
+            ]);
+            setPayments(paymentsData);
+            setContractorPayments(contractorPaymentsData);
+            
+            setIsContractorPaymentModalOpen(false);
+            setContractorPaymentAmount('');
+            setSelectedContractorId('');
+            setSelectedEventForPayment(null);
+        } catch (e) {
+            console.error(e);
+            alert('Error al registrar pago');
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 h-full flex flex-col">
             
@@ -399,22 +583,29 @@ export default function PaymentsPage() {
                 
                 <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-xl flex">
                     <button 
+                        onClick={() => handleOpenManualTransaction('IN')} 
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all mr-2 shadow-lg"
+                    >
+                        <DollarSign className="w-4 h-4" /> Registrar Transacción
+                    </button>
+
+                    <button 
                         onClick={() => setViewMode('CALENDAR')} 
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
-                        <CalendarRange className="w-4 h-4" /> Calendario
+                        <CalendarRange className="w-4 h-4" />
                     </button>
                     <button 
                         onClick={() => setViewMode('FORECAST')} 
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'FORECAST' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
-                        <TrendingUp className="w-4 h-4" /> Proyección
+                        <TrendingUp className="w-4 h-4" /> 
                     </button>
                     <button 
                         onClick={() => setViewMode('HISTORY')} 
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
                     >
-                        <History className="w-4 h-4" /> Historial
+                        <History className="w-4 h-4" /> 
                     </button>
                 </div>
             </div>
@@ -768,16 +959,29 @@ export default function PaymentsPage() {
                 >
                     <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 mb-1">
                         <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{contextMenu.event.label}</p>
-                        <p className="text-[10px] text-gray-500">Acciones de Pago</p>
+                        <p className="text-[10px] text-gray-500">Acciones</p>
                     </div>
                     
-                    <button onClick={() => handleMarkAsPaid('FULL')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2">
-                        <Check className="w-4 h-4" /> Pagó Completo
-                    </button>
-                    <button onClick={() => handleMarkAsPaid('PARTIAL')} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex items-center gap-2">
-                        <DollarSign className="w-4 h-4" /> Pagó Parcial...
-                    </button>
-                    <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                    {contextMenu.event.type === 'IN' && (
+                        <>
+                            <button onClick={() => handleMarkAsPaid('FULL')} className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-2">
+                                <Check className="w-4 h-4" /> Pagó Completo
+                            </button>
+                            <button onClick={() => handleMarkAsPaid('PARTIAL')} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" /> Pagó Parcial...
+                            </button>
+                            <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                        </>
+                    )}
+
+                    {contextMenu.event.type === 'OUT' && (
+                        <>
+                            <button onClick={openContractorPaymentModal} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" /> Registrar Pago Socio
+                            </button>
+                             <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                        </>
+                    )}
                     
                     {contextMenu.event.paymentId && (
                         <>
@@ -841,6 +1045,114 @@ export default function PaymentsPage() {
                     <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setIsEditDateModalOpen(false)}>Cancelar</Button>
                         <Button onClick={handleUpdatePaymentDateAction}>Guardar Cambios</Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL PAGO A CONTRATISTA */}
+            <Modal isOpen={isContractorPaymentModalOpen} onClose={() => setIsContractorPaymentModalOpen(false)} title="Registrar Pago a Socio">
+                <div className="space-y-4">
+                    <div>
+                        <Label>Socio / Contratista</Label>
+                        <Select 
+                            value={selectedContractorId} 
+                            onChange={(e) => setSelectedContractorId(e.target.value)}
+                        >
+                            <option value="">Seleccionar...</option>
+                            {contractors.map(c => (
+                                <option key={c.id} value={c.id}>{c.name} ({c.role})</option>
+                            ))}
+                        </Select>
+                    </div>
+                    <div>
+                        <Label>Monto a Pagar</Label>
+                        <Input 
+                            type="number" 
+                            value={contractorPaymentAmount} 
+                            onChange={(e) => setContractorPaymentAmount(e.target.value)} 
+                        />
+                    </div>
+                    <div className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
+                        <p className="text-xs text-gray-500">Proyecto Asociado</p>
+                        <p className="font-bold text-gray-900 dark:text-white">
+                            {projects.find(p => p.id === selectedEventForPayment?.projectId)?.name || 'Desconocido'}
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="ghost" onClick={() => setIsContractorPaymentModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={submitContractorPayment} disabled={!selectedContractorId || !contractorPaymentAmount}>
+                             Registrar Pago
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL MANUAL TRANSACTION */}
+            <Modal isOpen={isManualTransactionModalOpen} onClose={() => setIsManualTransactionModalOpen(false)} title="Registrar Transacción">
+                <div className="space-y-4">
+                    <div className="flex gap-2 mb-4">
+                        <button 
+                            onClick={() => setManualType('IN')}
+                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'IN' ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-500 text-emerald-700 dark:text-emerald-300' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'}`}
+                        >
+                            Ingreso (Cobro)
+                        </button>
+                        <button 
+                            onClick={() => setManualType('OUT')}
+                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'OUT' ? 'bg-red-100 dark:bg-red-900 border-red-500 text-red-700 dark:text-red-300' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'}`}
+                        >
+                            Salida (Pago)
+                        </button>
+                    </div>
+
+                    <div>
+                        <Label>{manualType === 'IN' ? 'Cliente' : 'Socio / Contratista'}</Label>
+                        <Select 
+                            value={manualEntityId} 
+                            onChange={(e) => setManualEntityId(e.target.value)}
+                        >
+                            <option value="">Seleccionar...</option>
+                            {manualType === 'IN' 
+                                ? projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                                : contractors.map(c => <option key={c.id} value={c.id}>{c.name} ({c.role})</option>)
+                            }
+                        </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Monto</Label>
+                            <Input 
+                                type="number" 
+                                value={manualAmount} 
+                                onChange={(e) => setManualAmount(e.target.value)}
+                                placeholder="0.00"
+                            />
+                        </div>
+                        <div>
+                            <Label>Fecha</Label>
+                            <Input 
+                                type="date" 
+                                value={manualDate} 
+                                onChange={(e) => setManualDate(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label>Descripción / Notas</Label>
+                        <Input 
+                            value={manualDescription} 
+                            onChange={(e) => setManualDescription(e.target.value)}
+                            placeholder={manualType === 'IN' ? 'Ej: Pago Mensual Marzo' : 'Ej: Pago por Diseño Web'}
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-slate-800">
+                        <Button variant="ghost" onClick={() => setIsManualTransactionModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={submitManualTransaction} disabled={!manualEntityId || !manualAmount}>
+                             Guardar Transacción
+                        </Button>
                     </div>
                 </div>
             </Modal>

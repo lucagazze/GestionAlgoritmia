@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role, ContentIdea } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role, ContentIdea, ContractorPayment } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -321,33 +321,59 @@ export const db = {
   
   projects: {
     getAll: async (): Promise<Project[]> => {
-      const { data, error } = await supabase.from('Client').select('*');
+      // Fetch Clients with their Proposals and Items to calculate outsourcing cost dynamically
+      const { data, error } = await supabase
+        .from('Client')
+        .select(`
+            *,
+            proposals:Proposal(
+                id,
+                status,
+                items:ProposalItem(outsourcingCost)
+            )
+        `);
+
       if (error) {
         console.error('Supabase Error (Client):', error);
         return [];
       }
-      return (data || []).map((c: any) => ({
-        ...c,
-        status: c.status || ProjectStatus.ACTIVE,
-        monthlyRevenue: c.monthlyRevenue || 0,
-        billingDay: c.billingDay || 1,
-        notes: c.notes || '',
-        phone: c.phone || '',
-        outsourcingCost: c.outsourcingCost || 0,
-        assignedPartnerId: c.assignedPartnerId || null,
-        proposalUrl: c.proposalUrl || '',
-        healthScore: c.healthScore || 'GOOD',
-        lastPaymentDate: c.lastPaymentDate || null,
-        lastContactDate: c.lastContactDate || null,
-        resources: c.resources || [],
-        contacts: c.contacts || [],
-        brandColors: c.brandColors || [],
-        brandFonts: c.brandFonts || [],
-        internalCost: c.internalCost || 0,
-        publicToken: c.publicToken || '',
-        progress: c.progress || 0,
-        growthStrategy: c.growthStrategy || ''
-      }));
+
+      return (data || []).map((c: any) => {
+        // Calculate outsourcing cost from active proposal if Client value is 0 or missing
+        let calculatedOutsourcing = c.outsourcingCost || 0;
+        
+        if (c.proposals && Array.isArray(c.proposals)) {
+            const activeProposal = c.proposals.find((p: any) => p.status === 'ACCEPTED');
+            if (activeProposal && activeProposal.items) {
+                const sum = activeProposal.items.reduce((acc: number, item: any) => acc + (item.outsourcingCost || 0), 0);
+                // Prefer calculated sum if it exists, assuming it's more granular/recent
+                if (sum > 0) calculatedOutsourcing = sum;
+            }
+        }
+
+        return {
+            ...c,
+            status: c.status || ProjectStatus.ACTIVE,
+            monthlyRevenue: c.monthlyRevenue || 0,
+            billingDay: c.billingDay || 1,
+            notes: c.notes || '',
+            phone: c.phone || '',
+            outsourcingCost: calculatedOutsourcing,
+            assignedPartnerId: c.assignedPartnerId || null,
+            proposalUrl: c.proposalUrl || '',
+            healthScore: c.healthScore || 'GOOD',
+            lastPaymentDate: c.lastPaymentDate || null,
+            lastContactDate: c.lastContactDate || null,
+            resources: c.resources || [],
+            contacts: c.contacts || [],
+            brandColors: c.brandColors || [],
+            brandFonts: c.brandFonts || [],
+            internalCost: c.internalCost || 0,
+            publicToken: c.publicToken || '',
+            progress: c.progress || 0,
+            growthStrategy: c.growthStrategy || ''
+        };
+      });
     },
     getByToken: async (token: string): Promise<Project | null> => {
          const { data, error } = await supabase.from('Client').select('*').eq('publicToken', token).maybeSingle();
@@ -404,6 +430,11 @@ export const db = {
          };
     },
     create: async (data: Partial<Project>): Promise<Project> => {
+      // 🧠 LOGIC: If created as ACTIVE, set billing day to today if not provided
+      if (data.status === ProjectStatus.ACTIVE && !data.billingDay) {
+          data.billingDay = new Date().getDate();
+      }
+      
       const { data: created, error } = await supabase.from('Client').insert(data).select().single();
       if (error) throw error;
 
@@ -433,6 +464,15 @@ export const db = {
       
       // 1. Separar los datos que van a la tabla Client (Proyecto)
       const clientData = { ...data };
+      
+      // 🧠 LOGIC: If activating context, reset billing day to today
+      if (data.status === ProjectStatus.ACTIVE) {
+          const today = new Date();
+          clientData.billingDay = today.getDate();
+          console.log(`🔄 Reactivating Project: Setting billing day to ${today.getDate()}`);
+      }
+
+      // Eliminamos los campos que no existen en la tabla Client para evitar errores
       // Eliminamos los campos que no existen en la tabla Client para evitar errores
       delete clientData.targetAudience;
       delete clientData.contextProblem;
@@ -830,7 +870,13 @@ export const db = {
         // F. Activar Cliente y CALCULAR FECHA FIN
         if (proposal.clientId) {
             // Calcular fecha fin: StartDate (o Hoy) + Duration (Meses)
-            const start = startDate ? new Date(startDate) : new Date();
+            let start = new Date();
+            if (startDate) {
+                // 🧠 FIX: Parse 'YYYY-MM-DD' as local date to preserve the selected day
+                const [y, m, d] = startDate.split('-').map(Number);
+                start = new Date(y, m - 1, d);
+            }
+            
             const endDate = new Date(start);
             endDate.setMonth(endDate.getMonth() + finalDuration);
             
@@ -1206,9 +1252,27 @@ export const db = {
         const { error } = await supabase.from('Payment').update(data).eq('id', id);
         if (error) throw error;
     },
-    
     delete: async (id: string): Promise<void> => {
         const { error } = await supabase.from('Payment').delete().eq('id', id);
+        if (error) throw error;
+    }
+  },
+
+  contractorPayments: {
+    getAll: async (): Promise<ContractorPayment[]> => {
+        // We use quote because table name is case sensitive in DB as "ContractorPayment"
+        return handleResponse<ContractorPayment>(supabase.from('ContractorPayment').select('*').order('date', { ascending: false }));
+    },
+    create: async (data: Omit<ContractorPayment, 'id' | 'created_at'>): Promise<ContractorPayment> => {
+        const { data: created, error } = await supabase.from('ContractorPayment').insert({
+            ...data,
+            created_at: new Date().toISOString()
+        }).select().single();
+        if (error) throw error;
+        return created;
+    },
+    delete: async (id: string): Promise<void> => {
+        const { error } = await supabase.from('ContractorPayment').delete().eq('id', id);
         if (error) throw error;
     }
   },
