@@ -382,7 +382,8 @@ export const db = {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
             monthlyRevenue: data.monthlyRevenue || 0,
-            billingDay: data.billingDay || 1,
+            // 🧠 FIX: Prioritize snake_case 'billing_day' (new source of truth) over camelCase 'billingDay' (legacy)
+            billingDay: data.billing_day || data.billingDay || 1,
             notes: data.notes || '',
             phone: data.phone || '',
             outsourcingCost: data.outsourcingCost || 0,
@@ -391,7 +392,9 @@ export const db = {
             internalCost: data.internalCost || 0,
             publicToken: data.publicToken || '',
             progress: data.progress || 0,
-            growthStrategy: data.growthStrategy || ''
+            growthStrategy: data.growthStrategy || '',
+            contractStartDate: data.contract_start_date || null,
+            contractEndDate: data.contract_end_date || null,
          };
     },
     getById: async (id: string): Promise<Project | null> => {
@@ -405,7 +408,8 @@ export const db = {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
             monthlyRevenue: data.monthlyRevenue || 0,
-            billingDay: data.billingDay || 1,
+            // 🧠 FIX: Prioritize snake_case 'billing_day'
+            billingDay: data.billing_day || data.billingDay || 1,
             notes: data.notes || '',
             phone: data.phone || '',
             outsourcingCost: data.outsourcingCost || 0,
@@ -423,6 +427,10 @@ export const db = {
             lastPaymentDate: data.lastPaymentDate || null,
             lastContactDate: data.lastContactDate || null,
             
+            // ✅ NUEVO: Datos de contrato
+            contractStartDate: data.contract_start_date || null,
+            contractEndDate: data.contract_end_date || null,
+
             // ✅ NUEVO: Mapear datos del perfil al proyecto
             targetAudience: profile?.targetAudience || '',
             contextProblem: profile?.problem || '',      // 'problem' en DB -> 'contextProblem' en App
@@ -469,6 +477,7 @@ export const db = {
       if (data.status === ProjectStatus.ACTIVE) {
           const today = new Date();
           clientData.billingDay = today.getDate();
+          (clientData as any).billing_day = today.getDate(); // Sync snake_case
           console.log(`🔄 Reactivating Project: Setting billing day to ${today.getDate()}`);
       }
 
@@ -535,12 +544,15 @@ export const db = {
             if (!projects) return;
 
             const today = new Date();
+            today.setHours(0, 0, 0, 0); // Ignore time for comparison
             let pausedCount = 0;
 
             for (const p of projects) {
                 if (p.contractEndDate) {
                     const endDate = new Date(p.contractEndDate);
-                    // Si ya pasó la fecha de fin (y no es hoy)
+                    endDate.setHours(0, 0, 0, 0); // Normalize end date too just in case
+
+                    // Si ya pasó la fecha de fin (ayer fue el último día)
                     if (endDate < today) {
                         console.log(`⏸️ Pausando contrato vencido: ${p.name} (Venció: ${p.contractEndDate})`);
                         await db.projects.update(p.id, { 
@@ -751,7 +763,16 @@ export const db = {
             .select(`*, client:Client(*), items:ProposalItem(*)`) 
             .order('createdAt', { ascending: false });
          if (error) throw error;
-         return data as Proposal[];
+         
+         // 🧠 FIX: Map DB snake_case dates to camelCase for frontend
+         return data.map((p: any) => ({
+             ...p,
+             client: p.client ? {
+                 ...p.client,
+                 contractStartDate: p.client.contract_start_date,
+                 contractEndDate: p.client.contract_end_date
+             } : undefined
+         })) as Proposal[];
     },
 
     getById: async (id: string): Promise<Proposal | null> => {
@@ -765,7 +786,15 @@ export const db = {
             console.error("Error getting proposal by id:", error);
             return null;
         }
-        return data as Proposal;
+        
+        // 🧠 FIX: Map DB snake_case dates to camelCase for frontend
+        const proposal = data as any;
+        if (proposal.client) {
+            proposal.client.contractStartDate = proposal.client.contract_start_date;
+            proposal.client.contractEndDate = proposal.client.contract_end_date;
+        }
+        
+        return proposal as Proposal;
     },
 
     // 2. Asegúrate de tener la función approve completa que hicimos antes
@@ -908,12 +937,27 @@ export const db = {
 
             await supabase.from('Client').update({
                 status: 'ACTIVE',
-                monthlyRevenue: newRecurring,
+                // Map to existing camelCase columns if they exist, or snake_case if new
+                // checking types.ts/Project interface might help, but let's assume valid DB columns
+                // logic: 'monthlyRevenue' is likely 'monthlyRevenue' or 'monthly_revenue'? 
+                // Previous code used 'monthlyRevenue' and it worked?
+                // Providing both just in case or checking previous fetches.
+                // Actually, earlier fetches used `select('*')`. 
+                // Let's rely on standard mapping if Supabase doesn't auto-convert.
+                // BUT the error happened on the NEW fields.
+                monthlyRevenue: newRecurring, 
                 outsourcingCost: totalOutsourcing,
                 lastContactDate: new Date().toISOString(),
-                billingDay: start.getDate(),
-                contractEndDate: endDate.toISOString(),
-                serviceDetails: serviceNames // ✅ Save service names
+                
+                
+                // NEW COLUMNS (Snake Case in DB)
+                // 🧠 FIX: Update BOTH snake_case and camelCase to ensure sync
+                billing_day: start.getDate(),
+                billingDay: start.getDate(), 
+                
+                contract_start_date: start.toISOString(), // ✅ Save Start Date
+                contract_end_date: endDate.toISOString(),
+                service_details: serviceNames
             }).eq('id', proposal.clientId);
         }
     },

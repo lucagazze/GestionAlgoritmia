@@ -3,11 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Proposal, Contractor, ProposalStatus } from '../types';
 import { Button, Input, Card, Badge, Modal, Label } from '../components/UIComponents';
-import { 
-  FileText, Plus, CheckCircle2, XCircle, Clock, 
-  Search, MoreVertical, Send, AlertCircle, Loader2, 
-  Wallet, User, Calendar, Briefcase, Edit, ArrowRight, Eye, Trash2 // Importamos Trash2
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Filter, Plus, Search, Trash2, Calendar, FileText, Briefcase, ExternalLink, RefreshCw, Loader2, Bot, SlidersHorizontal, Eye, CheckCircle2, Clock, XCircle, AlertCircle, TrendingUp, Edit, MoreVertical } from 'lucide-react';
+import { generateProposalPDF, generatePartnerPDF } from '../services/pdfGenerator';
 import { useToast } from '../components/Toast';
 
 export default function QuotationsPage() {
@@ -439,11 +436,39 @@ export default function QuotationsPage() {
                                 <div className="flex items-center gap-2 mt-1">
                                     {getStatusBadge(selectedDetailProposal.status)}
                                     <span className="text-sm text-gray-500">Duración: <b>{fin.duration} meses</b></span>
+                                    {selectedDetailProposal.client?.contractStartDate && (
+                                        <div className="flex items-center gap-1 text-sm text-gray-500 ml-2 border-l pl-2 border-gray-300">
+                                            <Calendar className="w-3 h-3" />
+                                            <span>Inicio: <b>{new Date(selectedDetailProposal.client.contractStartDate).toLocaleDateString()}</b></span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
-                                <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">${fin.totalContractRevenue.toLocaleString()}</p>
+                            <div className="text-right flex flex-col items-end gap-2">
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
+                                    <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">${fin.totalContractRevenue.toLocaleString()}</p>
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                     <Button size="sm" variant="outline" onClick={() => generateProposalPDF(selectedDetailProposal)}>
+                                         <Download className="w-4 h-4 mr-2" /> PDF Propuesta
+                                     </Button>
+                                     {/* Botones de Socios */}
+                                     {Object.values(
+                                         selectedDetailProposal.items.filter(i => i.assignedContractorId && i.outsourcingCost > 0).reduce((acc, item) => {
+                                             if (item.assignedContractorId && !acc[item.assignedContractorId]) {
+                                                 const contractor = contractors.find(c => c.id === item.assignedContractorId);
+                                                 if (contractor) acc[item.assignedContractorId] = { contractor, items: [] };
+                                             }
+                                             if (acc[item.assignedContractorId]) acc[item.assignedContractorId].items.push(item);
+                                             return acc;
+                                         }, {} as Record<string, { contractor: any, items: any[] }>)
+                                     ).map(({ contractor, items }) => (
+                                         <Button key={contractor.id} size="sm" variant="outline" className="border-gray-200 text-gray-600" onClick={() => generatePartnerPDF(selectedDetailProposal, contractor, items)}>
+                                             <FileText className="w-4 h-4 mr-2" /> PDF {contractor.name.split(' ')[0]}
+                                         </Button>
+                                     ))}
+                                </div>
                             </div>
                         </div>
                         {/* ... Grids de finanzas ... */}
@@ -459,6 +484,37 @@ export default function QuotationsPage() {
                             <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Mensualidad</p>
                                 <p className="text-2xl font-bold text-gray-900 dark:text-white">${fin.revenueRecurring.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Servicios Incluidos */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden">
+                            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
+                                <h3 className="font-bold text-gray-900 dark:text-white text-sm">Servicios Incluidos</h3>
+                            </div>
+                            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                                {selectedDetailProposal.items?.map((item: any) => (
+                                    <div key={item.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
+                                                <Briefcase className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
+                                                {item.serviceSnapshotDescription && <p className="text-xs text-gray-500">{item.serviceSnapshotDescription}</p>}
+                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                    {item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Pago Único'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-gray-900 dark:text-white">${item.serviceSnapshotCost.toLocaleString()}</p>
+                                            {item.outsourcingCost > 0 && (
+                                                <p className="text-xs text-red-500 font-medium">Outsourcing: ${item.outsourcingCost.toLocaleString()}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 

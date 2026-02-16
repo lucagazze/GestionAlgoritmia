@@ -67,6 +67,9 @@ export interface Client {
   phone?: string; 
   location?: string;
   createdAt: Date;
+  // Optional contract fields for proposal display
+  contractStartDate?: string;
+  contractEndDate?: string;
 }
 
 export interface Project extends Client {
@@ -86,6 +89,7 @@ export interface Project extends Client {
   healthScore?: ClientHealth;
   lastPaymentDate?: string;
   contractEndDate?: string; // ✅ NUEVO: Fecha fin de contrato para auto-pause
+  contractStartDate?: string; // ✅ NUEVO: Fecha inicio de contrato (Reactivación)
   lastContactDate?: string;   // Ghosting Monitor
   resources?: ProjectResource[];
   contacts?: ProjectContact[];

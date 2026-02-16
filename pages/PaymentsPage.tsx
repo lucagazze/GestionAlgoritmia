@@ -14,6 +14,19 @@ export default function PaymentsPage() {
     const [contractors, setContractors] = useState<Contractor[]>([]);
     const [contractorPayments, setContractorPayments] = useState<ContractorPayment[]>([]);
 
+    interface CalendarEvent {
+        type: 'IN' | 'OUT';
+        label: string;
+        amount: number;
+        projectId?: string;
+        paid?: boolean;
+        paymentId?: string;
+        paymentAmount?: number;
+        date?: Date;
+        notes?: string;
+        description?: string;
+    }
+
     const [referenceDate, setReferenceDate] = useState(new Date());
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'CALENDAR' | 'FORECAST' | 'HISTORY'>('CALENDAR');
@@ -154,6 +167,15 @@ export default function PaymentsPage() {
             setContractors(contractorsData);
             setContractorPayments(contractorPaymentsData);
             setLoading(false);
+
+            // 🐛 DEBUG: Check billingDay and dates
+            console.log("🐛 PAYMENTS PAGE DEBUG:", projectsData.map(p => ({
+                name: p.name,
+                status: p.status,
+                billingDay: p.billingDay,
+                contractStartDate: p.contractStartDate,
+                createdAt: p.createdAt
+            })));
         };
         load();
     }, []);
@@ -178,10 +200,10 @@ export default function PaymentsPage() {
     // Define getEventsForDate BEFORE monthlyTotals
     const getEventsForDate = (date: Date) => {
         if (!date) return [];
+        const events: CalendarEvent[] = [];
         const day = date.getDate();
         const eventMonth = date.getMonth();
         const eventYear = date.getFullYear();
-        const events: { type: 'IN' | 'OUT', label: string, amount: number, projectId?: string, paid?: boolean, paymentId?: string, paymentAmount?: number, date?: Date }[] = [];
 
         // 1. ACTUAL PAYMENTS (IN) - Show on specific date
         payments.forEach(pay => {
@@ -224,8 +246,10 @@ export default function PaymentsPage() {
         // 3. PROJECTED INCOME (IN) - Only show if NOT paid fully
         activeProjects.forEach(p => {
             // Check Dates
-            const projectStart = new Date(p.createdAt);
+            const pStart = p.contractStartDate ? new Date(p.contractStartDate) : new Date(p.createdAt);
+            const projectStart = new Date(pStart);
             projectStart.setHours(0, 0, 0, 0);
+            
             const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
             if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
 
@@ -951,9 +975,28 @@ export default function PaymentsPage() {
                                                             <p className="text-xs text-gray-500">{item.serviceSnapshotName}</p>
                                                         </div>
                                                     </div>
-                                                    <span className="font-bold text-red-500 text-lg">
-                                                        - ${item.outsourcingCost.toLocaleString()}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-red-500 text-lg">
+                                                            - ${item.outsourcingCost.toLocaleString()}
+                                                        </span>
+                                                        {item.contractor?.id && (
+                                                            <Button 
+                                                                size="sm" 
+                                                                className="h-7 px-2 text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+                                                                onClick={() => {
+                                                                    // Open Contractor Payment Modal pre-filled
+                                                                    setSelectedContractorId(item.contractor.id);
+                                                                    setContractorPaymentAmount(item.outsourcingCost.toString());
+                                                                    setIsContractorPaymentModalOpen(true);
+                                                                    setIsPaymentDetailModalOpen(false); // Close current modal? Or keep open? User preference.
+                                                                    // Usually easier to close invalidating `loadingProposal` state if we return.
+                                                                    // Let's close it to avoid modal stacking issues unless we handle z-index well.
+                                                                }}
+                                                            >
+                                                                Pagar
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         })}

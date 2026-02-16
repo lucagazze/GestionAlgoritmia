@@ -1,0 +1,18 @@
+--- Client Columns (31) ---
+id, name, industry, email, status, monthlyRevenue, billingDay, notes, createdAt, phone, outsourcingCost, assignedPartnerId, proposalUrl, healthScore, lastPaymentDate, lastContactDate, resources, contacts, brandColors, brandFonts, internalCost, publicToken, progress, growthStrategy, onboardingFee, contractEndDate, startDate, contract_end_date, billing_day, service_details, contract_start_date
+
+--- Data Sample ---
+Puertas Blindadas Jack: {"name":"Puertas Blindadas Jack","billing_day":24,"billingDay":16}
+Atermicos Pinamar: {"name":"Atermicos Pinamar","billing_day":null,"billingDay":5}
+Libreria Mayorista Leo: {"name":"Libreria Mayorista Leo","billing_day":null,"billingDay":14}
+Alejandro Pattone: {"name":"Alejandro Pattone","billing_day":null,"billingDay":25}
+Selecta Sa: {"name":"Selecta Sa","billing_day":null,"billingDay":3}
+Sunset Pools: {"name":"Sunset Pools","billing_day":null,"billingDay":1}
+Juan Tessari: {"name":"Juan Tessari","billing_day":null,"billingDay":1}
+Dr Suzi Fraga: {"name":"Dr Suzi Fraga","billing_day":null,"billingDay":1}
+Gestión Meta Ads - Ronald: {"name":"Gestión Meta Ads - Ronald","billing_day":null,"billingDay":1}
+Gestión de Meta Ads - Ronald: {"name":"Gestión de Meta Ads - Ronald","billing_day":null,"billingDay":1}
+Rocio Fuentes: {"name":"Rocio Fuentes","billing_day":null,"billingDay":23}
+Ronald - Doctor Rodilla: {"name":"Ronald - Doctor Rodilla","billing_day":18,"billingDay":9}
+Fagaz: {"name":"Fagaz","billing_day":null,"billingDay":4}
+Doctor Larrosa: {"name":"Doctor Larrosa","billing_day":null,"billingDay":1}
