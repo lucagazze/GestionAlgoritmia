@@ -196,7 +196,8 @@ export default function PaymentsPage() {
                     paid: true,
                     paymentId: pay.id,
                     paymentAmount: pay.amount,
-                    date: date
+                    date: date,
+                    notes: pay.notes // ✅ Add Notes
                 });
             }
         });
@@ -214,7 +215,8 @@ export default function PaymentsPage() {
                      paid: true,
                      paymentId: cp.id,
                      paymentAmount: cp.amount,
-                     date: date
+                     date: date,
+                     description: cp.description // ✅ Add Description
                  });
             }
         });
@@ -861,6 +863,14 @@ export default function PaymentsPage() {
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPaymentDetail.label}</h3>
                             <p className="text-sm text-gray-500">{new Date(selectedPaymentDetail.date || new Date()).toLocaleDateString()}</p>
                             <p className="text-3xl font-black text-indigo-600 mt-2">${selectedPaymentDetail.amount.toLocaleString()}</p>
+                            
+                            {/* DESCRIPTION / NOTES */}
+                            {(selectedPaymentDetail.notes || selectedPaymentDetail.description) && (
+                                <div className="mt-3 p-2 bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700 text-sm text-gray-600 dark:text-gray-300 italic">
+                                    "{selectedPaymentDetail.notes || selectedPaymentDetail.description}"
+                                </div>
+                            )}
+
                             <div className="flex justify-center gap-2 mt-2">
                                 {selectedPaymentDetail.paid && <Badge variant="green">Pagado</Badge>}
                                 {activeProposalDetails?.isSnapshot && <Badge variant="blue">Histórico</Badge>}
@@ -891,6 +901,27 @@ export default function PaymentsPage() {
                             <div className="py-10 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>
                         ) : activeProposalDetails ? (
                             <div className="space-y-4">
+                                {/* Services List */}
+                                <div>
+                                    <Label className="mb-2 block font-bold">Servicios Incluidos</Label>
+                                    <div className="space-y-2">
+                                        {activeProposalDetails.items?.map((item: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
+                                                        <Briefcase className="w-4 h-4"/>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
+                                                        {item.serviceSnapshotDescription && <p className="text-xs text-gray-500">{item.serviceSnapshotDescription}</p>}
+                                                    </div>
+                                                </div>
+                                                {/* Optional: Show cost if you want to be transparent, or hide it if it's internal */}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div>
                                     <Label className="mb-2 block font-bold">Distribución de Ingresos</Label>
                                     <div className="space-y-2">
@@ -910,12 +941,7 @@ export default function PaymentsPage() {
 
                                         {/* Socios (Loop Items) */}
                                         {activeProposalDetails.items?.filter((i: any) => i.outsourcingCost > 0).map((item: any, idx: number) => {
-                                            // Find contractor name (Assuming populated or we use ID)
-                                            // In our db.clients.getActiveProposal we joined contractor:assignedContractorId(*)
-                                            // BUT supabase join syntax might return array or object depending on relationship.
-                                            // Let's assume singular object 'contractor'
                                             const partnerName = item.contractor?.name || 'Socio';
-                                            
                                             return (
                                                 <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
                                                     <div className="flex items-center gap-3">
@@ -940,7 +966,7 @@ export default function PaymentsPage() {
                             </div>
                         ) : (
                             <div className="text-center py-4 text-gray-500">
-                                <p>No se encontraron detalles detallados del contrato activo.</p>
+                                <p>No se encontraron detalles del contrato activo.</p>
                             </div>
                         )}
 

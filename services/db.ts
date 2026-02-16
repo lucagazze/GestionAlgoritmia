@@ -807,12 +807,32 @@ export const db = {
     },
 
     // 1. Función para cambiar estado simple (ej: Rechazar o Poner en Espera)
+    // 1. Función para cambiar estado simple (ej: Rechazar o Poner en Espera)
     updateStatus: async (id: string, status: string): Promise<void> => {
         const { error } = await supabase
             .from('Proposal')
             .update({ status })
             .eq('id', id);
         if (error) throw error;
+
+        // 🧠 SYNC CLIENT STATUS
+        // If proposal is rejected or put on hold, update the client/project status too
+        // so it stops showing up in financial projections.
+        try {
+            const { data: proposal } = await supabase.from('Proposal').select('clientId').eq('id', id).single();
+            if (proposal?.clientId) {
+                let newClientStatus = '';
+                
+                if (status === 'REJECTED') newClientStatus = 'LOST';
+                if (status === 'SENT') newClientStatus = 'PAUSED'; // Or PROPOSAL/NEGOTIATION, but PAUSED stops billing
+
+                if (newClientStatus) {
+                    await supabase.from('Client').update({ status: newClientStatus }).eq('id', proposal.clientId);
+                }
+            }
+        } catch (e) {
+            console.error("Error syncing client status:", e);
+        }
     },
 
     approve: async (proposalId: string, acceptedItemIds: string[], assignments: Record<string, { contractorId: string, cost: number }> = {}, durationMonths?: number, startDate?: string): Promise<void> => {

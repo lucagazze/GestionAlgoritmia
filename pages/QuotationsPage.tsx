@@ -54,7 +54,7 @@ export default function QuotationsPage() {
     const [propsData, contsData, clientsData] = await Promise.all([
         db.proposals.getAll(),
         db.contractors.getAll(),
-        db.clients.getAll()
+        db.projects.getAll() // ✅ Use projects.getAll() as it returns clients/projects
     ]);
     setProposals(propsData);
     setContractors(contsData);
@@ -197,6 +197,7 @@ export default function QuotationsPage() {
       }
   };
 
+  const filteredProposals = proposals.filter(p => {
       const matchesClient = selectedClientId === 'ALL' || p.clientId === selectedClientId;
       
       let matchesTab = true;
@@ -410,7 +411,7 @@ export default function QuotationsPage() {
                 </div>
                 <div className="p-1 space-y-0.5">
                     <button onClick={handleApprovePartial} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4"/> Aprobar / Configurar
+                        <CheckCircle2 className="w-4 h-4"/> Aprobar / Reactivar
                     </button>
                     <button onClick={handleSetWaiting} className="w-full text-left px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg flex items-center gap-2">
                         <Clock className="w-4 h-4"/> En Espera
