@@ -277,7 +277,30 @@ export default function ProjectsPage() {
                       <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
                           {isLoading ? (<tr><td colSpan={6} className="text-center py-20 text-gray-400"><div className="animate-pulse">Cargando...</div></td></tr>) : 
                               filteredProjects.map((p) => {
-                                  const paid = isPaymentCurrent(p);
+                                  const getPaymentInfo = (proj: Project) => {
+                                      // 1. Check if paid this month
+                                      if (proj.lastPaymentDate) {
+                                          const last = new Date(proj.lastPaymentDate);
+                                          const now = new Date();
+                                          if (last.getMonth() === now.getMonth() && last.getFullYear() === now.getFullYear()) {
+                                              return { label: 'PAGADO', className: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' };
+                                          }
+                                      }
+                                      
+                                      // 2. Check if Overdue
+                                      const today = new Date().getDate();
+                                      const billingDay = proj.billingDay || 1;
+                                      
+                                      if (today > billingDay) {
+                                          return { label: 'VENCIDO', className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 animate-pulse' };
+                                      } else if (today === billingDay) {
+                                           return { label: 'VENCE HOY', className: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' };
+                                      } else {
+                                          return { label: 'PENDIENTE', className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' };
+                                      }
+                                  };
+
+                                  const paymentStatus = getPaymentInfo(p);
                                   const ghostStatus = getGhostingStatus(p.lastContactDate);
                                   return (
                                       <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} onContextMenu={(e) => handleContextMenu(e, p)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group">
@@ -294,9 +317,16 @@ export default function ProjectsPage() {
                                           <td className="px-4 py-2 text-right font-mono font-medium text-gray-700 dark:text-gray-300 text-xs">${p.monthlyRevenue.toLocaleString()}</td>
                                           <td className="px-4 py-2 text-center flex justify-center scale-90">{renderHealthBadge(p.healthScore || 'GOOD')}</td>
                                           <td className="px-4 py-2 text-center">
-                                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${paid ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 border-red-100 dark:border-red-800'}`}>
-                                                  {paid ? 'PAGADO' : 'PENDIENTE'}
-                                              </span>
+                                              <div className="flex flex-col items-center">
+                                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${paymentStatus.className}`}>
+                                                      {paymentStatus.label}
+                                                  </span>
+                                                  {paymentStatus.label !== 'PAGADO' && (
+                                                      <span className="text-[9px] text-gray-400 mt-0.5">
+                                                          Día {p.billingDay || 1}
+                                                      </span>
+                                                  )}
+                                              </div>
                                           </td>
                                           <td className="px-4 py-2 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-400 hover:text-black dark:hover:text-white transition-all"><Edit2 className="w-3 h-3" /></button></td>
                                       </tr>
