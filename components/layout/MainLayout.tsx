@@ -27,6 +27,7 @@ import QuotationsPage from '../../pages/QuotationsPage';
 import RolesPage from '../../pages/RolesPage';
 import ContentIdeasPage from '../../pages/ContentIdeasPage';
 import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage'; // ✅ ADDED
+import { GhostingAlert } from '../GhostingAlert';
 
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,6 +105,7 @@ export const MainLayout = () => {
             <>
               <AIActionCenter />
               <CommandPalette />
+              <GhostingAlert />
             </>
           )}
           
