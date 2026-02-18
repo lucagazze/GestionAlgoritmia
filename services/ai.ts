@@ -218,6 +218,9 @@ export const ai = {
   /**
    * Genera ideas o guiones específicos para Redes Sociales
    */
+  /**
+   * Genera ideas o guiones específicos para Redes Sociales
+   */
   generateContentScript: async (type: 'IDEA' | 'SCRIPT', data: any) => {
     try {
         const client = await getClient();
@@ -262,6 +265,57 @@ export const ai = {
         console.error("Content Gen Error:", error);
         return null;
     }
+  },
+
+  /**
+   * Analiza un guion existente y extrae/completa la metadata faltante
+   */
+  analyzeScript: async (script: string) => {
+      try {
+          const client = await getClient();
+          const prompt = `
+          ACTÚA COMO: Un Editor de Contenidos Experto.
+          OBJETIVO: Analizar el siguiente GUION y extraer sus metadatos clave para clasificarlo.
+          
+          GUION:
+          """
+          ${script}
+          """
+          
+          TAREA:
+          Deduce y genera los siguientes campos basados en el texto:
+          1. title: Un título corto y pegadizo (5-7 palabras).
+          2. concept: Una frase resumen de qué trata el video.
+          3. hook: La primera frase o gancho (si no es obvio, genéralo).
+          4. visuals: Sugerencias de B-Roll o estilo visual para este guion.
+          5. platform: La plataforma más adecuada (Instagram, TikTok, YouTube, LinkedIn).
+          6. contentType: 'POST' o 'AD' (Si parece venta directa).
+          
+          FORMATO JSON:
+          {
+            "title": "...",
+            "concept": "...",
+            "hook": "...",
+            "visuals": "...",
+            "platform": "...",
+            "contentType": "..."
+          }
+          `;
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: { responseMimeType: 'application/json' }
+          });
+
+          const text = response.text;
+          if (!text) return null;
+          
+          return JSON.parse(text);
+      } catch (error) {
+          console.error("Analyze Script Error:", error);
+          return null;
+      }
   },
 
 

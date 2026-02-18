@@ -17,13 +17,13 @@ export default function PublicContentIdeaPage() {
 
     const fetchIdea = async (ideaId: string) => {
         try {
-            const { data, error } = await supabase
-                .from('content_ideas')
+            const { data, error: fetchError } = await supabase
+                .from('contentidea')
                 .select('*')
                 .eq('id', ideaId)
                 .single();
 
-            if (error) throw error;
+            if (fetchError) throw fetchError;
             setIdea(data);
         } catch (err: any) {
             console.error("Error fetching public idea:", err);
@@ -79,69 +79,73 @@ export default function PublicContentIdeaPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-            <div className="max-w-3xl mx-auto">
+        <div className="min-h-screen bg-gray-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+            <div className="max-w-4xl mx-auto space-y-8">
                 {/* Brand Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-black text-white font-bold text-xl mb-4">
+                <div className="text-center">
+                    <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-black text-white font-bold text-2xl mb-6 shadow-lg shadow-gray-200">
                         A
                     </div>
-                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight sm:text-4xl">
+                    <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
                         {idea.title}
                     </h2>
                     {idea.concept && (
-                        <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
+                        <p className="mt-4 max-w-2xl mx-auto text-xl md:text-2xl text-gray-500 font-light leading-relaxed">
                             {idea.concept}
                         </p>
                     )}
                 </div>
 
-                <div className="bg-white overflow-hidden shadow-xl rounded-2xl border border-gray-100">
+                <div className="bg-white overflow-hidden shadow-2xl shadow-gray-200/50 rounded-3xl border border-gray-100">
                     {/* Metadata Bar */}
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-wrap gap-4 items-center justify-between">
-                         <div className="flex items-center gap-3">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${idea.platform === 'Instagram' ? 'bg-pink-100 text-pink-800' : 'bg-blue-100 text-blue-800'}`}>
+                    <div className="bg-gray-50/50 backdrop-blur-sm px-8 py-6 border-b border-gray-100 flex flex-wrap gap-6 items-center justify-between">
+                         <div className="flex items-center gap-4">
+                            <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold tracking-wide shadow-sm ${idea.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' : idea.platform === 'TikTok' ? 'bg-black text-white' : 'bg-blue-100 text-blue-800'}`}>
                                 {idea.platform}
                             </span>
-                            <span className="text-gray-300">|</span>
-                            <span className="text-sm font-medium text-gray-600">{idea.contentType}</span>
+                            <span className="text-gray-300 transform scale-150">|</span>
+                            <span className="text-base font-medium text-gray-600 uppercase tracking-wide">{idea.contentType}</span>
                          </div>
-                         <div className="flex items-center gap-2">
-                             <CheckCircle2 className={`w-4 h-4 ${idea.status === 'POSTED' ? 'text-green-500' : 'text-gray-400'}`} />
-                             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{idea.status}</span>
-                         </div>
+                         {idea.scheduledDate && (
+                             <div className="text-gray-500 font-medium text-sm flex items-center gap-2">
+                                 📅 {new Date(idea.scheduledDate).toLocaleDateString()}
+                             </div>
+                         )}
                     </div>
 
-                    <div className="p-8 space-y-8">
+                    <div className="p-8 md:p-12 space-y-12">
                         {/* Hook Section */}
                         {idea.hook && (
-                            <div className="bg-rose-50 rounded-xl p-6 border border-rose-100">
-                                <h3 className="text-rose-900 font-bold text-sm uppercase tracking-wider mb-2 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4" /> Hook / Gancho
+                            <div className="bg-rose-50/50 rounded-2xl p-8 border border-rose-100 relative group hover:shadow-md transition-shadow">
+                                <span className="absolute -top-3 -left-2 bg-rose-100 text-rose-600 p-2 rounded-lg shadow-sm transform -rotate-6 group-hover:rotate-0 transition-transform">
+                                    <Sparkles className="w-5 h-5" />
+                                </span>
+                                <h3 className="text-rose-900/60 font-bold text-xs uppercase tracking-widest mb-3 ml-2">
+                                    Hook / Gancho
                                 </h3>
-                                <p className="text-lg font-medium text-rose-800">
-                                    {idea.hook}
+                                <p className="text-xl md:text-2xl font-bold text-rose-900 font-serif leading-relaxed">
+                                    "{idea.hook}"
                                 </p>
                             </div>
                         )}
 
                         {/* Script Section */}
-                        <div>
-                            <h3 className="text-gray-900 font-bold text-lg mb-4 flex items-center gap-2">
-                                <FileText className="w-5 h-5 text-indigo-600" /> Guion
+                        <div className="space-y-6">
+                            <h3 className="text-gray-900 font-bold text-xl flex items-center gap-3 pb-4 border-b border-gray-100">
+                                <FileText className="w-6 h-6 text-indigo-600" /> Guion
                             </h3>
-                            <div className="prose prose-lg text-gray-600 font-serif leading-relaxed max-w-none">
+                            <div className="prose prose-xl prose-slate max-w-none font-serif leading-loose text-gray-700">
                                 {renderScript(idea.script || '')}
                             </div>
                         </div>
 
                         {/* Visuals Section */}
                         {idea.visuals && (
-                            <div className="border-t border-gray-100 pt-8">
-                                <h3 className="text-gray-900 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <Video className="w-4 h-4 text-emerald-600" /> Referencias Visuales
+                            <div className="bg-emerald-50/30 rounded-2xl p-8 border border-emerald-100/50">
+                                <h3 className="text-emerald-900 font-bold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Video className="w-5 h-5 text-emerald-600" /> Referencias Visuales
                                 </h3>
-                                <div className="bg-slate-50 rounded-lg p-4 text-slate-700 text-sm whitespace-pre-wrap">
+                                <div className="text-emerald-900/80 text-lg leading-relaxed whitespace-pre-wrap font-medium">
                                     {idea.visuals}
                                 </div>
                             </div>
@@ -149,8 +153,10 @@ export default function PublicContentIdeaPage() {
                     </div>
                 </div>
                 
-                <div className="mt-8 text-center text-sm text-gray-400">
-                    Gestión de Contenido por <strong>Algoritmia OS</strong>
+                <div className="text-center pb-8">
+                    <p className="text-sm text-gray-400 font-medium">
+                        Gestión de Contenido por <span className="text-gray-600 font-bold">Algoritmia OS</span>
+                    </p>
                 </div>
             </div>
         </div>
