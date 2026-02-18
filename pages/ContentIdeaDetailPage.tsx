@@ -4,7 +4,7 @@ import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { ContentIdea } from '../types';
 import { Button, Input, Textarea, Select, Badge } from '../components/UIComponents';
-import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2, Wand2, Maximize2, Minimize2, ZoomIn, ZoomOut } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2, Wand2, Maximize2, Minimize2, ZoomIn, ZoomOut, Bold, Share2, Edit3, Eye } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
 export default function ContentIdeaDetailPage() {
@@ -16,6 +16,7 @@ export default function ContentIdeaDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [fontSize, setFontSize] = useState(18);
+  const [viewMode, setViewMode] = useState<'EDIT' | 'READ'>('READ'); // Default to READ in full screen for better experience
 
   const [formData, setFormData] = useState<Partial<ContentIdea>>({
     title: '',
@@ -150,6 +151,69 @@ export default function ContentIdeaDetailPage() {
       }
   };
 
+  // --- NEW FEATURE: Auto-Bold Spoken Text ---
+  const handleAutoFormatScript = () => {
+      if (!formData.script) return;
+
+      const lines = formData.script.split('\n');
+      const formattedLines = lines.map(line => {
+          const trimmed = line.trim();
+          
+          // Identify spoken lines:
+          // 1. Starts with " or "
+          // 2. Starts with "LO QUE DECÍS:" or "LO QUE DICES:" or "AUDIO:"
+          // 3. Or just looks like dialog vs instruction (Instructions usually ALL CAPS or [brackets])
+          
+          const isInstruction = /^[A-ZÁÉÍÓÚÑ\s]+:|\[.*\]|^VISUAL:/.test(trimmed);
+          const isSpoken = trimmed.startsWith('"') || trimmed.startsWith('“') || trimmed.startsWith('LO QUE DECÍS:');
+
+          if (isSpoken && !trimmed.includes('**')) {
+               // Robustly wrap content in ** **
+               // Case 1: "Hello world" -> "**"Hello world"**" (Looks weird but works) -> actually better: "**Hello world**"
+               if (trimmed.startsWith('"') || trimmed.startsWith('“')) {
+                   return `**${trimmed}**`; 
+               }
+               // Case 2: LO QUE DECÍS: "Hello world"
+               if (trimmed.startsWith('LO QUE DECÍS:')) {
+                   return trimmed.replace(/LO QUE DECÍS:\s*"?([^"]*)"?/, 'LO QUE DECÍS: "**$1**"');
+               }
+               return `**${trimmed}**`;
+          }
+          
+          return line;
+      });
+
+      setFormData({ ...formData, script: formattedLines.join('\n') });
+      setViewMode('READ'); // Switch to read mode to see result
+      showToast("✨ Guion formateado: Texto hablado en negrita", "success");
+  };
+
+  const handleCopyPublicLink = () => {
+      const url = `${window.location.origin}/#/p/${id}`;
+      navigator.clipboard.writeText(url);
+      showToast("Enlace público copiado al portapapeles", "success");
+  };
+  
+  // Render script content with markdown bolding
+  const renderScriptContent = () => {
+      if (!formData.script) return null;
+      
+      return formData.script.split('\n').map((line, i) => {
+          // Check for bold syntax **text**
+          const parts = line.split(/(\*\*.*?\*\*)/g);
+          
+          return (
+              <div key={i} className="min-h-[1em] mb-1">
+                  {parts.map((part, j) => {
+                      if (part.startsWith('**') && part.endsWith('**')) {
+                          return <strong key={j} className="text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-1 rounded">{part.slice(2, -2)}</strong>;
+                      }
+                      return <span key={j}>{part}</span>;
+                  })}
+              </div>
+          );
+      });
+  };
 
   if (loading) {
      return (
@@ -158,8 +222,6 @@ export default function ContentIdeaDetailPage() {
         </div>
      );
   }
-
-
 
   return (
     <>
@@ -183,21 +245,54 @@ export default function ContentIdeaDetailPage() {
                       </Button>
                   </div>
               </div>
-              <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                  Modo Teleprompter / Lectura
+              
+              {/* View Mode Toggle */}
+              <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                  <button
+                      onClick={() => setViewMode('EDIT')}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'EDIT' ? 'bg-white dark:bg-slate-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}`}
+                  >
+                      <Edit3 className="w-4 h-4" /> Editar
+                  </button>
+                  <button
+                      onClick={() => setViewMode('READ')}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'READ' ? 'bg-white dark:bg-slate-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}`}
+                  >
+                      <Eye className="w-4 h-4" /> Leer
+                  </button>
+              </div>
+
+              <div className="flex items-center gap-4">
+                   <Button 
+                        onClick={handleAutoFormatScript}
+                        variant="secondary"
+                        className="gap-2 text-indigo-600 bg-indigo-50 border-indigo-100 hover:bg-indigo-100"
+                   >
+                       <Bold className="w-4 h-4" />
+                       <span className="hidden sm:inline">Resaltar Guion (IA)</span>
+                   </Button>
               </div>
            </div>
 
            {/* Editor / Reader */}
            <div className="flex-1 overflow-auto bg-gray-50 dark:bg-black relative">
                <div className="w-full min-h-full bg-white dark:bg-black shadow-none p-8 md:p-12">
-                  <textarea
-                      value={formData.script}
-                      onChange={e => setFormData({ ...formData, script: e.target.value })}
-                      placeholder="Escribe tu guion aquí..."
-                      className="w-full h-full bg-transparent border-none resize-none focus:ring-0 p-0 font-serif leading-relaxed text-gray-900 dark:text-gray-100"
-                      style={{ fontSize: `${fontSize}px`, minHeight: '80vh', outline: 'none' }}
-                  />
+                  {viewMode === 'READ' ? (
+                      <div 
+                        className="w-full h-full font-serif leading-relaxed text-gray-900 dark:text-gray-100 whitespace-pre-wrap outline-none"
+                        style={{ fontSize: `${fontSize}px`, minHeight: '80vh' }}
+                      >
+                          {renderScriptContent()}
+                      </div>
+                  ) : (
+                      <textarea
+                          value={formData.script}
+                          onChange={e => setFormData({ ...formData, script: e.target.value })}
+                          placeholder="Escribe tu guion aquí..."
+                          className="w-full h-full bg-transparent border-none resize-none focus:ring-0 p-0 font-serif leading-relaxed text-gray-900 dark:text-gray-100"
+                          style={{ fontSize: `${fontSize}px`, minHeight: '80vh', outline: 'none' }}
+                      />
+                  )}
                </div>
            </div>
         </div>
@@ -227,6 +322,16 @@ export default function ContentIdeaDetailPage() {
                </div>
 
                <div className="flex items-center gap-3 w-full md:w-auto flex-shrink-0">
+                    <Button 
+                        onClick={handleCopyPublicLink} 
+                        variant="outline" 
+                        className="gap-2 hidden md:flex"
+                        title="Copiar enlace público"
+                    >
+                        <Share2 className="w-4 h-4" />
+                        <span className="hidden lg:inline">Compartir</span>
+                    </Button>
+
                    <Select
                         value={formData.status}
                         onChange={e => setFormData({ ...formData, status: e.target.value as any })}
