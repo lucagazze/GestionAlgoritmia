@@ -1,0 +1,89 @@
+[33m1047b16[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: reset: moving to 1047b16f40477c1136fb0cb48b430cd46ef48033
+[33mb15d3a2[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{1}: checkout: moving from main to main
+[33mb15d3a2[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{2}: commit: 2
+[33m1047b16[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{3}: commit: 2
+[33m7d4261e[m HEAD@{4}: commit: 2
+[33mfb39ad4[m HEAD@{5}: commit: 2
+[33me7d2ebe[m HEAD@{6}: commit: 2
+[33m719f36e[m HEAD@{7}: commit: 2
+[33m95f4280[m HEAD@{8}: commit: 2
+[33m3fe171a[m HEAD@{9}: commit: 2
+[33mdcb65eb[m HEAD@{10}: commit: 2
+[33m49f0ae1[m HEAD@{11}: commit: 2
+[33m08517e5[m HEAD@{12}: commit: 2
+[33ma9a0c62[m HEAD@{13}: commit: 2
+[33m5afc9c4[m HEAD@{14}: commit: 2
+[33mbd96224[m HEAD@{15}: commit: 2
+[33m1b5c637[m HEAD@{16}: commit: 2
+[33ma801a1e[m HEAD@{17}: commit: 2
+[33m5a00188[m HEAD@{18}: commit: 2
+[33mb3d12b8[m HEAD@{19}: commit: 2
+[33m333190d[m HEAD@{20}: commit: 2
+[33m04d6fa6[m HEAD@{21}: commit: 2
+[33md33a8ba[m HEAD@{22}: commit: 2
+[33m0f5466d[m HEAD@{23}: commit: 2
+[33m4e3c264[m HEAD@{24}: commit: 2
+[33mad0d5e3[m HEAD@{25}: commit: 2
+[33m0cb12ef[m HEAD@{26}: commit: 2
+[33m82a69be[m HEAD@{27}: commit: 2
+[33m9a1da50[m HEAD@{28}: commit: 2
+[33m110098e[m HEAD@{29}: commit: 2
+[33m0c72520[m HEAD@{30}: commit: 2
+[33mbb5472f[m HEAD@{31}: commit: 2
+[33mca3f0ba[m HEAD@{32}: commit: 2
+[33m962c6a7[m HEAD@{33}: commit: 2
+[33m1b403a6[m HEAD@{34}: reset: moving to 1b403a69056df41517549bc81e5237e2fd21e93b
+[33mcd8381d[m HEAD@{35}: checkout: moving from 1b403a69056df41517549bc81e5237e2fd21e93b to main
+[33m1b403a6[m HEAD@{36}: checkout: moving from main to 1b403a69056df41517549bc81e5237e2fd21e93b
+[33mcd8381d[m HEAD@{37}: commit: 2
+[33m1b403a6[m HEAD@{38}: commit: 2
+[33mb8a0239[m HEAD@{39}: commit: 2
+[33med74442[m HEAD@{40}: commit: 2
+[33m6e8196e[m HEAD@{41}: commit: 2
+[33m3b005ba[m HEAD@{42}: reset: moving to 3b005ba3b5368077018829146f05cc8524b62f1e
+[33mfc7003c[m HEAD@{43}: commit: 2
+[33m3b005ba[m HEAD@{44}: commit: 2
+[33m169a4ea[m HEAD@{45}: commit: 2
+[33mb66ac5a[m HEAD@{46}: commit: 2
+[33mebe4549[m HEAD@{47}: commit: 2
+[33m3152ddd[m HEAD@{48}: commit: 2
+[33m6dbd7df[m HEAD@{49}: commit: 2
+[33m039f26f[m HEAD@{50}: commit: 2
+[33mcdbf273[m HEAD@{51}: commit: 2
+[33m3749278[m HEAD@{52}: commit: 2
+[33mc3966ee[m HEAD@{53}: commit: 2
+[33m8f00f41[m HEAD@{54}: commit: 2
+[33m229d5ff[m HEAD@{55}: commit: 2
+[33m5a8db97[m HEAD@{56}: commit: 2
+[33m69f0ddb[m HEAD@{57}: commit: 2
+[33mfb488f4[m HEAD@{58}: commit: 2
+[33ma33e73c[m HEAD@{59}: commit: 2
+[33mfe6a6f6[m HEAD@{60}: commit: 2
+[33m686049f[m HEAD@{61}: commit: 2
+[33me319d15[m HEAD@{62}: commit: 2
+[33m474cd99[m HEAD@{63}: commit: 2
+[33m3c80955[m HEAD@{64}: commit: 2
+[33m4f97249[m HEAD@{65}: commit: 2
+[33m85cef56[m HEAD@{66}: commit: 2
+[33m8822192[m HEAD@{67}: commit: 2
+[33m2cb6342[m HEAD@{68}: commit: 2
+[33m7b3e9af[m HEAD@{69}: commit: 2
+[33m19f2464[m HEAD@{70}: commit: 2
+[33m820bf02[m HEAD@{71}: commit: 2
+[33ma607cd3[m HEAD@{72}: commit: 2
+[33mb03cef4[m HEAD@{73}: commit: 2
+[33m5b8d778[m HEAD@{74}: commit: 2
+[33m59a5a14[m HEAD@{75}: commit: 2
+[33m9ea67d0[m HEAD@{76}: commit: 2
+[33m7a8a890[m HEAD@{77}: commit: 2
+[33m36bea7b[m HEAD@{78}: commit: 2
+[33m1f4fbc2[m HEAD@{79}: commit: 2
+[33mbe93acb[m HEAD@{80}: commit: 2
+[33m798233f[m HEAD@{81}: commit: 2
+[33m3099d64[m HEAD@{82}: commit: 2
+[33mb0a50f6[m HEAD@{83}: commit: 2
+[33m13d577f[m HEAD@{84}: commit: 2
+[33m19bba97[m HEAD@{85}: commit: 2
+[33mb886097[m HEAD@{86}: commit: 2
+[33mefbca96[m HEAD@{87}: commit: 2
+[33mdd12d29[m HEAD@{88}: clone: from github.com:lucagazze/GestionAlgoritmia.git
