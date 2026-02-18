@@ -971,17 +971,16 @@ export const db = {
              console.error('Error fetching ideas:', error);
              return [];
           }
-          // Map DB lowercase to Frontend camelCase
+          // Mapeo defensivo: Intenta leer ambas versiones de las columnas
           return (data || []).map((item: any) => ({
               ...item,
-              scheduledDate: item.scheduleddate, // Map back
-              contentType: item.content_type || 'POST', // Map back (default to POST)
-              createdAt: item.createdat,
-              updatedAt: item.updatedat
+              scheduledDate: item.scheduleddate || item.scheduledDate, // Leer ambas posibilidades
+              contentType: item.content_type || item.contentType || 'POST', // Leer ambas posibilidades
+              createdAt: item.createdat || item.createdAt,
+              updatedAt: item.updatedat || item.updatedAt
           }));
       },
       create: async (data: Omit<ContentIdea, 'id' | 'createdAt'>): Promise<ContentIdea> => {
-          // Map Frontend camelCase to DB lowercase
           const dbPayload = {
               title: data.title,
               concept: data.concept,
@@ -989,9 +988,11 @@ export const db = {
               script: data.script,
               visuals: data.visuals,
               platform: data.platform,
-              content_type: data.contentType, // Map to DB
               status: data.status,
-              scheduleddate: data.scheduledDate, // Map to DB
+              
+              "contentType": data.contentType, 
+              "scheduledDate": data.scheduledDate,
+
               createdat: new Date().toISOString(),
               updatedat: new Date().toISOString()
           };
@@ -1001,14 +1002,13 @@ export const db = {
           
           return {
               ...created,
-              contentType: created.content_type,
-              scheduledDate: created.scheduleddate,
-              createdAt: created.createdat,
-              updatedAt: created.updatedat
+              contentType: created.content_type || created.contentType,
+              scheduledDate: created.scheduleddate || created.scheduledDate,
+              createdAt: created.createdat || created.createdAt,
+              updatedAt: created.updatedat || created.updatedAt
           };
       },
       update: async (id: string, data: Partial<ContentIdea>): Promise<void> => {
-           // Map Partial Data
            const dbPayload: any = {};
            if (data.title !== undefined) dbPayload.title = data.title;
            if (data.concept !== undefined) dbPayload.concept = data.concept;
@@ -1017,8 +1017,13 @@ export const db = {
            if (data.visuals !== undefined) dbPayload.visuals = data.visuals;
            if (data.platform !== undefined) dbPayload.platform = data.platform;
            if (data.status !== undefined) dbPayload.status = data.status;
-           if (data.scheduledDate !== undefined) dbPayload.scheduleddate = data.scheduledDate;
-           if (data.contentType !== undefined) dbPayload.content_type = data.contentType;
+           
+           if (data.scheduledDate !== undefined) {
+               dbPayload["scheduledDate"] = data.scheduledDate;
+           }
+           if (data.contentType !== undefined) {
+               dbPayload["contentType"] = data.contentType;
+           }
            
            dbPayload.updatedat = new Date().toISOString();
 
