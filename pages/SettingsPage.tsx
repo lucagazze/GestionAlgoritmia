@@ -117,6 +117,9 @@ alter table "Client" add column if not exists "internalCost" numeric default 0;
 alter table "Client" add column if not exists "publicToken" text;
 alter table "Client" add column if not exists progress integer default 0;
 alter table "Client" add column if not exists "growthStrategy" text;
+alter table "Client" add column if not exists currency text default 'ARS';
+
+alter table "Proposal" add column if not exists currency text default 'ARS';
 
 alter table "Contractor" add column if not exists phone text;
 alter table "Task" add column if not exists "sopId" uuid references "SOP"(id);

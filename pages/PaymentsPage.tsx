@@ -6,6 +6,7 @@ import { Project, Contractor, ProjectStatus, ContractorPayment } from '../types'
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users } from 'lucide-react';
 import { Card, Button, Modal, Badge, Input, Label, Select } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { formatMoney } from '../utils/currency';
 
 export default function PaymentsPage() {
     const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function PaymentsPage() {
         date?: Date;
         notes?: string;
         description?: string;
+        currency?: 'ARS' | 'USD';
     }
 
     const [referenceDate, setReferenceDate] = useState(new Date());
@@ -214,12 +216,12 @@ export default function PaymentsPage() {
                     type: 'IN',
                     label: clientName,
                     amount: pay.amount,
-                    projectId: pay.client_id || pay.clientId,
                     paid: true,
                     paymentId: pay.id,
                     paymentAmount: pay.amount,
                     date: date,
-                    notes: pay.notes // ✅ Add Notes
+                    notes: pay.notes, // ✅ Add Notes
+                    currency: pay.client?.currency || projects.find(p => p.id === pay.client_id || p.id === pay.clientId)?.currency || 'ARS'
                 });
             }
         });
@@ -233,12 +235,12 @@ export default function PaymentsPage() {
                      type: 'OUT',
                      label: contractorName,
                      amount: cp.amount,
-                     projectId: cp.client_id, // Might be null
                      paid: true,
                      paymentId: cp.id,
                      paymentAmount: cp.amount,
                      date: date,
-                     description: cp.description // ✅ Add Description
+                     description: cp.description, // ✅ Add Description
+                     currency: projects.find(p => p.id === cp.client_id)?.currency || 'ARS'
                  });
             }
         });
@@ -278,10 +280,11 @@ export default function PaymentsPage() {
                     type: 'IN', 
                     label: `${p.name} (Pendiente)`, 
                     amount: remaining, 
-                    projectId: p.id,
                     paid: false,
+                    projectId: p.id,
                     paymentAmount: paidAmount,
-                    date: date // Pass the calendar date
+                    date: date, // Pass the calendar date
+                    currency: p.currency || 'ARS'
                 });
             }
         });
@@ -313,20 +316,19 @@ export default function PaymentsPage() {
                         type: 'OUT', 
                         label: `Socio (${p.name}) (Pendiente)`, 
                         amount: remaining,
-                        projectId: p.id,
                         paid: false,
                         paymentAmount: paidAmount,
-                        date: date 
+                        date: date,
+                        currency: p.currency || 'ARS'
                     });
                 }
             });
         }
         
-        // Internal Costs (Day 1) - Keep as is (Projections)
         if (day === 1) {
             activeProjects.forEach(p => {
                 if (p.internalCost && p.internalCost > 0) {
-                    events.push({ type: 'OUT', label: `Interno (${p.name})`, amount: p.internalCost });
+                    events.push({ type: 'OUT', label: `Interno (${p.name})`, amount: p.internalCost, currency: p.currency || 'ARS' });
                 }
             });
         }
@@ -334,10 +336,11 @@ export default function PaymentsPage() {
         return events;
     };
 
-    // Calculate monthly totals based on the displayed month
     const monthlyTotals = useMemo(() => {
-        let totalIn = 0;
-        let totalOut = 0;
+        let totalInUSD = 0;
+        let totalOutUSD = 0;
+        let totalInARS = 0;
+        let totalOutARS = 0;
 
         // Iterate through all days in the displayed month
         for (let day = 1; day <= daysInMonth; day++) {
@@ -346,23 +349,26 @@ export default function PaymentsPage() {
             
             events.forEach(evt => {
                 if (evt.type === 'IN') {
-                    totalIn += evt.amount;
+                    if (evt.currency === 'ARS') totalInARS += evt.amount;
+                    else totalInUSD += evt.amount;
                 } else if (evt.type === 'OUT') {
-                    totalOut += evt.amount;
+                    if (evt.currency === 'ARS') totalOutARS += evt.amount;
+                    else totalOutUSD += evt.amount;
                 }
             });
         }
 
         return {
-            totalIn,
-            totalOut,
-            net: totalIn - totalOut
+            totalInUSD,
+            totalOutUSD,
+            netUSD: totalInUSD - totalOutUSD,
+            totalInARS,
+            totalOutARS,
+            netARS: totalInARS - totalOutARS,
         };
     }, [year, month, daysInMonth, activeProjects, payments]);
 
-    const totalIn = monthlyTotals.totalIn;
-    const totalOut = monthlyTotals.totalOut;
-    const net = monthlyTotals.net;
+    const { totalInUSD, totalOutUSD, netUSD, totalInARS, totalOutARS, netARS } = monthlyTotals;
         
     // --- FORECAST LOGIC (90 DAYS) ---
     const forecastData = useMemo(() => {
@@ -373,16 +379,19 @@ export default function PaymentsPage() {
             const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
             const monthName = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
             
-            // Assume active projects stay active (Conservative projection)
-            // Future improvement: Check contract end dates if available
-            const projectedIn = activeProjects.reduce((acc, p) => acc + (p.monthlyRevenue || 0), 0);
-            const projectedOut = activeProjects.reduce((acc, p) => acc + (p.outsourcingCost || 0) + (p.internalCost || 0), 0);
+            const projectedInUSD = activeProjects.filter(p => p.currency === 'USD').reduce((acc, p) => acc + (p.monthlyRevenue || 0), 0);
+            const projectedOutUSD = activeProjects.filter(p => p.currency === 'USD').reduce((acc, p) => acc + (p.outsourcingCost || 0) + (p.internalCost || 0), 0);
+            const projectedInARS = activeProjects.filter(p => !p.currency || p.currency === 'ARS').reduce((acc, p) => acc + (p.monthlyRevenue || 0), 0);
+            const projectedOutARS = activeProjects.filter(p => !p.currency || p.currency === 'ARS').reduce((acc, p) => acc + (p.outsourcingCost || 0) + (p.internalCost || 0), 0);
             
             data.push({
                 name: monthName,
-                ingresos: projectedIn,
-                gastos: projectedOut,
-                neto: projectedIn - projectedOut
+                ingresosUSD: projectedInUSD,
+                gastosUSD: projectedOutUSD,
+                netoUSD: projectedInUSD - projectedOutUSD,
+                ingresosARS: projectedInARS,
+                gastosARS: projectedOutARS,
+                netoARS: projectedInARS - projectedOutARS,
             });
         }
         return data;
@@ -644,21 +653,24 @@ export default function PaymentsPage() {
                             <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-full text-emerald-600 dark:text-emerald-400"><TrendingUp className="w-5 h-5"/></div>
                             <div>
                                 <p className="text-xs text-emerald-800 dark:text-emerald-300 font-bold uppercase">Entradas (Mes)</p>
-                                <p className="text-lg font-bold text-emerald-900 dark:text-emerald-100">${totalIn.toLocaleString()}</p>
+                                <p className="text-lg font-bold text-emerald-900 dark:text-emerald-100">{formatMoney(totalInUSD, 'USD')}</p>
+                                {totalInARS > 0 && <p className="text-sm font-bold text-emerald-700 dark:text-emerald-200">{formatMoney(totalInARS, 'ARS')}</p>}
                             </div>
                         </Card>
                         <Card className="p-4 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900">
                             <div className="p-2 bg-red-100 dark:bg-red-900 rounded-full text-red-600 dark:text-red-400"><TrendingDown className="w-5 h-5"/></div>
                             <div>
                                 <p className="text-xs text-red-800 dark:text-red-300 font-bold uppercase">Salidas (Mes)</p>
-                                <p className="text-lg font-bold text-red-900 dark:text-red-100">${totalOut.toLocaleString()}</p>
+                                <p className="text-lg font-bold text-red-900 dark:text-red-100">{formatMoney(totalOutUSD, 'USD')}</p>
+                                {totalOutARS > 0 && <p className="text-sm font-bold text-red-700 dark:text-red-200">{formatMoney(totalOutARS, 'ARS')}</p>}
                             </div>
                         </Card>
                         <Card className="p-4 flex items-center gap-3 bg-gray-900 dark:bg-white text-white dark:text-black border-gray-800">
                             <div className="p-2 bg-gray-700 dark:bg-gray-200 rounded-full text-white dark:text-black"><Wallet className="w-5 h-5"/></div>
                             <div>
                                 <p className="text-xs text-gray-400 dark:text-gray-600 font-bold uppercase">Neto Estimado</p>
-                                <p className="text-lg font-bold">${net.toLocaleString()}</p>
+                                <p className="text-lg font-bold">{formatMoney(netUSD, 'USD')}</p>
+                                {netARS !== 0 && <p className="text-sm font-bold">{formatMoney(netARS, 'ARS')}</p>}
                             </div>
                         </Card>
                     </div>
@@ -737,9 +749,9 @@ export default function PaymentsPage() {
                                                     title={
                                                         evt.paid 
                                                             ? (evt.paymentAmount && evt.paymentAmount < evt.amount 
-                                                                ? `${evt.label}: $${evt.amount}\nPagado: $${evt.paymentAmount}\nFalta: $${evt.amount - evt.paymentAmount}` 
-                                                                : `${evt.label}: $${evt.amount} (Pagado Completo)`)
-                                                            : `${evt.label}: $${evt.amount} (Pendiente)`
+                                                                ? `${evt.label}: ${formatMoney(evt.amount, evt.currency || 'USD')}\nPagado: ${formatMoney(evt.paymentAmount, evt.currency || 'USD')}\nFalta: ${formatMoney(evt.amount - evt.paymentAmount, evt.currency || 'USD')}` 
+                                                                : `${evt.label}: ${formatMoney(evt.amount, evt.currency || 'USD')} (Pagado Completo)`)
+                                                            : `${evt.label}: ${formatMoney(evt.amount, evt.currency || 'USD')} (Pendiente)`
                                                     }
                                                 >
                                                     <div className="flex items-center gap-1 overflow-hidden">
@@ -758,7 +770,7 @@ export default function PaymentsPage() {
                                                         )}
                                                         <span className="truncate">{evt.label}</span>
                                                     </div>
-                                                    <span className="font-bold ml-1">${evt.amount.toLocaleString()}</span>
+                                                    <span className="font-bold ml-1">{formatMoney(evt.amount, evt.currency || 'USD')}</span>
                                                 </div>
                                                 );
                                             })}
@@ -784,17 +796,30 @@ export default function PaymentsPage() {
                                 <div className="space-y-3">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Ingresos</span>
-                                        <span className="font-bold text-green-600">+${month.ingresos.toLocaleString()}</span>
+                                        <div className="text-right">
+                                            <span className="font-bold text-green-600">+{formatMoney(month.ingresosUSD, 'USD')}</span>
+                                            {month.ingresosARS > 0 && <div className="font-bold text-green-600 text-xs">+{formatMoney(month.ingresosARS, 'ARS')}</div>}
+                                        </div>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Gastos Fijos</span>
-                                        <span className="font-bold text-red-600">-${month.gastos.toLocaleString()}</span>
+                                        <div className="text-right">
+                                            <span className="font-bold text-red-600">-{formatMoney(month.gastosUSD, 'USD')}</span>
+                                            {month.gastosARS > 0 && <div className="font-bold text-red-600 text-xs">-{formatMoney(month.gastosARS, 'ARS')}</div>}
+                                        </div>
                                     </div>
                                     <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex justify-between items-center">
                                         <span className="font-bold text-gray-900 dark:text-white">Flujo Neto</span>
-                                        <span className={`text-xl font-bold ${month.neto >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600'}`}>
-                                            ${month.neto.toLocaleString()}
-                                        </span>
+                                        <div className="text-right">
+                                            <span className={`text-xl font-bold ${month.netoUSD >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600'}`}>
+                                                {formatMoney(month.netoUSD, 'USD')}
+                                            </span>
+                                            {month.netoARS !== 0 && (
+                                                <div className={`text-sm font-bold ${month.netoARS >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600'}`}>
+                                                    {formatMoney(month.netoARS, 'ARS')}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </Card>
@@ -886,7 +911,7 @@ export default function PaymentsPage() {
                         <div className="bg-gray-50 dark:bg-slate-900 p-4 rounded-xl text-center">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPaymentDetail.label}</h3>
                             <p className="text-sm text-gray-500">{new Date(selectedPaymentDetail.date || new Date()).toLocaleDateString()}</p>
-                            <p className="text-3xl font-black text-indigo-600 mt-2">${selectedPaymentDetail.amount.toLocaleString()}</p>
+                            <p className="text-3xl font-black text-indigo-600 mt-2">{formatMoney(selectedPaymentDetail.amount, selectedPaymentDetail.currency || 'ARS')}</p>
                             
                             {/* DESCRIPTION / NOTES */}
                             {(selectedPaymentDetail.notes || selectedPaymentDetail.description) && (
@@ -911,11 +936,11 @@ export default function PaymentsPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
                                         <p className="text-xs text-gray-500 mb-1">Pagado</p>
-                                        <p className="text-xl font-bold text-green-600">${selectedPaymentDetail.paymentAmount.toLocaleString()}</p>
+                                        <p className="text-xl font-bold text-green-600">{formatMoney(selectedPaymentDetail.paymentAmount, selectedPaymentDetail.currency || 'ARS')}</p>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
                                         <p className="text-xs text-gray-500 mb-1">Falta</p>
-                                        <p className="text-xl font-bold text-red-600">${(selectedPaymentDetail.amount - selectedPaymentDetail.paymentAmount).toLocaleString()}</p>
+                                        <p className="text-xl font-bold text-red-600">{formatMoney(selectedPaymentDetail.amount - selectedPaymentDetail.paymentAmount, selectedPaymentDetail.currency || 'ARS')}</p>
                                     </div>
                                 </div>
                             </div>
@@ -1086,7 +1111,7 @@ export default function PaymentsPage() {
                             autoFocus
                         />
                          {selectedEventForPayment && (
-                            <p className="text-xs text-gray-500 mt-1">Total esperado: ${selectedEventForPayment.amount.toLocaleString()}</p>
+                            <p className="text-xs text-gray-500 mt-1">Total esperado: {formatMoney(selectedEventForPayment.amount, selectedEventForPayment.currency || 'ARS')}</p>
                         )}
                     </div>
                     <div className="flex justify-end gap-2">

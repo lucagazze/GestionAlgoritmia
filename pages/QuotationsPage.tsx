@@ -6,6 +6,7 @@ import { Button, Input, Card, Badge, Modal, Label } from '../components/UICompon
 import { ChevronLeft, ChevronRight, Download, Filter, Plus, Search, Trash2, Calendar, FileText, Briefcase, ExternalLink, RefreshCw, Loader2, Bot, SlidersHorizontal, Eye, CheckCircle2, Clock, XCircle, AlertCircle, TrendingUp, Edit, MoreVertical } from 'lucide-react';
 import { generateProposalPDF, generatePartnerPDF } from '../services/pdfGenerator';
 import { useToast } from '../components/Toast';
+import { formatMoney } from '../utils/currency';
 
 export default function QuotationsPage() {
   const navigate = useNavigate();
@@ -336,7 +337,7 @@ export default function QuotationsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="font-black text-gray-900 dark:text-white text-base">
-                                                ${finance.totalContractRevenue.toLocaleString()}
+                                                {formatMoney(finance.totalContractRevenue, proposal.currency)}
                                             </div>
                                             <div className="text-xs text-indigo-500 font-medium">
                                                 {finance.duration} meses
@@ -344,7 +345,7 @@ export default function QuotationsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="font-bold text-emerald-600 dark:text-emerald-400">
-                                                ${finance.netProfit.toLocaleString()}
+                                                {formatMoney(finance.netProfit, proposal.currency)}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 flex justify-center gap-2">
@@ -447,7 +448,7 @@ export default function QuotationsPage() {
                             <div className="text-right flex flex-col items-end gap-2">
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
-                                    <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">${fin.totalContractRevenue.toLocaleString()}</p>
+                                    <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{formatMoney(fin.totalContractRevenue, selectedDetailProposal.currency)}</p>
                                 </div>
                                 <div className="flex gap-2 mt-2">
                                      <Button size="sm" variant="outline" onClick={() => generateProposalPDF(selectedDetailProposal)}>
@@ -475,15 +476,15 @@ export default function QuotationsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800">
                                 <p className="text-sm font-bold text-emerald-700">Tu Ganancia Neta</p>
-                                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">${fin.netProfit.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">{formatMoney(fin.netProfit, selectedDetailProposal.currency)}</p>
                             </div>
                             <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800">
                                 <p className="text-sm font-bold text-red-700">Gastos de Equipo</p>
-                                <p className="text-2xl font-bold text-red-800 dark:text-red-200">${fin.totalContractCost.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-red-800 dark:text-red-200">{formatMoney(fin.totalContractCost, selectedDetailProposal.currency)}</p>
                             </div>
                             <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
                                 <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Mensualidad</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">${fin.revenueRecurring.toLocaleString()}</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatMoney(fin.revenueRecurring, selectedDetailProposal.currency)}</p>
                             </div>
                         </div>
 
@@ -508,9 +509,9 @@ export default function QuotationsPage() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-bold text-gray-900 dark:text-white">${item.serviceSnapshotCost.toLocaleString()}</p>
+                                            <p className="font-bold text-gray-900 dark:text-white">{formatMoney(item.serviceSnapshotCost, selectedDetailProposal.currency)}</p>
                                             {item.outsourcingCost > 0 && (
-                                                <p className="text-xs text-red-500 font-medium">Outsourcing: ${item.outsourcingCost.toLocaleString()}</p>
+                                                <p className="text-xs text-red-500 font-medium">Outsourcing: {formatMoney(item.outsourcingCost, selectedDetailProposal.currency)}</p>
                                             )}
                                         </div>
                                     </div>
@@ -555,7 +556,7 @@ export default function QuotationsPage() {
                                 <Input type="number" min={1} max={60} value={approvedDuration} onChange={(e) => setApprovedDuration(Number(e.target.value))} className="w-24 text-center font-bold text-lg" />
                                 <div className="text-sm text-gray-500">
                                     <p>Nuevo Total Estimado:</p>
-                                    <p className="font-bold text-indigo-600 text-lg">${previewFin.totalContractRevenue.toLocaleString()}</p>
+                                    <p className="font-bold text-indigo-600 text-lg">{formatMoney(previewFin.totalContractRevenue, selectedProposal.currency)}</p>
                                 </div>
                             </div>
                         </div>
@@ -582,7 +583,7 @@ export default function QuotationsPage() {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
-                                                    <p className="text-xs text-gray-500">${item.serviceSnapshotCost.toLocaleString()}</p>
+                                                    <p className="text-xs text-gray-500">{formatMoney(item.serviceSnapshotCost, selectedProposal.currency)}</p>
                                                 </div>
                                             </div>
                                             <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>{item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}</Badge>

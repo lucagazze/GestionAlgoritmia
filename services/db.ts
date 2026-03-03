@@ -1,6 +1,6 @@
 
 import { supabase } from './supabase';
-import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role, ContentIdea, ContractorPayment } from '../types';
+import { Service, Proposal, ProposalItem, Project, Task, ProjectStatus, ProposalStatus, TaskStatus, Contractor, AgencySettings, ClientNote, AIChatLog, AIChatSession, SOP, AutomationRecipe, Deliverable, PortalMessage, Payment, Role, ContentIdea, ContentFolder, ContractorPayment } from '../types';
 
 // Utility to handle Supabase responses
 const handleResponse = async <T>(query: any): Promise<T[]> => {
@@ -371,7 +371,8 @@ export const db = {
             internalCost: c.internalCost || 0,
             publicToken: c.publicToken || '',
             progress: c.progress || 0,
-            growthStrategy: c.growthStrategy || ''
+            growthStrategy: c.growthStrategy || '',
+            currency: c.currency || 'ARS'
         };
       });
     },
@@ -395,6 +396,7 @@ export const db = {
             growthStrategy: data.growthStrategy || '',
             contractStartDate: data.contract_start_date || null,
             contractEndDate: data.contract_end_date || null,
+            currency: data.currency || 'ARS',
          };
     },
     getById: async (id: string): Promise<Project | null> => {
@@ -435,6 +437,7 @@ export const db = {
             targetAudience: profile?.targetAudience || '',
             contextProblem: profile?.problem || '',      // 'problem' en DB -> 'contextProblem' en App
             contextObjectives: profile?.objectives || '', // 'objectives' en DB -> 'contextObjectives' en App
+            currency: data.currency || 'ARS',
          };
     },
     create: async (data: Partial<Project>): Promise<Project> => {
@@ -689,7 +692,10 @@ export const db = {
         
         if (existingClient) {
             clientId = existingClient.id;
-            await supabase.from('Client').update({ monthlyRevenue: data.totalRecurringPrice }).eq('id', clientId);
+            await supabase.from('Client').update({ 
+                monthlyRevenue: data.totalRecurringPrice,
+                currency: data.currency || 'ARS'
+            }).eq('id', clientId);
         } else {
             const { data: newClient, error: clientError } = await supabase.from('Client').insert({
                 name: clientName,
@@ -697,7 +703,8 @@ export const db = {
                 createdAt: new Date().toISOString(),
                 status: ProjectStatus.ONBOARDING,
                 monthlyRevenue: data.totalRecurringPrice,
-                billingDay: 1
+                billingDay: 1,
+                currency: data.currency || 'ARS'
             }).select().single();
             if (clientError) throw clientError;
             clientId = newClient.id;
@@ -717,7 +724,8 @@ export const db = {
             totalRecurringPrice: data.totalRecurringPrice,
             totalContractValue: data.totalContractValue,
             aiPromptGenerated: data.aiPromptGenerated,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            currency: data.currency || 'ARS'
         };
 
         const { data: newProposal, error: proposalError } = await supabase.from('Proposal').insert(proposalPayload).select().single();
@@ -957,10 +965,44 @@ export const db = {
                 
                 contract_start_date: start.toISOString(), // ✅ Save Start Date
                 contract_end_date: endDate.toISOString(),
-                service_details: serviceNames
+                service_details: serviceNames,
+                currency: proposal.currency || 'ARS'
             }).eq('id', proposal.clientId);
         }
     },
+  },
+
+  contentFolders: {
+      getAll: async (): Promise<ContentFolder[]> => {
+          const { data, error } = await supabase.from('contentfolder').select('*').order('createdat', { ascending: true });
+          if (error) {
+              if (error.code === 'PGRST205') return [];
+              console.error('Error fetching folders:', error);
+              return [];
+          }
+          return (data || []).map((f: any) => ({
+              ...f,
+              createdAt: f.createdat || f.createdAt,
+          })) as ContentFolder[];
+      },
+      create: async (data: Omit<ContentFolder, 'id' | 'createdAt'>): Promise<ContentFolder> => {
+          const { data: created, error } = await supabase.from('contentfolder').insert({
+              name: data.name,
+              color: data.color || '#6366f1',
+              icon: data.icon || '📁',
+              createdat: new Date().toISOString(),
+          }).select().single();
+          if (error) throw error;
+          return { ...created, createdAt: created.createdat };
+      },
+      update: async (id: string, data: Partial<ContentFolder>): Promise<void> => {
+          const { error } = await supabase.from('contentfolder').update(data).eq('id', id);
+          if (error) throw error;
+      },
+      delete: async (id: string): Promise<void> => {
+          const { error } = await supabase.from('contentfolder').delete().eq('id', id);
+          if (error) throw error;
+      }
   },
 
   contentIdeas: {
@@ -974,10 +1016,11 @@ export const db = {
           // Mapeo defensivo: Intenta leer ambas versiones de las columnas
           return (data || []).map((item: any) => ({
               ...item,
-              scheduledDate: item.scheduleddate || item.scheduledDate, // Leer ambas posibilidades
-              contentType: item.content_type || item.contentType || 'POST', // Leer ambas posibilidades
+              scheduledDate: item.scheduleddate || item.scheduledDate,
+              contentType: item.content_type || item.contentType || 'POST',
               createdAt: item.createdat || item.createdAt,
-              updatedAt: item.updatedat || item.updatedAt
+              updatedAt: item.updatedat || item.updatedAt,
+              folderId: item.folder_id || null,
           }));
       },
       create: async (data: Omit<ContentIdea, 'id' | 'createdAt'>): Promise<ContentIdea> => {
@@ -989,10 +1032,9 @@ export const db = {
               visuals: data.visuals,
               platform: data.platform,
               status: data.status,
-              
               "contentType": data.contentType, 
               "scheduledDate": data.scheduledDate,
-
+              folder_id: (data as any).folderId || null,
               createdat: new Date().toISOString(),
               updatedat: new Date().toISOString()
           };

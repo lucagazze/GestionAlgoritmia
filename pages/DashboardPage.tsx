@@ -26,6 +26,7 @@ import {
 import { db } from '../services/db';
 import { Project, Task, TaskStatus, ProjectStatus, Contractor } from '../types';
 import { Card, Button, Badge } from '../components/UIComponents';
+import { formatMoney } from '../utils/currency';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -100,8 +101,9 @@ export default function DashboardPage() {
               return created <= endOfMonth && (p.status === ProjectStatus.ACTIVE || p.status === ProjectStatus.ONBOARDING);
           });
           
-          const totalMrr = activeAtTime.reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
-          data.push({ name: monthName, mrr: totalMrr });
+          const totalMrrUSD = activeAtTime.filter(p => !p.currency || p.currency === 'USD').reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
+          const totalMrrARS = activeAtTime.filter(p => p.currency === 'ARS').reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
+          data.push({ name: monthName, mrrUSD: totalMrrUSD, mrrARS: totalMrrARS });
       }
       return data;
   }, [projects]);
@@ -135,16 +137,21 @@ export default function DashboardPage() {
 
 
   const activeProjects = projects.filter(p => p.status === ProjectStatus.ACTIVE);
-  const mrr = activeProjects.reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
+  const mrrUSD = activeProjects.filter(p => !p.currency || p.currency === 'USD').reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
+  const mrrARS = activeProjects.filter(p => p.currency === 'ARS').reduce((sum, p) => sum + (p.monthlyRevenue || 0), 0);
   
   const CustomTooltip = ({ active, payload, label }: any) => {
       if (active && payload && payload.length) {
           return (
               <div className="bg-white dark:bg-slate-800 p-3 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl">
                   <p className="font-bold text-xs mb-1 text-gray-700 dark:text-gray-300">{label}</p>
-                  <p className="text-sm font-mono text-indigo-600 dark:text-indigo-400">
-                      {payload[0].name === 'mrr' ? `$${payload[0].value.toLocaleString()}` : payload[0].value}
-                  </p>
+                  {payload.map((p: any) => (
+                      <p key={p.dataKey} className="text-sm font-mono" style={{color: p.color}}>
+                          {p.dataKey === 'mrrUSD' && formatMoney(p.value, 'USD')}
+                          {p.dataKey === 'mrrARS' && formatMoney(p.value, 'ARS')}
+                          {p.dataKey !== 'mrrUSD' && p.dataKey !== 'mrrARS' && p.value}
+                      </p>
+                  ))}
               </div>
           );
       }
@@ -197,7 +204,7 @@ export default function DashboardPage() {
                               <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-gray-500 font-bold">${p.monthlyRevenue.toLocaleString()}</span>
+                              <span className="text-xs font-mono text-gray-500 font-bold">{formatMoney(p.monthlyRevenue, p.currency)}</span>
                           </div>
                       </div>
                   ))}
@@ -245,7 +252,11 @@ export default function DashboardPage() {
               <div className="flex justify-between items-start mb-6">
                   <div>
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Crecimiento MRR (6 Meses)</p>
-                      <h2 className="text-2xl font-bold tracking-tight mt-1">${mrr.toLocaleString()} <span className="text-sm font-normal text-gray-400">/ mes actual</span></h2>
+                      <h2 className="text-2xl font-bold tracking-tight mt-1">
+                          <span className="text-indigo-600">{formatMoney(mrrUSD, 'USD')}</span>
+                          {mrrARS > 0 && <span className="text-emerald-600 ml-4">{formatMoney(mrrARS, 'ARS')}</span>}
+                          <span className="text-sm font-normal text-gray-400 ml-2">/ mes actual</span>
+                      </h2>
                   </div>
                   <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-green-600"><TrendingUp className="w-5 h-5"/></div>
               </div>
@@ -260,7 +271,8 @@ export default function DashboardPage() {
                           </defs>
                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9ca3af'}} />
                           <Tooltip content={<CustomTooltip />} />
-                          <Area type="monotone" dataKey="mrr" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
+                          <Area type="monotone" dataKey="mrrUSD" name="USD MRR" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorMrr)" />
+                          <Area type="monotone" dataKey="mrrARS" name="ARS MRR" stroke="#10b981" strokeWidth={3} fillOpacity={0.1} fill="#10b981" />
                       </AreaChart>
                   </ResponsiveContainer>
               </div>

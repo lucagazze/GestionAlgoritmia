@@ -2,9 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
-import { ContentIdea } from '../types';
+import { ContentIdea, ContentFolder } from '../types';
 import { Button, Input, Textarea, Select, Badge } from '../components/UIComponents';
-import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2, Wand2, Maximize2, ZoomIn, ZoomOut, Bold, Share2, Edit3, Eye } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Video, FileText, Sparkles, Calendar, CheckCircle2, Wand2, Maximize2, ZoomIn, ZoomOut, Bold, Share2, Edit3, Eye, Folder } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
 export default function ContentIdeaDetailPage() {
@@ -18,6 +18,7 @@ export default function ContentIdeaDetailPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [viewMode, setViewMode] = useState<'EDIT' | 'READ'>('READ');
+  const [folders, setFolders] = useState<ContentFolder[]>([]);
 
   const [formData, setFormData] = useState<Partial<ContentIdea>>({
     title: '',
@@ -28,7 +29,8 @@ export default function ContentIdeaDetailPage() {
     platform: 'Instagram',
     contentType: 'POST',
     status: 'IDEA',
-    scheduledDate: ''
+    scheduledDate: '',
+    folderId: undefined
   });
 
   // History for Undo/Redo
@@ -43,6 +45,7 @@ export default function ContentIdeaDetailPage() {
     if (id && id !== 'new') {
       loadData(id);
     }
+    db.contentFolders.getAll().then(setFolders).catch(console.error);
   }, [id]);
 
   // Initialize history
@@ -543,7 +546,7 @@ export default function ContentIdeaDetailPage() {
                 
                 <div className="lg:col-span-4 space-y-6">
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
-                        <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                         <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                            <Video className="w-4 h-4 text-blue-500" /> Plataforma & Tipo
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
@@ -570,6 +573,22 @@ export default function ContentIdeaDetailPage() {
                                     <option value="AD">Ad / Anuncio</option>
                                 </Select>
                             </div>
+                        </div>
+
+                        {/* Carpeta */}
+                        <div className="space-y-1 pt-2 border-t border-gray-100 dark:border-slate-800">
+                            <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+                                <Folder className="w-3 h-3" /> Carpeta
+                            </label>
+                            <Select
+                                value={formData.folderId || ''}
+                                onChange={e => setFormData({ ...formData, folderId: e.target.value || undefined })}
+                            >
+                                <option value="">📂 Sin carpeta</option>
+                                {folders.map(f => (
+                                    <option key={f.id} value={f.id}>{f.icon} {f.name}</option>
+                                ))}
+                            </Select>
                         </div>
                     </div>
 

@@ -70,6 +70,7 @@ export interface Client {
   // Optional contract fields for proposal display
   contractStartDate?: string;
   contractEndDate?: string;
+  currency?: 'ARS' | 'USD';
 }
 
 export interface Project extends Client {
@@ -111,6 +112,7 @@ export interface Project extends Client {
   targetAudience?: string;    // Público Objetivo
   contextProblem?: string;    // Situación Actual (Dolores)
   contextObjectives?: string; // Objetivo Principal
+  currency?: 'ARS' | 'USD'; // ✅ NUEVO: Moneda del cliente
 }
 
 export interface Contractor {
@@ -176,6 +178,7 @@ export interface Proposal {
   aiPromptGenerated: string;
   items: ProposalItem[];
   createdAt: Date;
+  currency?: 'ARS' | 'USD'; // ✅ NUEVO: Moneda de la propuesta
 }
 
 export interface AgencySettings {
@@ -279,6 +282,14 @@ export interface Role {
     priority?: 'ALTA' | 'MEDIA' | 'BAJA';
 }
 
+export interface ContentFolder {
+  id: string;
+  name: string;
+  color: string; // Hex color, e.g. '#6366f1'
+  icon: string;  // Emoji icon, e.g. '📁'
+  createdAt: string;
+}
+
 export interface ContentIdea {
   id: string;
   title: string;
@@ -291,6 +302,7 @@ export interface ContentIdea {
   status: 'IDEA' | 'SCRIPTED' | 'FILMED' | 'EDITED' | 'POSTED';
   scheduledDate?: string;
   createdAt: string;
+  folderId?: string; // Carpeta a la que pertenece
 }
 
 export interface ContractorPayment {

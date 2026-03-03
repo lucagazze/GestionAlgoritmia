@@ -8,6 +8,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Badge, 
 import { Check, Copy, Save, Wand2, User, Layers, FileDown, Loader2, Bot, X, ChevronRight, ChevronLeft, Sparkles, RefreshCw, TrendingUp, Trash2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { formatMoney } from '../utils/currency';
 
 // WIZARD STEPS
 const STEPS: { number: number; title: string; icon: React.ElementType }[] = [
@@ -50,7 +51,8 @@ export default function CalculatorPage() {
   // --- STEP 3 (Variables moved here) ---
   const [contractVars, setContractVars] = useState({
       budget: '',
-      duration: 6
+      duration: 6,
+      currency: 'ARS' as 'ARS' | 'USD'
       // Margin removed
   });
 
@@ -295,7 +297,8 @@ export default function CalculatorPage() {
           
           setContractVars({
               budget: '',
-              duration: p.durationMonths || 6
+              duration: p.durationMonths || 6,
+              currency: p.currency || 'ARS'
           });
 
           // ✅ Forzamos la vista al modo Calculadora y al Paso 3
@@ -350,6 +353,7 @@ export default function CalculatorPage() {
         targetAudience: clientInfo.targetAudience,
         currentSituation: clientInfo.currentSituation,
         durationMonths: contractVars.duration,
+        currency: contractVars.currency,
         totalOneTimePrice: setupFee,
         totalRecurringPrice: monthlyFee,
         totalContractValue: contractValue,
@@ -482,10 +486,10 @@ Actúa como Estratega de Agencia Senior. Escribe una propuesta para "${clientInf
 ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${phase}\n${items.join('\n')}`).join('\n')}
 
 **Inversión:**
-- Setup: $${setupFee.toLocaleString()} (Único)
-- Fee Mensual: $${monthlyFee.toLocaleString()}
+- Setup: ${formatMoney(setupFee, contractVars.currency)} (Único)
+- Fee Mensual: ${formatMoney(monthlyFee, contractVars.currency)}
 - Duración: ${contractVars.duration} meses
-- Valor Total: $${contractValue.toLocaleString()}
+- Valor Total: ${formatMoney(contractValue, contractVars.currency)}
 
 **Instrucciones:**
 1. Crea una intro empática basada en su situación actual.
@@ -691,7 +695,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
           body: calculations.selected.map(s => [
               s.name + (s.description ? `\n${s.description}` : ''),
               s.type === 'ONE_TIME' ? 'Setup' : 'Mes',
-              `$${getSellingPrice(s).toLocaleString()}`
+              formatMoney(getSellingPrice(s), contractVars.currency)
           ]),
           styles: { 
               fontSize: 9, 
@@ -774,14 +778,14 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.text("Setup Inicial", 125, finalY + 10);
       doc.setFontSize(12);
       doc.setTextColor(0);
-      doc.text(`$${calculations.setupFee.toLocaleString()}`, 190, finalY + 10, { align: 'right' });
+      doc.text(formatMoney(calculations.setupFee, contractVars.currency), 190, finalY + 10, { align: 'right' });
 
       doc.setFontSize(10);
       doc.setTextColor(100);
       doc.text("Fee Mensual", 125, finalY + 20);
       doc.setFontSize(12);
       doc.setTextColor(0);
-      doc.text(`$${calculations.monthlyFee.toLocaleString()}`, 190, finalY + 20, { align: 'right' });
+      doc.text(formatMoney(calculations.monthlyFee, contractVars.currency), 190, finalY + 20, { align: 'right' });
 
       doc.setDrawColor(200);
       doc.line(125, finalY + 28, 190, finalY + 28);
@@ -795,7 +799,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       doc.setFontSize(16);
       doc.setTextColor(0, 102, 204); // Blue branding
       doc.setFont("helvetica", "bold");
-      doc.text(`$${calculations.contractValue.toLocaleString()}`, 190, finalY + 42, { align: 'right' });
+      doc.text(formatMoney(calculations.contractValue, contractVars.currency), 190, finalY + 42, { align: 'right' });
 
       // -- FOOTER --
       const totalPages = doc.internal.getNumberOfPages();
@@ -1418,13 +1422,26 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                 <div className="p-8">
                                     <h3 className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-8">Resumen Económico</h3>
                                     
+                                    <div className="mb-6">
+                                      <Label className="text-xs text-gray-500 block mb-1">Moneda de la Propuesta</Label>
+                                      <select
+                                        value={contractVars.currency || 'ARS'}
+                                        onChange={e => setContractVars({...contractVars, currency: e.target.value as 'ARS' | 'USD'})}
+                                        className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400"
+                                        disabled={isReadOnly}
+                                      >
+                                        <option value="ARS">Pesos Argentinos (ARS)</option>
+                                        <option value="USD">Dólares (USD)</option>
+                                      </select>
+                                    </div>
+
                                     <div className="space-y-8">
                                         <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
                                             <div>
                                                 <p className="text-sm font-medium text-gray-500 mb-1">Fee Mensual (Recurrente)</p>
                                                 <p className="text-xs text-gray-400">Durante {contractVars.duration} meses</p>
                                             </div>
-                                            <div className="text-4xl font-bold tracking-tighter dark:text-white">${calculations.monthlyFee.toLocaleString()}</div>
+                                            <div className="text-4xl font-bold tracking-tighter dark:text-white">{formatMoney(calculations.monthlyFee, contractVars.currency)}</div>
                                         </div>
       
                                         <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
@@ -1432,7 +1449,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                 <p className="text-sm font-medium text-gray-500 mb-1">Setup / Onboarding</p>
                                                 <p className="text-xs text-gray-400">Pago Único</p>
                                             </div>
-                                            <div className="text-3xl font-bold tracking-tighter text-gray-700 dark:text-gray-300">${calculations.setupFee.toLocaleString()}</div>
+                                            <div className="text-3xl font-bold tracking-tighter text-gray-700 dark:text-gray-300">{formatMoney(calculations.setupFee, contractVars.currency)}</div>
                                         </div>
       
                                         <div className="bg-black dark:bg-white text-white dark:text-black p-6 rounded-2xl flex justify-between items-center shadow-lg">
@@ -1440,18 +1457,18 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                 <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Valor Total Contrato</p>
                                                 <p className="text-xs opacity-50 mt-1">LTV (Life Time Value)</p>
                                             </div>
-                                            <div className="text-3xl font-bold tracking-tight">${calculations.contractValue.toLocaleString()}</div>
+                                            <div className="text-3xl font-bold tracking-tight">{formatMoney(calculations.contractValue, contractVars.currency)}</div>
                                         </div>
       
                                         {/* Internal Profit Stats */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-900 text-center">
                                                 <p className="text-xs text-green-800 dark:text-green-300 font-bold uppercase mb-1">Ganancia Estimada</p>
-                                                <p className="text-xl font-bold text-green-700 dark:text-green-400">${calculations.profit.toLocaleString()}</p>
+                                                <p className="text-xl font-bold text-green-700 dark:text-green-400">{formatMoney(calculations.profit, contractVars.currency)}</p>
                                             </div>
                                             <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900 text-center">
                                                 <p className="text-xs text-red-800 dark:text-red-300 font-bold uppercase mb-1">Costos Externos</p>
-                                                <p className="text-xl font-bold text-red-700 dark:text-red-400">${calculations.totalOutsourcingCost.toLocaleString()}</p>
+                                                <p className="text-xl font-bold text-red-700 dark:text-red-400">{formatMoney(calculations.totalOutsourcingCost, contractVars.currency)}</p>
                                             </div>
                                         </div>
                                     </div>

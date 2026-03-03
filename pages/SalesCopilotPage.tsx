@@ -11,6 +11,7 @@ import {
 import { useToast } from '../components/Toast';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { formatMoney } from '../utils/currency';
 
 // ... (Interfaces ProposalFormData y ServiceItemState se mantienen igual) ...
 interface ProposalFormData {
@@ -20,6 +21,7 @@ interface ProposalFormData {
   targetAudience: string;
   currentSituation: string;
   durationMonths: number;
+  currency: 'ARS' | 'USD';
 }
 
 interface ServiceItemState extends Service {
@@ -47,6 +49,7 @@ export default function SalesCopilotPage() {
     targetAudience: '',
     currentSituation: '',
     durationMonths: 3, // Default a 3 meses
+    currency: 'ARS',
   });
 
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
@@ -99,6 +102,7 @@ export default function SalesCopilotPage() {
               targetAudience: proposal.targetAudience || '',
               currentSituation: proposal.currentSituation || '',
               durationMonths: proposal.durationMonths || 1,
+              currency: proposal.currency || 'ARS',
           });
 
           // Rellenar servicios seleccionados
@@ -201,6 +205,7 @@ export default function SalesCopilotPage() {
         totalRecurringPrice: totals.recurringRevenue,
         totalContractValue: totalContractRevenue,
         aiPromptGenerated: aiPrompt,
+        currency: formData.currency,
         items: itemsData
       };
 
@@ -373,7 +378,7 @@ export default function SalesCopilotPage() {
                         <option value="">Seleccionar servicio...</option>
                         {availableServices.map(s => (
                             <option key={s.id} value={s.id}>
-                                {s.name} ({s.type === 'RECURRING' ? 'Mensual' : 'Único'} - ${s.baseCost})
+                                {s.name} ({s.type === 'RECURRING' ? 'Mensual' : 'Único'} - {formatMoney(s.baseCost, formData.currency)})
                             </option>
                         ))}
                     </select>
@@ -443,10 +448,10 @@ export default function SalesCopilotPage() {
 
                       <div>
                           <Label className="text-xs flex items-center justify-between">
-                             Costo Externo ($)
+                             Costo Externo ({formData.currency})
                              {item.customPrice && item.outsourcingCost ? (
                                  <span className={`text-[10px] ${item.customPrice - item.outsourcingCost > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                     Margen: ${item.customPrice - item.outsourcingCost}
+                                     Margen: {formatMoney(item.customPrice - item.outsourcingCost, formData.currency)}
                                  </span>
                              ) : null}
                           </Label>
@@ -474,22 +479,35 @@ export default function SalesCopilotPage() {
               <DollarSign className="w-5 h-5 text-emerald-500"/> Resumen Financiero
             </h3>
 
+            <div className="mb-4">
+              <Label className="text-xs text-gray-500">Moneda de la Propuesta</Label>
+              <select
+                value={formData.currency}
+                onChange={e => setFormData({...formData, currency: e.target.value as 'ARS' | 'USD'})}
+                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400 mt-1"
+                disabled={isReadOnly}
+              >
+                <option value="ARS">Pesos Argentinos (ARS)</option>
+                <option value="USD">Dólares (USD)</option>
+              </select>
+            </div>
+
             <div className="space-y-3 mb-6">
                 {/* Ingresos */}
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
                     <p className="text-xs text-gray-500 mb-1">Ingresos Brutos (Cliente)</p>
                     <div className="flex justify-between text-sm mb-1">
                         <span>Recurrente ({formData.durationMonths} meses):</span>
-                        <span className="font-medium">${(totals.recurringRevenue * formData.durationMonths).toLocaleString()}</span>
+                        <span className="font-medium">{formatMoney(totals.recurringRevenue * formData.durationMonths, formData.currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                         <span>Pago Único:</span>
-                        <span className="font-medium">${totals.oneTimeRevenue.toLocaleString()}</span>
+                        <span className="font-medium">{formatMoney(totals.oneTimeRevenue, formData.currency)}</span>
                     </div>
                     <div className="border-t border-gray-100 dark:border-slate-700 my-2"></div>
                     <div className="flex justify-between font-bold text-indigo-600 dark:text-indigo-400">
                         <span>Total Contrato:</span>
-                        <span>${totalContractRevenue.toLocaleString()}</span>
+                        <span>{formatMoney(totalContractRevenue, formData.currency)}</span>
                     </div>
                 </div>
 
@@ -498,16 +516,16 @@ export default function SalesCopilotPage() {
                     <p className="text-xs opacity-70 mb-1">Costos Externos (Equipo/Socios)</p>
                     <div className="flex justify-between text-sm mb-1">
                         <span>Recurrente ({formData.durationMonths} meses):</span>
-                        <span>- ${(totals.recurringCost * formData.durationMonths).toLocaleString()}</span>
+                        <span>- {formatMoney(totals.recurringCost * formData.durationMonths, formData.currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                         <span>Pago Único:</span>
-                        <span>- ${totals.oneTimeCost.toLocaleString()}</span>
+                        <span>- {formatMoney(totals.oneTimeCost, formData.currency)}</span>
                     </div>
                     <div className="border-t border-red-200 dark:border-red-700/50 my-2"></div>
                     <div className="flex justify-between font-bold">
                         <span>Total Costos:</span>
-                        <span>- ${totalContractCost.toLocaleString()}</span>
+                        <span>- {formatMoney(totalContractCost, formData.currency)}</span>
                     </div>
                 </div>
 
@@ -519,7 +537,7 @@ export default function SalesCopilotPage() {
                             <p className="text-xs opacity-70">Margen estimado: {margin}%</p>
                         </div>
                         <p className="text-2xl font-black">
-                            ${netProfit.toLocaleString()}
+                            {formatMoney(netProfit, formData.currency)}
                         </p>
                     </div>
                  </div>
@@ -664,7 +682,7 @@ export default function SalesCopilotPage() {
                                                     </Badge>
                                                 </td>
                                                 <td className="p-4 text-right font-bold text-gray-900">
-                                                    ${item.customPrice?.toLocaleString()}
+                                                    {formatMoney(item.customPrice || 0, formData.currency)}
                                                 </td>
                                             </tr>
                                         ))}
@@ -680,11 +698,11 @@ export default function SalesCopilotPage() {
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
                                         <span>Inversión Mensual (Recurrente):</span>
-                                        <span className="font-medium">${totals.recurringRevenue.toLocaleString()}</span>
+                                        <span className="font-medium">{formatMoney(totals.recurringRevenue, formData.currency)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Inversión Inicial (Único):</span>
-                                        <span className="font-medium">${totals.oneTimeRevenue.toLocaleString()}</span>
+                                        <span className="font-medium">{formatMoney(totals.oneTimeRevenue, formData.currency)}</span>
                                     </div>
                                     <div className="flex justify-between text-gray-500">
                                         <span>Duración del contrato:</span>
@@ -693,7 +711,7 @@ export default function SalesCopilotPage() {
                                     <hr className="my-2 border-gray-300"/>
                                     <div className="flex justify-between text-xl font-black text-indigo-600">
                                         <span>Valor Total del Contrato:</span>
-                                        <span>${totalContractRevenue.toLocaleString()}</span>
+                                        <span>{formatMoney(totalContractRevenue, formData.currency)}</span>
                                     </div>
                                 </div>
                             </div>

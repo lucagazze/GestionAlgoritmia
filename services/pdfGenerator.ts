@@ -2,6 +2,7 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Proposal, ProposalItem, Contractor } from '../types';
+import { formatMoney } from '../utils/currency';
 
 // Helper to load logo
 const loadLogo = async (): Promise<HTMLImageElement> => {
@@ -117,7 +118,7 @@ export const generateProposalPDF = async (proposal: Proposal) => {
         body: proposal.items.map(s => [
             s.serviceSnapshotName + (s.serviceSnapshotDescription ? `\n${s.serviceSnapshotDescription}` : ''),
             s.serviceSnapshotType === 'ONE_TIME' ? 'Setup' : 'Mes',
-            `$${s.serviceSnapshotCost.toLocaleString()}`
+            formatMoney(s.serviceSnapshotCost, proposal.currency)
         ]),
         styles: { 
             fontSize: 9, 
@@ -182,14 +183,14 @@ export const generateProposalPDF = async (proposal: Proposal) => {
     doc.text("Setup Inicial", 125, finalY + 10);
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text(`$${proposal.totalOneTimePrice.toLocaleString()}`, 190, finalY + 10, { align: 'right' });
+    doc.text(formatMoney(proposal.totalOneTimePrice, proposal.currency), 190, finalY + 10, { align: 'right' });
 
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text("Fee Mensual", 125, finalY + 20);
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text(`$${proposal.totalRecurringPrice.toLocaleString()}`, 190, finalY + 20, { align: 'right' });
+    doc.text(formatMoney(proposal.totalRecurringPrice, proposal.currency), 190, finalY + 20, { align: 'right' });
 
     doc.setDrawColor(200);
     doc.line(125, finalY + 28, 190, finalY + 28);
@@ -203,7 +204,7 @@ export const generateProposalPDF = async (proposal: Proposal) => {
     doc.setFontSize(16);
     doc.setTextColor(0, 102, 204);
     doc.setFont("helvetica", "bold");
-    doc.text(`$${proposal.totalContractValue.toLocaleString()}`, 190, finalY + 42, { align: 'right' });
+    doc.text(formatMoney(proposal.totalContractValue, proposal.currency), 190, finalY + 42, { align: 'right' });
 
     doc.save(`Propuesta_${clientName.replace(/\s+/g, '_')}.pdf`);
 };
@@ -242,7 +243,7 @@ export const generatePartnerPDF = async (proposal: Proposal, contractor: Contrac
         body: items.map(s => [
             s.serviceSnapshotName + (s.serviceSnapshotDescription ? `\n${s.serviceSnapshotDescription}` : ''),
             s.serviceSnapshotType === 'ONE_TIME' ? 'Setup' : 'Mes',
-            `$${(s.outsourcingCost || 0).toLocaleString()}`
+            formatMoney(s.outsourcingCost || 0, proposal.currency)
         ]),
         styles: { fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [0, 0, 0], textColor: 255, fontStyle: 'bold' },
@@ -260,7 +261,7 @@ export const generatePartnerPDF = async (proposal: Proposal, contractor: Contrac
      doc.setFontSize(10); doc.setTextColor(100);
      doc.text("TOTAL A PAGAR", 125, finalY + 13);
      doc.setFontSize(16); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-     doc.text(`$${totalPay.toLocaleString()}`, 190, finalY + 13, { align: 'right' });
+     doc.text(formatMoney(totalPay, proposal.currency), 190, finalY + 13, { align: 'right' });
 
     doc.save(`Orden_${contractor.name.split(' ')[0]}_${clientName}.pdf`);
 };
