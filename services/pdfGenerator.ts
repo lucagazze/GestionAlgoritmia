@@ -189,14 +189,15 @@ export interface MarketingProposalData {
 // Color spec (PROMPT MAESTRO)
 // ======================================
 const C = {
-    NEGRO:        [0, 0, 0]         as [number,number,number],
-    TABLE_HEAD:   [26, 26, 26]      as [number,number,number],  // #1A1A1A
-    ALT_ROW:      [242, 242, 242]   as [number,number,number],  // #F2F2F2
-    BORDER:       [204, 204, 204]   as [number,number,number],  // #CCCCCC
-    BODY:         [51, 51, 51]      as [number,number,number],  // #333333
-    GRIS_SUB:     [85, 85, 85]      as [number,number,number],  // #555555
+    NEGRO:        [15, 23, 42]      as [number,number,number],  // Slate 900
+    TABLE_HEAD:   [30, 58, 138]     as [number,number,number],  // Blue 900 (Professional Default)
+    ALT_ROW:      [248, 250, 252]   as [number,number,number],  // Slate 50
+    BORDER:       [226, 232, 240]   as [number,number,number],  // Slate 200
+    BODY:         [51, 65, 85]      as [number,number,number],  // Slate 700
+    GRIS_SUB:     [100, 116, 139]   as [number,number,number],  // Slate 500
     BLANCO:       [255, 255, 255]   as [number,number,number],
-    VERDE:        [34, 139, 34]     as [number,number,number],
+    VERDE:        [16, 185, 129]    as [number,number,number],  // Emerald 500
+    ACCENT:       [79, 70, 229]     as [number,number,number],  // Indigo 600
 };
 
 // US Letter in points, 1" margins
@@ -231,14 +232,14 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
         if (y + needed > PH - MT - 28) { doc.addPage(); y = MT; }
     };
 
-    // Section title: 14pt bold BLACK UPPERCASE + thick black underline
+    // Section title: 14pt bold BLUE UPPERCASE + thick short accent underline
     const sectionTitle = (text: string) => {
         checkY(30);
-        F('bold', 14, C.NEGRO);
+        F('bold', 14, C.TABLE_HEAD);
         doc.text(text.toUpperCase(), ML, y);
-        doc.setDrawColor(...C.NEGRO);
+        doc.setDrawColor(...C.ACCENT);
         doc.setLineWidth(2);
-        doc.line(ML, y + 4, PW - MR, y + 4);
+        doc.line(ML, y + 4, ML + 40, y + 4);
         doc.setLineWidth(0.2);
         y += 20;
     };
@@ -263,8 +264,9 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     // ▶ bullet
     const bullet = (text: string) => {
         checkY(15);
-        F('normal', 11, C.BODY);
+        F('normal', 10, C.ACCENT);
         doc.text('\u25B6', ML + 8, y);
+        F('normal', 11, C.BODY);
         const lines = doc.splitTextToSize(text, CW - 24);
         doc.text(lines, ML + 22, y);
         y += lines.length * 14 + 3;
@@ -273,8 +275,9 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     // ✔ checkmark bullet
     const checkItem = (text: string) => {
         checkY(15);
-        F('normal', 11, C.BODY);
+        F('normal', 11, C.VERDE);
         doc.text('✔', ML + 8, y);
+        F('normal', 11, C.BODY);
         const lines = doc.splitTextToSize(text, CW - 24);
         doc.text(lines, ML + 22, y);
         y += lines.length * 14 + 3;
@@ -352,42 +355,41 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     // PÁGINA 1 — PORTADA
     // =========================================
 
+    const coverStartY = 240;
+
     // "ALGORITMIA" centered top
     F('bold', 28, C.NEGRO);
-    doc.text('ALGORITMIA', PW / 2, MT + 30, { align: 'center' });
+    doc.text('ALGORITMIA', PW / 2, coverStartY, { align: 'center' });
 
     // Subheader line
     F('normal', 11, C.GRIS_SUB);
-    doc.text(`ALGORITMIA | Propuesta Digital para ${d.clientName} | ${capDate}`, PW / 2, MT + 52, { align: 'center' });
+    doc.text(`ALGORITMIA | Propuesta Digital para ${d.clientName} | ${capDate}`, PW / 2, coverStartY + 22, { align: 'center' });
 
     // Divider
-    doc.setDrawColor(...C.BORDER); doc.setLineWidth(0.5);
-    doc.line(ML + 60, MT + 62, PW - MR - 60, MT + 62);
+    doc.setDrawColor(...C.ACCENT); doc.setLineWidth(1.5);
+    doc.line(ML + 100, coverStartY + 40, PW - MR - 100, coverStartY + 40);
+    doc.setLineWidth(0.2);
 
     // Main title
-    F('bold', 28, C.NEGRO);
-    doc.text('PROPUESTA DE PUBLICIDAD DIGITAL', PW / 2, MT + 110, { align: 'center' });
+    F('bold', 28, C.TABLE_HEAD);
+    doc.text('PROPUESTA DE PUBLICIDAD DIGITAL', PW / 2, coverStartY + 100, { align: 'center' });
 
     // Client name as subtitle
-    F('normal', 14, C.GRIS_SUB);
-    doc.text(d.clientName, PW / 2, MT + 136, { align: 'center' });
+    F('bold', 16, C.NEGRO);
+    doc.text(d.clientName, PW / 2, coverStartY + 130, { align: 'center' });
 
     // Tagline
     const tagline = d.proposalObjective
         ? doc.splitTextToSize(d.proposalObjective, CW * 0.78)[0]
-        : `Estrategia ${d.platforms || 'Meta Ads'} para duplicar ventas online`;
+        : `Estrategia ${String(d.platforms || 'Meta Ads').split(',')[0]} para potenciar ventas online`;
     F('italic', 12, C.GRIS_SUB);
-    doc.text(tagline, PW / 2, MT + 162, { align: 'center' });
-
-    // Divider bottom
-    doc.setDrawColor(...C.BORDER); doc.setLineWidth(0.5);
-    doc.line(ML + 60, PH - 180, PW - MR - 60, PH - 180);
+    doc.text(tagline, PW / 2, coverStartY + 155, { align: 'center' });
 
     // Footer info on cover
     F('normal', 11, C.BODY);
-    doc.text(`Preparado por Algoritmia • ${capDate}`, PW / 2, PH - 155, { align: 'center' });
-    F('normal', 11, C.GRIS_SUB);
-    doc.text('Algoritmia | algoritmiadesarrollos.com.ar', PW / 2, PH - 134, { align: 'center' });
+    doc.text(`Preparado por Algoritmia • ${capDate}`, PW / 2, coverStartY + 260, { align: 'center' });
+    F('normal', 10, C.GRIS_SUB);
+    doc.text('algoritmiadesarrollos.com.ar', PW / 2, coverStartY + 280, { align: 'center' });
     addFooter();
 
     // =========================================

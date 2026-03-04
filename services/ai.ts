@@ -548,46 +548,44 @@ export const ai = {
   fillProposalWithAI: async (rawText: string): Promise<any> => {
       try {
           const client = await getClient();
-          const prompt = `Sos un experto en marketing digital. El usuario te dio información desordenada sobre su cliente y lo que le va a ofrecer.
-Interpreta esa información y devuélvela estructurada en JSON.
+          const prompt = `Sos un Director Estratégico de Marketing Digital y un Copywriter persuasivo (Estilo Alex Hormozi u Ogilvy). 
+Un vendedor de tu agencia te acaba de pasar información suelta y desordenada (dictada o en notas) sobre un cliente potencial y lo que le van a ofrecer.
 
-INFORMACIÓN DEL USUARIO:
+TU MISIÓN: Estructurar esa información, pero MÁS IMPORTANTE, PENSAR y REDACTAR mágicamente el contenido persuasivo que falta (público objetivo, dolores, objetivo de la propuesta, posicionamiento, textos de recomendación) para armar una propuesta comercial de altísimo estándar y que cierre ventas. Si el usuario te da un nicho y un servicio, vos debes deducir y redactar como un verdadero experto.
+
+INFORMACIÓN BRUTA DEL USUARIO:
 """
 ${rawText}
 """
 
-Devuelve ÚNICAMENTE un JSON válido con estos campos (usa null si no hay información suficiente, NO inventes datos):
+Devuelve ÚNICAMENTE un JSON válido con los siguientes campos. Para campos estratégicos que el usuario no mencionó, INVENTA Y REDACTA LA MEJOR ESTRATEGIA basándote en la industria de la que se hable:
+
 {
-  "clientName": null,
-  "clientIndustry": null,
-  "clientWebsite": null,
-  "clientLocation": null,
-  "clientCompetitors": null,
-  "clientDifferential": null,
-  "clientSocialPresence": null,
-  "clientAvgTicket": null,
-  "clientMonthlySales": null,
-  "proposalObjective": null,
-  "targetRevenue": null,
-  "timeframe": null,
-  "platforms": null,
-  "dailyAdBudget": null,
-  "targetAudience": null,
-  "painPoint": null,
-  "positioning": null,
-  "plans": null,
-  "excludedFromService": null,
-  "contractConditions": null,
-  "avgTicket": null,
-  "numInitialAds": null,
-  "scenarios": null
+  "clientName": (String extraído o nulo),
+  "clientIndustry": (Deducido si no se da),
+  "clientWebsite": (Extraído o nulo),
+  "clientLocation": (Extraído, o propuesto genéricamente por la industria),
+  "clientCompetitors": "...", (Deduce competidores comunes o el panorama de mercado),
+  "clientDifferential": "...", (Inventa un diferencial atractivo enfocado a conversiones si no se da),
+  "clientSocialPresence": (Extraído o nulo),
+  "clientAvgTicket": (Extraído numérico o string numérico, o nulo),
+  "clientMonthlySales": (Extraído o nulo),
+  "proposalObjective": "...", (Un objetivo persuasivo y macro orientado a resultados de negocio),
+  "targetRevenue": (String de ingresos proyectados, si aplica. Opcional),
+  "timeframe": (Ej: "3 a 6 meses para validación y escalado de campaña"),
+  "platforms": (Extrae o deduce Meta Ads, Google Ads, TikTok Ads según la lógica),
+  "dailyAdBudget": (String o número de la inversión en pauta diaria/mensual mencionada. Ej: "USD 15 diarios"),
+  "targetAudience": "...", (Describe psicológicamente y demográficamente al Buyer Persona),
+  "painPoint": "...", (Describe un dolor profundo que tu servicio publicitario le va a solucionar),
+  "positioning": "...", (El ángulo comercial a comunicar en los anuncios),
+  "recommendationText": "...", (Redacta de forma persuasiva la recomendación final del plan sugerido al cliente. Ej: "Basado en nuestro análisis, sugerimos empezar con el Plan..."),
+  "plans": (Solo si se mencionan servicios o precios, estructura en un Array de Objetos: [{"name": "Plan...", "price": 500, "includes": ["Setup de campañas", "Reporte"]}] o null si no hay info),
+  "contractConditions": "...", (Condiciones estándares amigables si no las menciona)
 }
 
 REGLAS:
-- plans: si menciona precio o servicios -> [{name: "...", price: N, includes: ["servicio 1", "servicio 2"]}]
-- scenarios: si hay ticket promedio y presupuesto de pauta -> [{label:"Pesimista",cpa:N,newSales:N},{label:"Normal",cpa:N,newSales:N},{label:"Optimista",cpa:N,newSales:N}]
-- numInitialAds: número de anuncios si lo menciona, sino null
-- Responde SOLO JSON válido sin texto extra`;
+- PENSAMIENTO ESTRATÉGICO: Actúa como el experto. Llena los campos de texto con respuestas profesionales de copywriting que enamoren al cliente al leer su propuesta.
+- FORMATO JSON ESTRICTO: Responde puramente un objeto JSON, sin \`\`\`json\`\`\` ni texto extra afuera. Las claves deben coincidir EXACTAMENTE con el esquema arriba.`;
 
           const response = await client.models.generateContent({
               model: MODEL_NAME,
