@@ -140,7 +140,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                 </Card>
             </div>
 
-            {/* 3. CONTEXTO ESTRATÉGICO & CONTACTO */}
+            {/* 3. CONTEXTO ESTRATÉGICO & COMERCIAL */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* COLUMNA IZQUIERDA: EL CEREBRO DEL CLIENTE */}
@@ -157,8 +157,8 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                 <Textarea 
                                     className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[80px] text-sm font-medium" 
                                     placeholder="¿Qué quieren lograr? (Punto B)"
-                                    value={formData.contextObjectives || ''} // ✅ Lee del estado
-                                    onChange={e => setFormData({...formData, contextObjectives: e.target.value})} // ✅ Escribe al estado
+                                    value={formData.contextObjectives || ''} 
+                                    onChange={e => setFormData({...formData, contextObjectives: e.target.value})} 
                                 />
                             </div>
                             <div>
@@ -168,6 +168,101 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                     placeholder="¿Qué les duele hoy? (Punto A)"
                                     value={formData.contextProblem || ''}
                                     onChange={e => setFormData({...formData, contextProblem: e.target.value})}
+                                />
+                            </div>
+                            <div className="border-t border-gray-100 dark:border-slate-800 pt-4 mt-2">
+                                <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Datos Comerciales</Label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label className="text-[10px] text-gray-500">Presupuesto Diario Ads</Label>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-gray-400 font-bold">$</span>
+                                            <Input 
+                                            className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none w-full text-right"
+                                            value={formData.dailyAdBudget || ''}
+                                            onChange={e => setFormData({...formData, dailyAdBudget: e.target.value})}
+                                            placeholder="Eg: Aprox $100K"
+                                        />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label className="text-[10px] text-gray-500">Ticket Promedio</Label>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-gray-400 font-bold">$</span>
+                                            <Input 
+                                                type="number"
+                                                className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
+                                                value={formData.avgTicket || 0}
+                                                onChange={e => setFormData({...formData, avgTicket: parseFloat(e.target.value)})}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-[10px] text-gray-500">Plataformas</Label>
+                                        <Input 
+                                            className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
+                                            placeholder="Meta Ads, Google Ads..."
+                                            value={formData.platforms || ''}
+                                            onChange={e => setFormData({...formData, platforms: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-[10px] text-gray-500">Competidores Mencionados</Label>
+                                        <Input 
+                                            className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
+                                            placeholder="Nombres de competencia..."
+                                            value={formData.competitors || ''}
+                                            onChange={e => setFormData({...formData, competitors: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <Label className="text-[10px] text-gray-500">Presencia en Redes</Label>
+                                        <Input 
+                                            className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
+                                            placeholder="Instagram 5k, TikTok..."
+                                            value={formData.socialPresence || ''}
+                                            onChange={e => setFormData({...formData, socialPresence: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                     </Card>
+                     
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                        <Label className="uppercase text-xs font-bold text-green-500 tracking-wider mb-4 flex items-center gap-2">
+                            <span className="bg-green-100 dark:bg-green-900/30 p-1 rounded">📈</span> Proyecciones de Crecimiento
+                        </Label>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-[10px] text-gray-500">Facturación Actual Aprox.</Label>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-400 font-bold">$</span>
+                                    <Input 
+                                        type="number"
+                                        className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                        value={formData.monthlySales || 0}
+                                        onChange={e => setFormData({...formData, monthlySales: parseFloat(e.target.value)})}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="text-[10px] text-gray-500">Meta Numérica / Deseo</Label>
+                                <Input 
+                                    className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                    placeholder="Llegar a $10M"
+                                    value={formData.targetRevenue || ''}
+                                    onChange={e => setFormData({...formData, targetRevenue: e.target.value})}
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <Label className="text-[10px] text-gray-500">Plazo Esperado</Label>
+                                <Input 
+                                    className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                    placeholder="3 a 6 meses"
+                                    value={formData.timeframe || ''}
+                                    onChange={e => setFormData({...formData, timeframe: e.target.value})}
                                 />
                             </div>
                         </div>
@@ -193,6 +288,32 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                             onChange={e => setFormData({...formData, growthStrategy: e.target.value})}
                         />
                      </Card>
+
+                    <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                        <Label className="uppercase text-xs font-bold text-gray-500 tracking-wider mb-4 flex items-center gap-2">
+                            <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 p-1 rounded">🛒</span> Posicionamiento y Competencia
+                        </Label>
+                        <div className="space-y-4">
+                            <div>
+                                <Label className="text-xs text-gray-500 mb-1">Diferencial / Ventaja</Label>
+                                <Textarea 
+                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[60px] text-sm" 
+                                    placeholder="¿Por qué elegirlos a ellos?"
+                                    value={formData.differential || ''}
+                                    onChange={e => setFormData({...formData, differential: e.target.value})}
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs text-gray-500 mb-1">Posicionamiento Deseado</Label>
+                                <Input 
+                                    className="bg-gray-50 dark:bg-slate-800 border-none font-medium text-sm" 
+                                    placeholder="Calidad premium, Precio..."
+                                    value={formData.positioning || ''}
+                                    onChange={e => setFormData({...formData, positioning: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                    </Card>
                 </div>
 
                 {/* COLUMNA DERECHA: CONTACTO & BRAND (Lo que ya tenías) */}

@@ -164,8 +164,9 @@ export interface MarketingProposalData {
     targetRevenue: string;
     timeframe: string;
     platforms: string;
-    dailyAdBudget: number;
+    dailyAdBudget: string;
     targetAudience: string;
+    recommendationText?: string;
     painPoint: string;
     positioning: string;
     agencyName: string;
@@ -206,10 +207,16 @@ const CW = PW - ML - MR; // 468pt
 
 export const generateMarketingProposalPDF = async (d: MarketingProposalData): Promise<void> => {
     const doc: any = new jsPDF({ unit: 'pt', format: 'letter', orientation: 'portrait' });
-    const monthlyBudget = d.dailyAdBudget * 30;
+    let monthlyBudget = 0;
+    if (typeof d.dailyAdBudget === 'string') {
+        // Simple heuristic to extract a number if possible, or leave 0
+        const match = d.dailyAdBudget.match(/\d+/);
+        if (match) monthlyBudget = Number(match[0]) * 30;
+    } else {
+        monthlyBudget = (d.dailyAdBudget || 0) * 30;
+    }
     const dateStr = new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
     const capDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-    const numAds = d.numInitialAds || 5;
 
     let y = MT;
 
@@ -421,85 +428,17 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
         ['Público objetivo',  d.targetAudience || '—'],
         ['Punto de dolor',    d.painPoint || '—'],
         ['Posicionamiento',   d.positioning || '—'],
-        ['Anuncios iniciales',`${numAds} anuncios`],
-        ['Inversión inicial', `USD ${monthlyBudget.toLocaleString()}/mes (USD ${d.dailyAdBudget}/día)`],
+        ['Inversión inicial sugerida', d.dailyAdBudget ? `${d.dailyAdBudget}` : '—'],
     ]);
 
     subTitle('Método de trabajo');
-    bullet('Semana 1: Configuración de cuentas, instalación de Pixel y Google Tag Manager, estructura de campañas por objetivo.');
-    bullet('Semana 2–3: Lanzamiento de los ' + numAds + ' anuncios iniciales. Monitoreo diario de CPA, CTR y ROAS.');
-    bullet('Semana 4: Primer análisis real. Pausa de creativos de bajo rendimiento, escala de los ganadores.');
-    bullet('Mes 2 en adelante: Ciclo de optimización continua — nuevos creativos cada 15 días, ajuste de audiencias y presupuesto según datos.');
-    bullet('Reporte quincenal con resultados, decisiones tomadas y próximos pasos.');
+    bullet('Semanas 1 y 2: Puesta a punto, configuración de cuentas, instalación de Pixel y recolección de contenido activo.');
+    bullet('Semanas 3 y 4: Lanzamiento de los anuncios iniciales. Monitoreo y prueba de efectividad.');
+    bullet('Mes 2 en adelante: Ciclo de optimización continua — iteración de creatividades, ajuste de presupuestos.');
+    bullet('Mes 3: Etapa de escalado sobre estrategias validadas e incursión en más perfiles de audiencia.');
     addFooter();
 
-    // =========================================
-    // PÁGINA 3 — ESCENARIOS DE RESULTADOS
-    // =========================================
-    doc.addPage(); y = MT;
-    sectionTitle('Escenarios de Resultados — Primer Mes');
-
-    F('normal', 11, C.BODY);
-    const escIntro = doc.splitTextToSize(
-        `Estas proyecciones están calculadas sobre un ticket promedio de USD ${d.avgTicket || d.clientAvgTicket} y una inversión mensual en pauta de USD ${monthlyBudget.toLocaleString()}. Son estimaciones conservadoras basadas en el comportamiento promedio de campañas similares.`,
-        CW
-    );
-    doc.text(escIntro, ML, y);
-    y += escIntro.length * 14 + 14;
-
-    // 5-column scenarios table
-    const scW = [100, 92, 92, 112, 72]; // total = 468
-    const scHeaders = ['Escenario', 'Costo por venta', 'Ventas nuevas/mes', 'Ingresos estimados', 'Retorno x $1'];
-    const sc = d.scenarios;
-
-    const calcRetorno = (s: { newSales: number }) =>
-        monthlyBudget > 0
-            ? `${((d.avgTicket * s.newSales) / monthlyBudget).toFixed(1)}x`
-            : '—';
-
-    const scRows = sc.map((s, i) => [
-        s.label,
-        `USD ${s.cpa}`,
-        `${s.newSales} ventas`,
-        `USD ${(d.avgTicket * s.newSales).toLocaleString()}`,
-        calcRetorno(s),
-    ]);
-
-    // Header row
-    checkY(22);
-    let cx = ML;
-    scHeaders.forEach((h, i) => {
-        doc.setFillColor(...C.TABLE_HEAD); doc.setDrawColor(...C.BORDER);
-        doc.rect(cx, y, scW[i], 22, 'FD');
-        F('bold', 10, C.BLANCO);
-        doc.text(h, cx + scW[i] / 2, y + 15, { align: 'center' });
-        cx += scW[i];
-    });
-    y += 22;
-
-    scRows.forEach((row, ri) => {
-        checkY(22);
-        cx = ML;
-        const bg = ri % 2 === 0 ? C.BLANCO : C.ALT_ROW;
-        row.forEach((cell, ci) => {
-            doc.setFillColor(...bg); doc.setDrawColor(...C.BORDER);
-            doc.rect(cx, y, scW[ci], 22, 'FD');
-            F(ci === 0 ? 'bold' : 'normal', 10, C.BODY);
-            doc.text(cell, cx + scW[ci] / 2, y + 15, { align: 'center' });
-            cx += scW[ci];
-        });
-        y += 22;
-    });
-    y += 10;
-
-    F('italic', 9, C.GRIS_SUB);
-    const noteLines = doc.splitTextToSize(
-        `* El retorno por $1 invertido se calcula dividiendo los ingresos estimados entre la inversión en pauta (USD ${monthlyBudget}/mes). No incluye el fee de gestión. Los resultados pueden variar según el mercado, la estacionalidad y la calidad de los creativos.`,
-        CW
-    );
-    doc.text(noteLines, ML, y);
-    y += noteLines.length * 13 + 12;
-    addFooter();
+    // SE ELIMINARON LOS ESCENARIOS POR PEDIDO DEL USUARIO
 
     // =========================================
     // PÁGINA 4 — PLAN DE ACCIÓN MES 1 + MES 2
@@ -515,7 +454,7 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
 
         // Table header
         checkY(22);
-        cx = ML;
+        let cx = ML;
         ['Período', 'Acciones', 'Qué vas a ver'].forEach((h, i) => {
             doc.setFillColor(...C.TABLE_HEAD); doc.setDrawColor(...C.BORDER);
             doc.rect(cx, y, planW[i], 22, 'FD');
@@ -554,7 +493,7 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
         `El primer mes es de puesta a punto y recolección de datos. Las campañas se activan, el algoritmo aprende y empezamos a identificar qué audiencias y creativos conectan mejor con los compradores de ${d.clientName || 'tu negocio'}.`,
         [
             ['Semana 1', 'Configuración de cuentas, Pixel, Google Tag Manager y estructura de campañas.', 'Infraestructura lista para lanzar sin errores de tracking.'],
-            ['Semana 2', 'Lanzamiento de los ' + numAds + ' anuncios iniciales en ' + (d.platforms || 'Meta Ads') + '.', 'Primeros datos reales: CTR, CPM, primeros resultados.'],
+            ['Semana 2', 'Lanzamiento de los anuncios iniciales en ' + (d.platforms || 'Meta Ads') + '.', 'Primeros datos reales: CTR, CPM, primeros resultados.'],
             ['Semana 3', 'Análisis intermedio. Pausa de creativos de bajo rendimiento.', 'CPA identificado. Tendencias claras de qué funciona.'],
             ['Semana 4', 'Primer escalado y renovación de creativos. Reporte mensual.', 'Resultados del mes y plan concreto para el mes 2.'],
         ]
@@ -589,16 +528,23 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     checkY(40);
     sectionTitle('Planes y Precios');
 
-    // 3-column plan comparison table
-    const planBest = d.plans.length > 1 ? d.plans[1] : d.plans[0];
-    const planBasic = d.plans[0];
+    // Dynamic Plan columns setup
+    // Available width = CW = 468. Service Column = 228 (if we have many plans, shrink it, else 228)
+    const numPlans = d.plans.length > 0 ? d.plans.length : 1;
+    let serviceWidth = 228;
+    if (numPlans > 2) {
+        serviceWidth = Math.max(140, 468 - (100 * numPlans));
+    }
+    const planColWidth = (468 - serviceWidth) / numPlans;
+
+    const planW3 = [serviceWidth, ...Array(numPlans).fill(planColWidth)];
+    const planHeaders3 = ['Servicio incluido', ...d.plans.map(p => p.name)];
+
     const allIncludes = [...new Set(d.plans.flatMap(p => p.includes))];
 
-    // Header: service | plan completo (recomendado) | plan básico
+    // Header: service | plan 1 | plan 2 ...
     checkY(22);
-    const planW3 = [228, 120, 120]; // total = 468
-    const planHeaders3 = ['Servicio incluido', `Plan Completo\n(Recomendado)`, 'Plan Básico'];
-    cx = ML;
+    let cx = ML;
     planHeaders3.forEach((h, i) => {
         doc.setFillColor(...C.TABLE_HEAD); doc.setDrawColor(...C.BORDER);
         doc.rect(cx, y, planW3[i], 26, 'FD');
@@ -621,8 +567,7 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
         doc.text(inc, cx + 6, y + 13);
         cx += planW3[0];
 
-        [planBest, planBasic].forEach((plan, pi) => {
-            if (!plan) { cx += planW3[pi + 1]; return; }
+        d.plans.forEach((plan, pi) => {
             const has = plan.includes.includes(inc);
             doc.setFillColor(...bg); doc.setDrawColor(...C.BORDER);
             doc.rect(cx, y, planW3[pi + 1], 20, 'FD');
@@ -636,7 +581,10 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     // Price row
     checkY(24);
     cx = ML;
-    [['Precio mensual', true], [`USD ${planBest?.price || 0}/mes`, false], [`USD ${planBasic?.price || 0}/mes`, false]].forEach((item, i) => {
+    const priceCells: [string, boolean][] = [['Precio mensual', true]];
+    d.plans.forEach(p => priceCells.push([`USD ${p.price || 0}/mes`, false]));
+
+    priceCells.forEach((item, i) => {
         doc.setFillColor(...C.TABLE_HEAD); doc.setDrawColor(...C.BORDER);
         doc.rect(cx, y, planW3[i], 24, 'FD');
         F('bold', 10, C.BLANCO);
@@ -645,14 +593,14 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     });
     y += 28;
 
-    // Investment table — 2 plan columns
+    // Investment table — n plan columns
     y += 8;
     subTitle('Inversión Total — Primer Mes');
-    const invW = [228, 120, 120];
+    const invW = planW3;
     // Header
     checkY(22);
     cx = ML;
-    ['', `Plan Completo`, 'Plan Básico'].forEach((h, i) => {
+    ['', ...d.plans.map(p => p.name)].forEach((h, i) => {
         doc.setFillColor(...(i === 0 ? [200,200,200] as [number,number,number] : C.TABLE_HEAD));
         doc.setDrawColor(...C.BORDER);
         doc.rect(cx, y, invW[i], 22, 'FD');
@@ -662,11 +610,16 @@ export const generateMarketingProposalPDF = async (d: MarketingProposalData): Pr
     });
     y += 22;
 
-    const invRows = [
-        ['Inversión en publicidad',  `USD ${monthlyBudget.toLocaleString()}`, `USD ${monthlyBudget.toLocaleString()}`],
-        ['Gestión Algoritmia',       `USD ${planBest?.price || 0}`,           `USD ${planBasic?.price || 0}`],
-        ['TOTAL PRIMER MES',         `USD ${monthlyBudget + (planBest?.price || 0)}`, `USD ${monthlyBudget + (planBasic?.price || 0)}`],
-    ];
+    const adsRow = ['Inversión en publicidad'];
+    d.plans.forEach(() => adsRow.push(`USD ${monthlyBudget.toLocaleString()}`));
+
+    const mgmtRow = ['Gestión Algoritmia'];
+    d.plans.forEach(p => mgmtRow.push(`USD ${p.price || 0}`));
+
+    const totalRow = ['TOTAL PRIMER MES'];
+    d.plans.forEach(p => totalRow.push(`USD ${monthlyBudget + (p.price || 0)}`));
+
+    const invRows = [adsRow, mgmtRow, totalRow];
     invRows.forEach((row, ri) => {
         checkY(22);
         cx = ML;

@@ -113,6 +113,20 @@ export interface Project extends Client {
   contextProblem?: string;    // Situación Actual (Dolores)
   contextObjectives?: string; // Objetivo Principal
   currency?: 'ARS' | 'USD'; // ✅ NUEVO: Moneda del cliente
+  
+  // ✅ NUEVO: Datos complementarios de IA
+  dailyAdBudget?: string;
+  platforms?: string;
+  avgTicket?: number;
+  competitors?: string;
+  
+  // ✅ NUEVO 2.0: Campos de alta de cliente
+  monthlySales?: number;
+  differential?: string;
+  socialPresence?: string;
+  targetRevenue?: string;
+  timeframe?: string;
+  positioning?: string;
 }
 
 export interface Contractor {

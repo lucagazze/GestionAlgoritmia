@@ -28,6 +28,7 @@ import RolesPage from '../../pages/RolesPage';
 import ContentIdeasPage from '../../pages/ContentIdeasPage';
 import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage'; // ✅ ADDED
 import MarketingProposalPage from '../../pages/MarketingProposalPage'; // ✅ ADDED
+import NewClientPage from '../../pages/NewClientPage'; // ✅ ADDED
 import { GhostingAlert } from '../GhostingAlert';
 
 export const MainLayout = () => {
@@ -82,6 +83,7 @@ export const MainLayout = () => {
               <Route path="/calculator" element={<CalculatorPage />} />
               <Route path="/payments" element={<PaymentsPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/new" element={<NewClientPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
               <Route path="/partners" element={<PartnersPage />} />
               <Route path="/partners/:id" element={<ContractorDetailPage />} />

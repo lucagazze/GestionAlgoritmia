@@ -20,8 +20,8 @@ const defaultData = (): MarketingProposalData => ({
   clientCompetitors: '', clientDifferential: '', clientSocialPresence: '',
   clientAvgTicket: 0, clientMonthlySales: 0,
   proposalObjective: '', targetRevenue: '', timeframe: '3 meses',
-  platforms: 'Meta Ads (Facebook + Instagram)', dailyAdBudget: 0,
   targetAudience: '', painPoint: '', positioning: 'Calidad y resultados',
+  platforms: 'Meta Ads (Facebook + Instagram)', dailyAdBudget: '',
   agencyName: 'Algoritmia', agencyWebsite: 'www.algoritmiadesarrollos.com.ar',
   proposalLanguage: 'Español', includeCTA: true, includeTerms: true, brandColor: '#1A3C6E',
   numInitialAds: 6,
@@ -40,10 +40,8 @@ const defaultData = (): MarketingProposalData => ({
 });
 
 // ---- Required fields for validation ----
-const REQUIRED_FIELDS: (keyof MarketingProposalData)[] = [
-  'clientName', 'clientIndustry', 'proposalObjective', 'platforms',
-  'targetAudience', 'avgTicket', 'dailyAdBudget'
-];
+// Quitamos la obligatoriedad estricta
+const REQUIRED_FIELDS: (keyof MarketingProposalData)[] = ['clientName'];
 
 // ---- Collapsible Section ----
 const Section: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; hasErrors?: boolean }> = ({ title, icon, children, defaultOpen = true, hasErrors }) => {
@@ -78,197 +76,7 @@ const FormField: React.FC<{ label: string; children: React.ReactNode; hint?: str
 const inputCls = "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white";
 const textareaCls = inputCls + " resize-none";
 
-// ---- AI Fill Modal ----
-const AIFillModal: React.FC<{
-  onClose: () => void;
-  onFill: (data: Partial<MarketingProposalData>) => void;
-  clientId?: string;
-}> = ({ onClose, onFill, clientId }) => {
-  const [text, setText] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [savingToClient, setSavingToClient] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const { showToast } = useToast();
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      audioChunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64 = (reader.result as string).split(',')[1];
-          setProcessing(true);
-          const transcribed = await ai.transcribe({ mimeType: 'audio/webm', data: base64 });
-          if (transcribed) {
-            setText(prev => prev ? prev + ' ' + transcribed : transcribed);
-            showToast('🎤 Transcripción exitosa', 'success');
-          } else {
-            showToast('No se pudo transcribir el audio', 'error');
-          }
-          setProcessing(false);
-        };
-        reader.readAsDataURL(blob);
-      };
-      mr.start();
-      mediaRecorderRef.current = mr;
-      setIsRecording(true);
-    } catch {
-      showToast('No se pudo acceder al micrófono', 'error');
-    }
-  };
-
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    setIsRecording(false);
-  };
-
-  const handleProcess = async () => {
-    if (!text.trim()) { showToast('Escribí o dictá algo primero', 'error'); return; }
-    setProcessing(true);
-    try {
-      const result = await ai.fillProposalWithAI(text);
-      if (!result) { showToast('Error al procesar con IA', 'error'); return; }
-
-      // Strip nulls — keep only non-null values
-      const cleaned: Partial<MarketingProposalData> = {};
-      for (const [k, v] of Object.entries(result)) {
-        if (v !== null && v !== undefined) (cleaned as any)[k] = v;
-      }
-
-      // Save relevant fields to client profile if clientId is provided
-      if (clientId && Object.keys(cleaned).length > 0) {
-        setSavingToClient(true);
-        try {
-          const clientUpdate: Record<string, any> = {};
-          if (cleaned.targetAudience) clientUpdate.targetAudience = cleaned.targetAudience;
-          if (cleaned.proposalObjective) clientUpdate.contextObjectives = cleaned.proposalObjective;
-          if (cleaned.painPoint) clientUpdate.contextProblem = cleaned.painPoint;
-          if (cleaned.positioning) clientUpdate.growthStrategy = cleaned.positioning;
-          if (cleaned.clientIndustry) clientUpdate.industry = cleaned.clientIndustry;
-          if (cleaned.clientLocation) clientUpdate.location = cleaned.clientLocation;
-          if (cleaned.clientWebsite) clientUpdate.proposalUrl = cleaned.clientWebsite;
-          if (cleaned.brandColor) clientUpdate.brandColors = [cleaned.brandColor];
-
-          if (Object.keys(clientUpdate).length > 0) {
-            await db.projects.update(clientId, clientUpdate);
-            showToast('💾 Información guardada en el perfil del cliente', 'success');
-          }
-        } catch (e) {
-          console.error('Error saving to client:', e);
-          showToast('No se pudo guardar en el cliente', 'error');
-        } finally {
-          setSavingToClient(false);
-        }
-      }
-
-      onFill(cleaned);
-      onClose();
-      showToast(`✅ ${Object.keys(cleaned).length} campos completados por la IA`, 'success');
-    } catch (e) {
-      console.error(e);
-      showToast('Error al procesar', 'error');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="font-bold text-lg">Completar con IA</h2>
-                <p className="text-indigo-200 text-sm">Contame sobre el cliente y qué le vas a ofrecer — yo lleno el formulario</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Voice button */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={processing}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${isRecording
-                ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-lg shadow-red-500/30'
-                : 'bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200'
-              }`}
-            >
-              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              {isRecording ? 'Detener dictado' : 'Dictar por voz'}
-            </button>
-            {isRecording && (
-              <div className="flex items-center gap-2 text-red-500 text-sm font-medium">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
-                Grabando...
-              </div>
-            )}
-            {processing && !isRecording && (
-              <div className="flex items-center gap-2 text-indigo-600 text-sm font-medium">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Transcribiendo...
-              </div>
-            )}
-          </div>
-
-          {/* Text area */}
-          <div className="relative">
-            <textarea
-              className={textareaCls + " min-h-[220px]"}
-              placeholder={`Contame todo lo que sabés del cliente y lo que le vas a ofrecer. Por ejemplo:
-
-"El cliente se llama Pampita Moda, vende ropa femenina en Buenos Aires. Tiene Instagram con 5k seguidores. Su ticket promedio es $50. Le voy a ofrecer Meta Ads por $400/mes, incluye gestión de campañas, 5 creatividades por mes y reporte semanal. El presupuesto de pauta es $15 por día. Su diferencial es ropa exclusiva con diseños propios..."`}
-              value={text}
-              onChange={e => setText(e.target.value)}
-            />
-            {text && (
-              <button onClick={() => setText('')} className="absolute top-3 right-3 w-6 h-6 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors">
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-
-          <p className="text-xs text-gray-400">
-            💡 Podés mezclar voz y texto. Cuanto más info des, más campos se completan. Los campos sin info quedarán en rojo para que los completes manualmente.
-            {clientId && <span className="ml-1 text-indigo-500 font-semibold">La información se guardará también en el perfil del cliente.</span>}
-          </p>
-
-          {/* Actions */}
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-sm">
-              Cancelar
-            </button>
-            <button
-              onClick={handleProcess}
-              disabled={processing || savingToClient || !text.trim()}
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-500/20 text-sm active:scale-95"
-            >
-              {(processing || savingToClient) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              {processing ? 'Analizando...' : savingToClient ? 'Guardando...' : 'Completar formulario'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { AIFillModal } from '../components/modals/AIFillModal';
 
 // ---- Main Page ----
 export default function MarketingProposalPage() {
@@ -339,6 +147,20 @@ export default function MarketingProposalPage() {
     updatePlan(planIndex, 'includes', lines);
   };
 
+  const addPlan = () => {
+    setData(prev => ({
+      ...prev,
+      plans: [...prev.plans, { name: `Plan ${prev.plans.length + 1}`, price: 0, includes: [] }]
+    }));
+  };
+
+  const removePlan = (index: number) => {
+    setData(prev => ({
+      ...prev,
+      plans: prev.plans.filter((_, i) => i !== index)
+    }));
+  };
+
   const saveToClient = async () => {
     if (!selectedClientId) { showToast('Seleccioná un cliente primero', 'error'); return; }
     try {
@@ -351,24 +173,15 @@ export default function MarketingProposalPage() {
         location: data.clientLocation,
         proposalUrl: data.clientWebsite,
         brandColors: data.brandColor ? [data.brandColor] : undefined,
+        platforms: data.platforms,
+        dailyAdBudget: data.dailyAdBudget
       });
       showToast('💾 Datos guardados en el perfil del cliente', 'success');
     } catch (e) { showToast('Error al guardar', 'error'); }
   };
 
   const handleGenerate = async () => {
-    // Validate required fields
-    const missing = new Set<string>();
-    REQUIRED_FIELDS.forEach(f => {
-      const v = data[f];
-      if (!v || v === 0 || v === '') missing.add(f as string);
-    });
-    if (missing.size > 0) {
-      setMissingFields(missing);
-      showToast(`⚠️ Completá los campos requeridos (${missing.size} faltantes)`, 'error');
-      return;
-    }
-    if (!data.clientName.trim()) { showToast('Completá el nombre del cliente', 'error'); return; }
+    if (!data.clientName.trim()) { showToast('Completá el nombre del cliente para generar', 'error'); return; }
     setGenerating(true);
     try {
       await generateMarketingProposalPDF(data);
@@ -386,8 +199,7 @@ export default function MarketingProposalPage() {
   // Determine sections with errors
   const block1Errors = ['clientName', 'clientIndustry'].some(f => isMissing(f as any));
   const block2Errors = ['proposalObjective'].some(f => isMissing(f as any));
-  const block3Errors = ['platforms', 'targetAudience', 'dailyAdBudget'].some(f => isMissing(f as any));
-  const block5Errors = ['avgTicket'].some(f => isMissing(f as any));
+  const block3Errors = ['platforms', 'dailyAdBudget'].some(f => isMissing(f as any));
 
   return (
     <div className="space-y-6 pb-20 max-w-7xl mx-auto">
@@ -510,7 +322,7 @@ export default function MarketingProposalPage() {
           </Section>
 
           {/* Block 3 — Strategy */}
-          <Section title="Bloque 3 — Plataformas y Estrategia" icon={<TrendingUp className="w-4 h-4" />} hasErrors={block3Errors}>
+          <Section title="Bloque 3 — Plataformas y Estrategia" icon={<TrendingUp className="w-4 h-4" />}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField label="Plataformas" required missing={isMissing('platforms')}>
                 <input className={inputCls} value={data.platforms} onChange={e => set('platforms', e.target.value)} placeholder="Ej: Meta Ads, Google Ads, TikTok Ads" />
@@ -519,7 +331,7 @@ export default function MarketingProposalPage() {
                 <input className={inputCls} type="number" value={data.dailyAdBudget || ''} onChange={e => set('dailyAdBudget', Number(e.target.value))} placeholder="10" />
               </FormField>
             </div>
-            <FormField label="Público objetivo" required missing={isMissing('targetAudience')}>
+            <FormField label="Público objetivo">
               <textarea className={textareaCls} rows={2} value={data.targetAudience} onChange={e => set('targetAudience', e.target.value)} placeholder="Ej: Mujeres 25-45 años, Buenos Aires, interesadas en moda sustentable" />
             </FormField>
             <FormField label="Punto de dolor del cliente ideal">
@@ -535,9 +347,16 @@ export default function MarketingProposalPage() {
             <div className="space-y-4">
               {data.plans.map((plan, idx) => (
                 <div key={idx} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3 border border-gray-100 dark:border-slate-700">
-                  <div className="flex items-center gap-2 font-bold text-sm text-indigo-700 dark:text-indigo-300">
-                    <span className="w-6 h-6 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-[10px] font-black">{idx + 1}</span>
-                    Plan {idx + 1}
+                  <div className="flex items-center justify-between font-bold text-sm text-indigo-700 dark:text-indigo-300">
+                    <div className="flex items-center gap-2">
+                       <span className="w-6 h-6 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-[10px] font-black">{idx + 1}</span>
+                       Plan {idx + 1}
+                    </div>
+                    {data.plans.length > 1 && (
+                      <button onClick={() => removePlan(idx)} className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1">
+                        <X className="w-3 h-3"/> Quitar
+                      </button>
+                    )}
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <FormField label="Nombre del plan">
@@ -552,51 +371,19 @@ export default function MarketingProposalPage() {
                   </FormField>
                 </div>
               ))}
+              <button onClick={addPlan} className="mt-3 w-full py-2.5 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 text-gray-500 font-bold text-sm hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors">
+                 + Añadir otro plan
+              </button>
             </div>
+            <FormField label="Recomendación Final">
+              <textarea className={textareaCls} rows={4} value={data.recommendationText || ''} onChange={e => set('recommendationText', e.target.value)} placeholder="Explica brevemente por qué recomiendas uno de los planes por sobre el resto." />
+            </FormField>
             <FormField label="¿Qué NO incluye el servicio?">
               <textarea className={textareaCls} rows={3} value={data.excludedFromService} onChange={e => set('excludedFromService', e.target.value)} />
             </FormField>
             <FormField label="Condiciones especiales">
               <textarea className={textareaCls} rows={2} value={data.contractConditions} onChange={e => set('contractConditions', e.target.value)} />
             </FormField>
-            <FormField label="Cantidad de anuncios iniciales" hint="Se usará para la sección 'Los N Anuncios Iniciales' del PDF">
-              <input className={inputCls} type="number" min={2} max={12} value={data.numInitialAds || 6} onChange={e => set('numInitialAds', Number(e.target.value))} />
-            </FormField>
-          </Section>
-
-          {/* Block 5 — Projections */}
-          <Section title="Bloque 5 — Proyecciones y Escenarios" icon={<BarChart3 className="w-4 h-4" />} hasErrors={block5Errors}>
-            <FormField label="Ticket promedio para calcular ROI (USD)" required missing={isMissing('avgTicket')}>
-              <input className={inputCls} type="number" value={data.avgTicket || ''} onChange={e => set('avgTicket', Number(e.target.value))} placeholder="50" />
-            </FormField>
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-slate-800 text-xs font-bold text-gray-500 uppercase">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Escenario</th>
-                    <th className="px-4 py-3 text-left">Costo por venta (USD)</th>
-                    <th className="px-4 py-3 text-left">Ventas nuevas est.</th>
-                    <th className="px-4 py-3 text-left text-gray-400">Ingresos (auto)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {data.scenarios.map((s, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30">
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-1 rounded-lg text-xs font-bold ${idx === 0 ? 'bg-red-100 text-red-700' : idx === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{s.label}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input className="w-24 bg-transparent border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" type="number" value={s.cpa || ''} onChange={e => updateScenario(idx, 'cpa', Number(e.target.value))} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input className="w-24 bg-transparent border border-gray-200 dark:border-slate-600 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" type="number" value={s.newSales || ''} onChange={e => updateScenario(idx, 'newSales', Number(e.target.value))} />
-                      </td>
-                      <td className="px-4 py-3 text-gray-400 font-bold">${((data.avgTicket || 0) * s.newSales).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </Section>
 
           {/* Block 6 — Visual Identity */}
@@ -657,7 +444,7 @@ export default function MarketingProposalPage() {
                 </div>
                 <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3">
                   <p className="text-[10px] text-gray-400 font-bold uppercase">Plataformas</p>
-                  <p className="font-bold text-gray-900 dark:text-white text-xs">{data.platforms.split(',')[0] || '—'}</p>
+                  <p className="font-bold text-gray-900 dark:text-white text-xs">{String(data.platforms || '').split(',')[0] || '—'}</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -672,18 +459,6 @@ export default function MarketingProposalPage() {
                   </div>
                 ))}
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Escenarios</p>
-                <div className="space-y-1.5">
-                  {data.scenarios.map((s, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs">
-                      <span className={`px-2 py-0.5 rounded-md font-bold ${idx === 0 ? 'bg-red-100 text-red-700' : idx === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{s.label}</span>
-                      <span className="text-gray-500">{s.newSales} ventas</span>
-                      <span className="font-bold text-gray-900 dark:text-white">${((data.avgTicket || 0) * s.newSales).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
               {missingFields.size > 0 && (
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -692,7 +467,7 @@ export default function MarketingProposalPage() {
               )}
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Secciones del PDF</p>
-                {['1. Portada', '2. El Objetivo', '3. Sobre el Negocio', '4. La Estrategia', '5. Escenarios de Resultados', '6. Plan de Acción 3 Meses', '7. Planes y Precios', '8. Compromiso / Garantía', '9. Lo que necesitamos', data.includeCTA ? '10. CTA Final' : null].filter(Boolean).map(s => (
+                {['1. Portada', '2. El Objetivo', '3. Sobre el Negocio', '4. La Estrategia', '5. Plan de Acción 3 Meses', '6. Planes y Precios', '7. Compromiso / Garantía', '8. Lo que necesitamos', data.includeCTA ? '9. CTA Final' : null].filter(Boolean).map(s => (
                   <div key={s} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 py-0.5">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />{s}
                   </div>

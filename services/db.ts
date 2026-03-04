@@ -438,6 +438,20 @@ export const db = {
             contextProblem: profile?.problem || '',      // 'problem' en DB -> 'contextProblem' en App
             contextObjectives: profile?.objectives || '', // 'objectives' en DB -> 'contextObjectives' en App
             currency: data.currency || 'ARS',
+            
+            // ✅ NUEVO: Nuevas columnas extraídas por IA
+            dailyAdBudget: profile?.dailyAdBudget || '',
+            platforms: profile?.platforms || '',
+            avgTicket: profile?.avgTicket || 0,
+            competitors: profile?.competitors || '',
+
+            // ✅ NUEVO 2.0: Más columnas para Alta
+            monthlySales: profile?.monthlySales || 0,
+            differential: profile?.differential || '',
+            socialPresence: profile?.socialPresence || '',
+            targetRevenue: profile?.targetRevenue || '',
+            timeframe: profile?.timeframe || '',
+            positioning: profile?.positioning || '',
          };
     },
     create: async (data: Partial<Project>): Promise<Project> => {
@@ -485,21 +499,54 @@ export const db = {
       }
 
       // Eliminamos los campos que no existen en la tabla Client para evitar errores
-      // Eliminamos los campos que no existen en la tabla Client para evitar errores
       delete clientData.targetAudience;
       delete clientData.contextProblem;
       delete clientData.contextObjectives;
+      delete clientData.dailyAdBudget;
+      delete clientData.platforms;
+      delete clientData.avgTicket;
+      delete clientData.competitors;
+      delete clientData.monthlySales;
+      delete clientData.differential;
+      delete clientData.socialPresence;
+      delete clientData.targetRevenue;
+      delete clientData.timeframe;
+      delete clientData.positioning;
 
       // Actualizar tabla Client
       const { error } = await supabase.from('Client').update(clientData).eq('id', id);
       if (error) throw error;
 
       // 2. ✅ NUEVO: Actualizar tabla ClientProfile si hay datos de contexto
-      if (data.targetAudience !== undefined || data.contextProblem !== undefined || data.contextObjectives !== undefined) {
+      if (
+          data.targetAudience !== undefined || 
+          data.contextProblem !== undefined || 
+          data.contextObjectives !== undefined ||
+          data.dailyAdBudget !== undefined ||
+          data.platforms !== undefined ||
+          data.avgTicket !== undefined ||
+          data.competitors !== undefined ||
+          data.monthlySales !== undefined ||
+          data.differential !== undefined ||
+          data.socialPresence !== undefined ||
+          data.targetRevenue !== undefined ||
+          data.timeframe !== undefined ||
+          data.positioning !== undefined
+      ) {
            const profileUpdate: any = {};
            if (data.targetAudience !== undefined) profileUpdate.targetAudience = data.targetAudience;
            if (data.contextProblem !== undefined) profileUpdate.problem = data.contextProblem; // Mapeo inverso
            if (data.contextObjectives !== undefined) profileUpdate.objectives = data.contextObjectives; // Mapeo inverso
+           if (data.dailyAdBudget !== undefined) profileUpdate.dailyAdBudget = data.dailyAdBudget;
+           if (data.platforms !== undefined) profileUpdate.platforms = data.platforms;
+           if (data.avgTicket !== undefined) profileUpdate.avgTicket = data.avgTicket;
+           if (data.competitors !== undefined) profileUpdate.competitors = data.competitors;
+           if (data.monthlySales !== undefined) profileUpdate.monthlySales = data.monthlySales;
+           if (data.differential !== undefined) profileUpdate.differential = data.differential;
+           if (data.socialPresence !== undefined) profileUpdate.socialPresence = data.socialPresence;
+           if (data.targetRevenue !== undefined) profileUpdate.targetRevenue = data.targetRevenue;
+           if (data.timeframe !== undefined) profileUpdate.timeframe = data.timeframe;
+           if (data.positioning !== undefined) profileUpdate.positioning = data.positioning;
            
            // Usamos upsert para crear el perfil si no existía (clientId es la PK o Unique Key)
            await db.clientProfiles.upsert(id, profileUpdate);

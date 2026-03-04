@@ -5,7 +5,7 @@ import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { useProjects } from '../hooks/queries/useProjects';
 import { Project, ProjectStatus, Contractor, ClientHealth } from '../types';
-import { Badge, Button, Input, Modal, Label, Textarea } from '../components/UIComponents';
+import { Badge, Button, Input, Label, Textarea } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
 import { 
   Plus, Edit2, User, Search, Trash2, Columns, Table as TableIcon, Heart, 
@@ -20,91 +20,9 @@ export default function ProjectsPage() {
   
   // View States
   const [viewMode, setViewMode] = useState<'LIST' | 'KANBAN'>('LIST');
-  
-  // Create Modal State
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  
-  // ✅ New Client Fields
-  const [newClientData, setNewClientData] = useState({
-      industry: '',
-      location: '',
-      email: '',
-      phone: '',
-      description: '' // ✅ NEW AI INPUT
-  });
-  
-  const [newClientContext, setNewClientContext] = useState({
-      targetAudience: '',
-      currentSituation: '', // problem
-      objective: ''        // objectives
-  });
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project | null }>({ x: 0, y: 0, project: null });
-
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleGenerateContext = async () => {
-      if (!newProjectName || !newClientData.industry) {
-          alert("Por favor ingresa Nombre e Industria primero.");
-          return;
-      }
-
-      setIsGenerating(true);
-      try {
-          const context = await ai.generateProjectContext(newProjectName, newClientData.industry, newClientData.description);
-          if (context) {
-              setNewClientContext({
-                  targetAudience: context.targetAudience,
-                  currentSituation: context.problem,
-                  objective: context.objectives
-              });
-          }
-      } catch (error) {
-          console.error("Error generating context:", error);
-          alert("Error al generar contexto con IA.");
-      } finally {
-          setIsGenerating(false);
-      }
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newProjectName) return;
-      try {
-        // 1. Create Client
-        const created = await createProject({
-            name: newProjectName,
-            status: ProjectStatus.ONBOARDING,
-            monthlyRevenue: 0,
-            industry: newClientData.industry,
-            billingDay: 1,
-            email: newClientData.email,
-            phone: newClientData.phone,
-            notes: (newClientData.location ? `Ubicación: ${newClientData.location}\n` : '') + (newClientData.description ? `Descripción: ${newClientData.description}` : '') 
-        });
-
-        // 2. Create Profile (Context)
-        if (newClientContext.targetAudience || newClientContext.currentSituation || newClientContext.objective) {
-            await db.clientProfiles.upsert(created.id, {
-                targetAudience: newClientContext.targetAudience,
-                problem: newClientContext.currentSituation,
-                objectives: newClientContext.objective
-            });
-        }
-
-        // Reset
-        setNewProjectName('');
-        setNewClientData({ industry: '', location: '', email: '', phone: '', description: '' });
-        setNewClientContext({ targetAudience: '', currentSituation: '', objective: '' });
-        
-        setIsCreateModalOpen(false);
-        navigate(`/projects/${created.id}`); // Jump straight to detail
-      } catch (error) {
-        console.error("Failed to create project", error);
-      }
-  };
 
   const handleContextMenu = (e: React.MouseEvent, project: Project) => {
       e.preventDefault();
@@ -262,7 +180,7 @@ export default function ProjectsPage() {
                  <button onClick={() => setViewMode('KANBAN')} className={`p-1.5 rounded-md transition-all ${viewMode === 'KANBAN' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-400'}`}><Columns className="w-4 h-4"/></button>
              </div>
              <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar cliente..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-4 h-4 mr-2" /> Nuevo Cliente</Button>
+            <Button onClick={() => navigate('/projects/new')} className="shadow-lg shadow-black/10 dark:shadow-white/5"><Plus className="w-4 h-4 mr-2" /> Nuevo Cliente</Button>
         </div>
       </div>
 
@@ -346,98 +264,6 @@ export default function ProjectsPage() {
             { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => contextMenu.project && handleDelete(contextMenu.project.id) }
         ]}
       />
-
-      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Nuevo Cliente">
-          <form onSubmit={handleCreate} className="space-y-4 max-h-[80vh] overflow-y-auto px-1">
-              
-              <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                      <Label>Nombre de la Empresa *</Label>
-                      <Input value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="Ej: Acme Corp" autoFocus required />
-                  </div>
-                  
-                  <div>
-                      <Label>Rubro / Industria</Label>
-                      <Input value={newClientData.industry} onChange={e => setNewClientData({...newClientData, industry: e.target.value})} placeholder="Ej: SaaS, Inmobiliaria" />
-                  </div>
-                  <div>
-                      <Label>Ubicación</Label>
-                      <Input value={newClientData.location} onChange={e => setNewClientData({...newClientData, location: e.target.value})} placeholder="Ej: Buenos Aires, AR" />
-                  </div>
-                  
-                  <div>
-                      <Label>Email de Contacto</Label>
-                      <Input type="email" value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} placeholder="contacto@cliente.com" />
-                  </div>
-                  <div>
-                      <Label>Teléfono</Label>
-                      <Input type="tel" value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} placeholder="+54 9 11..." />
-                  </div>
-                  
-                  {/* AI Input */}
-                  <div className="col-span-2">
-                       <Label className="text-indigo-600 font-bold">Descripción del Negocio (Para la IA)</Label>
-                       <Textarea 
-                            value={newClientData.description} 
-                            onChange={e => setNewClientData({...newClientData, description: e.target.value})} 
-                            placeholder="Pega aquí info bruta: descripción, qué venden, quiénes son, web, instagram..."
-                            className="h-20 bg-indigo-50/50 border-indigo-100 dark:bg-indigo-900/10 dark:border-indigo-900/30"
-                       />
-                       <p className="text-[10px] text-gray-400 mt-1">Cuanta más info pegues aquí, mejor será el autocompletado.</p>
-                  </div>
-              </div>
-
-              <div className="border-t border-gray-100 dark:border-slate-800 pt-4 mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                          <ShieldAlert className="w-3 h-3 text-blue-500"/> Contexto Estratégico
-                      </h3>
-                      <button 
-                          type="button"
-                          onClick={handleGenerateContext}
-                          disabled={isGenerating || !newProjectName || !newClientData.industry}
-                          className="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[10px] font-bold rounded-full shadow hover:shadow-indigo-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                          {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                          {isGenerating ? 'Generando...' : 'Completar con IA'}
-                      </button>
-                  </div>
-                  <div className="space-y-3">
-                      <div>
-                          <Label>Público Objetivo</Label>
-                          <Textarea 
-                              value={newClientContext.targetAudience} 
-                              onChange={e => setNewClientContext({...newClientContext, targetAudience: e.target.value})} 
-                              placeholder="¿A quién le venden? Ej: Dueños de PyMEs..."
-                              className="h-20 min-h-[80px]" 
-                          />
-                      </div>
-                      <div>
-                          <Label>Situación Actual (Dolores)</Label>
-                          <Textarea 
-                              value={newClientContext.currentSituation} 
-                              onChange={e => setNewClientContext({...newClientContext, currentSituation: e.target.value})} 
-                              placeholder="¿Qué problemas tienen hoy?"
-                              className="h-20 min-h-[80px]" 
-                          />
-                      </div>
-                      <div>
-                          <Label>Objetivo Principal</Label>
-                          <Textarea 
-                              value={newClientContext.objective} 
-                              onChange={e => setNewClientContext({...newClientContext, objective: e.target.value})} 
-                              placeholder="¿Qué quieren lograr?"
-                              className="h-20 min-h-[80px]" 
-                          />
-                      </div>
-                  </div>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                  <Button type="submit">Crear Cliente</Button>
-              </div>
-          </form>
-      </Modal>
     </div>
   );
 }
