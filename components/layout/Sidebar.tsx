@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { 
   Home, Briefcase, Activity, CalendarDays, Calculator, FileText, CheckSquare, 
   Users, Rocket, Book, MessageSquareMore, LayoutGrid, Workflow, Settings, 
-  X, Sun, Moon, Globe 
+  X, Sun, Moon, Globe, Megaphone
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
               { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600 dark:text-emerald-400' },
               { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600 dark:text-gray-300' },
               { path: '/quotations', icon: <FileText className="w-5 h-5" />, label: 'Presupuestos', color: 'text-pink-600 dark:text-pink-400' },
+              { path: '/marketing-proposal', icon: <Megaphone className="w-5 h-5" />, label: 'Propuesta Publicitaria', color: 'text-violet-600 dark:text-violet-400' },
               { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-orange-600 dark:text-orange-400' },
               { path: '/content-ideas', icon: <FileText className="w-5 h-5" />, label: 'Contenido', color: 'text-pink-600 dark:text-pink-400' }, // ✅ ADDED
               { path: '/roles', icon: <Users className="w-5 h-5" />, label: 'Roles', color: 'text-teal-600 dark:text-teal-400' },

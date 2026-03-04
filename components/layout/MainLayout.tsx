@@ -27,6 +27,7 @@ import QuotationsPage from '../../pages/QuotationsPage';
 import RolesPage from '../../pages/RolesPage';
 import ContentIdeasPage from '../../pages/ContentIdeasPage';
 import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage'; // ✅ ADDED
+import MarketingProposalPage from '../../pages/MarketingProposalPage'; // ✅ ADDED
 import { GhostingAlert } from '../GhostingAlert';
 
 export const MainLayout = () => {
@@ -97,6 +98,7 @@ export const MainLayout = () => {
               <Route path="/automations" element={<AutomationsPage />} />
               <Route path="/portal/:token" element={<ClientPortalPage />} />
               <Route path="/audit" element={<AuditPage />} />
+              <Route path="/marketing-proposal" element={<MarketingProposalPage />} />
             </Routes>
           </div>
 

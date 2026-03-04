@@ -218,9 +218,6 @@ export const ai = {
   /**
    * Genera ideas o guiones específicos para Redes Sociales
    */
-  /**
-   * Genera ideas o guiones específicos para Redes Sociales
-   */
   generateContentScript: async (type: 'IDEA' | 'SCRIPT', data: any) => {
     try {
         const client = await getClient();
@@ -317,8 +314,6 @@ export const ai = {
           return null;
       }
   },
-
-
 
   /**
    * Genera contexto estratégico del proyecto basado en Nombre, Industria y Descripción opcional
@@ -470,133 +465,6 @@ export const ai = {
 
       ⚠️️️ REGLA ABSOLUTA - NUNCA DIGAS "ENTENDIDO":
       Si el usuario pide crear/modificar/borrar algo, DEBES EJECUTARLO INMEDIATAMENTE.
-      NO respondas con:
-      - "Entendido"
-      - "Ok"
-      - "Perfecto"
-      - "Lo haré"
-      - "Claro"
-      
-      EJEMPLO INCORRECTO:
-      Usuario: "Poneme una tarea para mañana"
-      Tú: "Entendido." ❌❌❌ PROHIBIDO
-      
-      EJEMPLO CORRECTO:
-      Usuario: "Poneme una tarea para mañana"
-      Tú: Generas ACTION con CREATE_TASK ✅
-      
-      Si falta información CRÍTICA (como título), usa type: "QUESTION".
-      Si el usuario pide crear, modificar o eliminar algo, DEBES generar una acción JSON.
-
-      🔄 REACT LOOP - TAREAS COMPLEJAS MULTI-PASO:
-      Si la solicitud requiere MÚLTIPLES PASOS o INFORMACIÓN que no tienes:
-      
-      1. USA type: "REASONING" para pensar y planificar
-      2. Especifica el próximo paso en "nextAction"
-      3. El sistema ejecutará la acción y te dará el resultado
-      4. Continúa con el siguiente paso
-      
-      EJEMPLO - Tarea compleja:
-      Usuario: "Busca los proyectos atrasados y mándales un mensaje"
-      
-      Iteración 1 - Tú respondes:
-      {
-        "type": "REASONING",
-        "thought": "Primero necesito buscar proyectos con fecha de cobro vencida",
-        "nextAction": {
-          "action": "QUERY_DATABASE",
-          "payload": {
-            "table": "Project",
-            "filter": { "overdue": true }
-          }
-        }
-      }
-      
-      Sistema te responde: "Found 2 results: [Project A, Project B]"
-      
-      Iteración 2 - Tú respondes:
-      {
-        "type": "REASONING",
-        "thought": "Encontré 2 proyectos. Ahora envío mensajes de recordatorio",
-        "nextAction": {
-          "action": "SEND_PORTAL_MESSAGE",
-          "payload": {
-            "projectId": "A",
-            "message": "Recordatorio de pago"
-          }
-        }
-      }
-      
-      ... y así hasta completar la tarea.
-      
-      Cuando termines TODAS las acciones, responde con type: "CHAT" y un resumen.
-      
-      ACCIONES DISPONIBLES:
-      
-      📋 TAREAS:
-      - CREATE_TASK: Crear tarea (title, description, dueDate, priority, assigneeId, projectId)
-      - UPDATE_TASK: Actualizar tarea (id, ...campos)
-      - DELETE_TASK: Borrar tarea (id)
-      - DELETE_TASKS: Borrar múltiples (ids: string[])
-      
-      📂 PROYECTOS:
-      - CREATE_PROJECT: Crear proyecto (name, monthlyRevenue, industry)
-      - UPDATE_PROJECT: Actualizar proyecto (id, ...campos)
-      - DELETE_PROJECT: Borrar proyecto (id)
-      
-      💰 CRM & CLIENTES:
-      - ADD_CLIENT_NOTE: Agregar nota (clientId, content, type: 'CALL'|'EMAIL'|'MEETING'|'OTHER')
-      - UPDATE_CLIENT_HEALTH: Actualizar health score (clientId, healthScore: 'GOOD'|'RISK'|'CRITICAL')
-      - GET_CLIENT_NOTES: Consultar notas (clientId, limit?)
-      
-      🤖 AUTOMATIZACIÓN:
-      - CREATE_SOP: Crear manual (title, category, content)
-      - GET_SOPS: Consultar manuales (category?)
-      
-      🧭 NAVEGACIÓN:
-      - NAVIGATE_TO: Ir a página (path: '/tasks'|'/projects'|'/settings'|'/analytics')
-      - OPEN_PROJECT: Abrir proyecto (projectId)
-      - OPEN_TASK: Mostrar tarea (taskId)
-      
-      🔄 REACT LOOP (para tareas complejas):
-      - QUERY_DATABASE: Buscar datos (table, filter, limit)
-      - SEND_PORTAL_MESSAGE: Enviar mensaje a cliente
-
-      REGLAS DE FORMATO Y PRESENTACIÓN (CRÍTICO):
-      1. **Usa NEGRITAS** para nombres propios, números importantes y fechas: **Juan**, **11 tareas**, **Lunes 10:00**
-      2. Si modificas/borras MÚLTIPLES items, genera un resumen con detalles:
-         Ejemplo: "✅ Borré **11 tareas** según tu solicitud."
-         Y en el campo "details": incluye array con {id, title, dueDate} de cada item afectado
-      3. **RECONOCIMIENTO DE ENTIDADES**:
-         - Si mencionan un NOMBRE (ej: "Juan", "María"), busca en:
-           * Clientes (tabla [CLIENTE])
-           * Equipo (tabla [EQUIPO])
-         - Si encuentras coincidencia, incluye en "entities": [{"type": "CLIENT", "id": "uuid", "name": "Juan"}]
-      4. **CONTEXTO TEMPORAL**:
-         - "Esta semana" = Lunes a Domingo de la semana actual
-         - "Hoy" = Fecha actual en Argentina
-         - Calcula rangos de fechas automáticamente
-
-      REGLAS DE ACCIÓN:
-      1. **CREAR TAREAS**:
-         - Si pide UNA tarea: Action "CREATE_TASK"
-         - Si pide MÚLTIPLES tareas (ej: "lunes a viernes"): Action "BATCH", con array de CREATE_TASK
-         - Título: OBLIGATORIO. Si no lo dice, usa descripción (ej: "ir a caminar" → title: "Ir a caminar")
-         - Fecha/Hora: Interpreta "lunes", "mañana", "dos y media" = 14:30
-         - **RANGOS DE TIEMPO**: Si dice "de 8 a 14:30", usa:
-           * dueDate: hora inicio (8:00)
-           * endTime: hora fin (14:30)
-         - **RECURRENCIA**: Si dice "lunes a viernes", crea 5 tareas separadas (una por día)
-      
-      2. **MODIFICAR TAREAS**:
-         - Si dice "Cambiar la fecha de la tarea X para el lunes", busca el ID en la lista [TAREA] y genera un "UPDATE_TASK".
-         - Si dice "Marcar como lista la tarea X", genera "UPDATE_TASK" con status: "DONE".
-         
-      3. **BORRAR**:
-         - Action: "DELETE_TASK" (uno) o "DELETE_PROJECT".
-         - **BORRADO MASIVO**: Si pide borrar "todo lo de la semana" o múltiples items:
-           Action: "DELETE_TASKS"
-           Payload: { "ids": ["uuid1", "uuid2"...] } (Debes inferir los IDs del contexto [TAREA]).
 
       FORMATO DE RESPUESTA JSON (ESTRICTO):
       Responde SIEMPRE con un objeto JSON. No uses markdown.
@@ -608,64 +476,25 @@ export const ai = {
           "payload": {
               "title": "Ir a caminar",
               "dueDate": "2026-02-03T14:30:00-03:00",
-              "endTime": "2026-02-03T16:00:00-03:00" (OPCIONAL, solo si especifica rango),
               "priority": "MEDIUM",
               "status": "TODO"
           },
           "message": "✅ Creé la tarea **Ir a caminar** para el **lunes a las 14:30**."
       }
-      
-      
-      EJEMPLO REAL - SOLICITUD COMPLEJA:
-      Usuario: "Poneme una tarea para el lunes a las dos y media ir a caminar. Y poneme también para entre las ocho a las dos y media de toda la semana de lunes a viernes trabajar."
-      
-      Análisis:
-      - "lunes a las dos y media ir a caminar" = 1 tarea (Lunes 14:30)
-      - "entre las ocho a las dos y media" = rango 8:00-14:30
-      - "toda la semana de lunes a viernes trabajar" = 5 tareas (Lun-Vie)
-      
-      Respuesta CORRECTA:
-      {
-          "type": "BATCH",
-          "actions": [
-              { "action": "CREATE_TASK", "payload": { "title": "Ir a caminar", "dueDate": "2026-02-03T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-03T08:00:00-03:00", "endTime": "2026-02-03T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-04T08:00:00-03:00", "endTime": "2026-02-04T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-05T08:00:00-03:00", "endTime": "2026-02-05T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-06T08:00:00-03:00", "endTime": "2026-02-06T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-07T08:00:00-03:00", "endTime": "2026-02-07T14:30:00-03:00" } }
-          ],
-          "message": "✅ Creé **6 tareas**: 1 para **ir a caminar** (Lunes 14:30) y 5 de **trabajo** (Lun-Vie 8:00-14:30)."
-      }
-      
-      Para MÚLTIPLES tareas:
-      {
-          "type": "BATCH",
-          "actions": [
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-03T08:00:00-03:00", "endTime": "2026-02-03T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-04T08:00:00-03:00", "endTime": "2026-02-04T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-05T08:00:00-03:00", "endTime": "2026-02-05T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-06T08:00:00-03:00", "endTime": "2026-02-06T14:30:00-03:00" } },
-              { "action": "CREATE_TASK", "payload": { "title": "Trabajar", "dueDate": "2026-02-07T08:00:00-03:00", "endTime": "2026-02-07T14:30:00-03:00" } }
-          ],
-          "message": "✅ Creé **5 tareas** de trabajo para **lunes a viernes de 8:00 a 14:30**."
-      }
 
-       Si es solo charla o consulta:
-       {
-           "type": "CHAT",
-           "message": "Tu respuesta CON FORMATO (usa **negritas**).",
-           "entities": [/* Si mencionas clientes/equipo */]
-       }
-       
-       Si necesitas MÁS INFORMACIÓN para ejecutar:
-       {
-           "type": "QUESTION",
-           "message": "Pregunta ESPECÍFICA (ej: '¿A qué hora quieres la reunión con **Juan**?')",
-           "context": "Breve explicación de por qué preguntas"
-       }
-       
-       ⚠️ NUNCA devuelvas type: "CHAT" con mensaje genérico como "Entendido" si el usuario pidió una ACCIÓN.
+      Si es solo charla o consulta:
+      {
+          "type": "CHAT",
+          "message": "Tu respuesta CON FORMATO (usa **negritas**).",
+          "entities": []
+      }
+      
+      Si necesitas MÁS INFORMACIÓN para ejecutar:
+      {
+          "type": "QUESTION",
+          "message": "Pregunta ESPECÍFICA",
+          "context": "Por qué preguntas"
+      }
       `;
 
       try {
@@ -710,5 +539,68 @@ export const ai = {
           console.error("AI Agent Error:", error);
           return null;
       }
-  }
+  },
+
+  /**
+   * Fill a Marketing Proposal form from a free-form text description.
+   * Returns structured JSON matching MarketingProposalData fields.
+   */
+  fillProposalWithAI: async (rawText: string): Promise<any> => {
+      try {
+          const client = await getClient();
+          const prompt = `Sos un experto en marketing digital. El usuario te dio información desordenada sobre su cliente y lo que le va a ofrecer.
+Interpreta esa información y devuélvela estructurada en JSON.
+
+INFORMACIÓN DEL USUARIO:
+"""
+${rawText}
+"""
+
+Devuelve ÚNICAMENTE un JSON válido con estos campos (usa null si no hay información suficiente, NO inventes datos):
+{
+  "clientName": null,
+  "clientIndustry": null,
+  "clientWebsite": null,
+  "clientLocation": null,
+  "clientCompetitors": null,
+  "clientDifferential": null,
+  "clientSocialPresence": null,
+  "clientAvgTicket": null,
+  "clientMonthlySales": null,
+  "proposalObjective": null,
+  "targetRevenue": null,
+  "timeframe": null,
+  "platforms": null,
+  "dailyAdBudget": null,
+  "targetAudience": null,
+  "painPoint": null,
+  "positioning": null,
+  "plans": null,
+  "excludedFromService": null,
+  "contractConditions": null,
+  "avgTicket": null,
+  "numInitialAds": null,
+  "scenarios": null
+}
+
+REGLAS:
+- plans: si menciona precio o servicios -> [{name: "...", price: N, includes: ["servicio 1", "servicio 2"]}]
+- scenarios: si hay ticket promedio y presupuesto de pauta -> [{label:"Pesimista",cpa:N,newSales:N},{label:"Normal",cpa:N,newSales:N},{label:"Optimista",cpa:N,newSales:N}]
+- numInitialAds: número de anuncios si lo menciona, sino null
+- Responde SOLO JSON válido sin texto extra`;
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: { responseMimeType: 'application/json' }
+          });
+
+          const text = response.text;
+          if (!text) return null;
+          return JSON.parse(text);
+      } catch (error) {
+          console.error("Fill Proposal AI Error:", error);
+          return null;
+      }
+  },
 };
