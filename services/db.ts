@@ -355,7 +355,11 @@ export const db = {
             ...c,
             status: c.status || ProjectStatus.ACTIVE,
             monthlyRevenue: c.monthlyRevenue || 0,
-            billingDay: c.billingDay || 1,
+            // 🧠 FIX: Prioritize snake_case 'billing_day' (written by approve()) over legacy camelCase
+            billingDay: c.billing_day || c.billingDay || 1,
+            // 🧠 FIX: Map snake_case contract dates to camelCase for PaymentsPage
+            contractStartDate: c.contract_start_date || null,
+            contractEndDate: c.contract_end_date || null,
             notes: c.notes || '',
             phone: c.phone || '',
             outsourcingCost: calculatedOutsourcing,
@@ -406,6 +410,10 @@ export const db = {
          // ✅ NUEVO: Traer también el perfil estratégico
          const { data: profile } = await supabase.from('ClientProfile').select('*').eq('clientId', id).maybeSingle();
 
+         // 🧠 WORKAROUND: Unpack fields hidden inside 'overview' to avoid SQL migrations
+         let extra: any = {};
+         try { if (profile?.overview) extra = JSON.parse(profile.overview); } catch(e) {}
+
          return {
             ...data,
             status: data.status || ProjectStatus.ACTIVE,
@@ -439,14 +447,14 @@ export const db = {
             contextObjectives: profile?.objectives || '', // 'objectives' en DB -> 'contextObjectives' en App
             currency: data.currency || 'ARS',
             
-            // ✅ NUEVO: Nuevas columnas extraídas por IA
-            dailyAdBudget: profile?.dailyAdBudget || '',
-            platforms: profile?.platforms || '',
-            avgTicket: profile?.avgTicket || 0,
+            // ✅ NUEVO: Nuevas columnas extraídas por IA (with fallback to JSON pack)
+            dailyAdBudget: profile?.dailyAdBudget || extra.dailyAdBudget || '',
+            platforms: profile?.platforms || extra.platforms || '',
+            avgTicket: profile?.avgTicket || extra.avgTicket || '',
             competitors: profile?.competitors || '',
 
-            // ✅ NUEVO 2.0: Más columnas para Alta
-            monthlySales: profile?.monthlySales || 0,
+            // ✅ NUEVO 2.0: Más columnas para Alta (fallback to JSON to support text without crash)
+            monthlySales: profile?.monthlySales || extra.monthlySales || '',
             differential: profile?.differential || '',
             socialPresence: profile?.socialPresence || '',
             targetRevenue: profile?.targetRevenue || '',
@@ -487,33 +495,30 @@ export const db = {
         console.warn('Failed to create audit snapshot:', e);
       }
       
-      // 1. Separar los datos que van a la tabla Client (Proyecto)
-      const clientData = { ...data };
-      
-      // 🧠 LOGIC: If activating context, reset billing day to today
+      // ✅ WHITELIST: Only send columns that actually exist in the Client table.
+      // This permanently prevents 400 Bad Request errors from extra/virtual fields.
+      const CLIENT_COLUMNS = new Set([
+        'name', 'industry', 'email', 'status', 'monthlyRevenue', 'billingDay',
+        'notes', 'phone', 'outsourcingCost', 'assignedPartnerId', 'proposalUrl',
+        'healthScore', 'lastPaymentDate', 'lastContactDate', 'resources', 'contacts',
+        'brandColors', 'brandFonts', 'internalCost', 'publicToken', 'progress',
+        'growthStrategy', 'onboardingFee', 'contractEndDate', 'startDate',
+        'contract_end_date', 'billing_day', 'service_details', 'contract_start_date',
+        'currency', 'createdAt',
+      ]);
+
+      const clientData: any = {};
+      for (const [key, value] of Object.entries(data as any)) {
+        if (CLIENT_COLUMNS.has(key)) clientData[key] = value;
+      }
+
+      // Sync billing_day when activating
       if (data.status === ProjectStatus.ACTIVE) {
           const today = new Date();
           clientData.billingDay = today.getDate();
-          (clientData as any).billing_day = today.getDate(); // Sync snake_case
-          console.log(`🔄 Reactivating Project: Setting billing day to ${today.getDate()}`);
+          clientData.billing_day = today.getDate();
       }
 
-      // Eliminamos los campos que no existen en la tabla Client para evitar errores
-      delete clientData.targetAudience;
-      delete clientData.contextProblem;
-      delete clientData.contextObjectives;
-      delete clientData.dailyAdBudget;
-      delete clientData.platforms;
-      delete clientData.avgTicket;
-      delete clientData.competitors;
-      delete clientData.monthlySales;
-      delete clientData.differential;
-      delete clientData.socialPresence;
-      delete clientData.targetRevenue;
-      delete clientData.timeframe;
-      delete clientData.positioning;
-
-      // Actualizar tabla Client
       const { error } = await supabase.from('Client').update(clientData).eq('id', id);
       if (error) throw error;
 
@@ -645,8 +650,37 @@ export const db = {
           return data;
       },
       upsert: async (clientId: string, data: Partial<any>): Promise<void> => {
-          const { error } = await supabase.from('ClientProfile').upsert({ clientId, ...data, updatedAt: new Date().toISOString() }, { onConflict: 'clientId' });
-          if (error) throw error;
+          // Verify if it already exists because onConflict: 'clientId' fails if there's no explicit unique constraint
+          const { data: existing } = await supabase.from('ClientProfile').select('id, overview').eq('clientId', clientId).maybeSingle();
+          
+          // 🧠 WORKAROUND: Pack missing/type-strict fields into the unused 'overview' field as JSON
+          // This avoids 400 Bad Request without forcing the user to run SQL migrations.
+          const extra: any = {};
+          if (existing?.overview) {
+             try { Object.assign(extra, JSON.parse(existing.overview)); } catch (e) { } 
+          }
+          if ('dailyAdBudget' in data) extra.dailyAdBudget = data.dailyAdBudget;
+          if ('platforms' in data) extra.platforms = data.platforms;
+          if ('avgTicket' in data) extra.avgTicket = data.avgTicket;
+          if ('monthlySales' in data) extra.monthlySales = data.monthlySales; // Avoids 'numeric' crash
+
+          const cleanData = { ...data };
+          delete cleanData.dailyAdBudget;
+          delete cleanData.platforms;
+          delete cleanData.avgTicket;
+          delete cleanData.monthlySales;
+          
+          if (Object.keys(extra).length > 0) {
+              cleanData.overview = JSON.stringify(extra);
+          }
+
+          if (existing) {
+              const { error } = await supabase.from('ClientProfile').update({ ...cleanData, updatedAt: new Date().toISOString() }).eq('id', existing.id);
+              if (error) throw error;
+          } else {
+              const { error } = await supabase.from('ClientProfile').insert({ clientId, ...cleanData, updatedAt: new Date().toISOString() });
+              if (error) throw error;
+          }
       }
   },
 

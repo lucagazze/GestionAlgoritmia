@@ -190,10 +190,9 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                         <div className="flex items-center gap-1">
                                             <span className="text-gray-400 font-bold">$</span>
                                             <Input 
-                                                type="number"
                                                 className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
-                                                value={formData.avgTicket || 0}
-                                                onChange={e => setFormData({...formData, avgTicket: parseFloat(e.target.value)})}
+                                                value={formData.avgTicket || ''}
+                                                onChange={e => setFormData({...formData, avgTicket: e.target.value})}
                                             />
                                         </div>
                                     </div>
@@ -240,10 +239,9 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                 <div className="flex items-center gap-1">
                                     <span className="text-gray-400 font-bold">$</span>
                                     <Input 
-                                        type="number"
                                         className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
-                                        value={formData.monthlySales || 0}
-                                        onChange={e => setFormData({...formData, monthlySales: parseFloat(e.target.value)})}
+                                        value={formData.monthlySales || ''}
+                                        onChange={e => setFormData({...formData, monthlySales: e.target.value})}
                                     />
                                 </div>
                             </div>

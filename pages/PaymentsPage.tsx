@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus, ContractorPayment } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users, Ban } from 'lucide-react';
 import { Card, Button, Modal, Badge, Input, Label, Select } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { formatMoney } from '../utils/currency';
@@ -21,6 +21,7 @@ export default function PaymentsPage() {
         amount: number;
         projectId?: string;
         paid?: boolean;
+        cancelled?: boolean;
         paymentId?: string;
         paymentAmount?: number;
         date?: Date;
@@ -207,10 +208,48 @@ export default function PaymentsPage() {
         const eventMonth = date.getMonth();
         const eventYear = date.getFullYear();
 
-        // 1. ACTUAL PAYMENTS (IN) - Show on specific date
+        // 1. ACTUAL PAYMENTS (IN) - Show on specific date (skip cancelled markers)
         payments.forEach(pay => {
             const payDate = new Date(pay.date);
             if (payDate.getDate() === day && payDate.getMonth() === eventMonth && payDate.getFullYear() === eventYear) {
+                // Show cancelled markers as a special visual-only event
+                if (pay.metadata?.cancelled) {
+                    if (!pay.metadata?.isExpense) {
+                        // Cancelled income — show as struck-through in calendar
+                        const clientName = pay.client?.name || projects.find(p => p.id === pay.client_id || p.id === pay.clientId)?.name || 'Cliente';
+                        // Find the project's monthlyRevenue to display the original amount
+                        const proj = projects.find(p => p.id === pay.client_id || p.id === pay.clientId);
+                        events.push({
+                            type: 'IN',
+                            label: clientName,
+                            amount: proj?.monthlyRevenue || 0,
+                            paid: true,
+                            cancelled: true,
+                            paymentId: pay.id,
+                            paymentAmount: 0,
+                            date: date,
+                            notes: pay.notes,
+                            currency: pay.client?.currency || proj?.currency || 'ARS'
+                        });
+                    } else {
+                        // Cancelled expense
+                        const proj = projects.find(p => p.id === pay.client_id || p.id === pay.clientId);
+                        events.push({
+                            type: 'OUT',
+                            label: `Socio (${proj?.name || 'Proyecto'})`,
+                            amount: proj?.outsourcingCost || 0,
+                            paid: true,
+                            cancelled: true,
+                            paymentId: pay.id,
+                            paymentAmount: 0,
+                            date: date,
+                            notes: pay.notes,
+                            currency: proj?.currency || 'ARS'
+                        });
+                    }
+                    return; // Don't add as normal payment
+                }
+
                 const clientName = pay.client?.name || projects.find(p => p.id === pay.client_id || p.id === pay.clientId)?.name || 'Cliente';
                 events.push({
                     type: 'IN',
@@ -220,7 +259,7 @@ export default function PaymentsPage() {
                     paymentId: pay.id,
                     paymentAmount: pay.amount,
                     date: date,
-                    notes: pay.notes, // ✅ Add Notes
+                    notes: pay.notes,
                     currency: pay.client?.currency || projects.find(p => p.id === pay.client_id || p.id === pay.clientId)?.currency || 'ARS'
                 });
             }
@@ -272,6 +311,17 @@ export default function PaymentsPage() {
                 // If fully paid, DON'T show projection (Actuals are already shown)
                 // If partially paid, show remainder? 
                 // Let's simpler: If Paid Amount >= Monthly Revenue, don't show projection.
+                // Check if this month was explicitly cancelled ("no se va a pagar")
+                const isCancelled = payments.some(pay => {
+                    const payDate = new Date(pay.date);
+                    return (pay.clientId === p.id || pay.client_id === p.id)
+                        && payDate.getMonth() === eventMonth
+                        && payDate.getFullYear() === eventYear
+                        && pay.metadata?.cancelled === true
+                        && !pay.metadata?.isExpense;
+                });
+                if (isCancelled) return; // Already shown as cancelled marker above
+
                 if (paidAmount >= p.monthlyRevenue) return;
 
                 const remaining = p.monthlyRevenue - paidAmount;
@@ -283,7 +333,7 @@ export default function PaymentsPage() {
                     paid: false,
                     projectId: p.id,
                     paymentAmount: paidAmount,
-                    date: date, // Pass the calendar date
+                    date: date,
                     currency: p.currency || 'ARS'
                 });
             }
@@ -308,6 +358,17 @@ export default function PaymentsPage() {
                         })
                         .reduce((sum, cp) => sum + cp.amount, 0);
 
+                    // Check if this expense was cancelled for this month
+                    const isExpenseCancelled = payments.some(pay => {
+                        const payDate = new Date(pay.date);
+                        return (pay.clientId === p.id || pay.client_id === p.id)
+                            && payDate.getMonth() === eventMonth
+                            && payDate.getFullYear() === eventYear
+                            && pay.metadata?.cancelled === true
+                            && pay.metadata?.isExpense === true;
+                    });
+                    if (isExpenseCancelled) return; // Already shown as cancelled marker above
+
                     if (paidAmount >= p.outsourcingCost) return;
 
                     const remaining = p.outsourcingCost - paidAmount;
@@ -317,6 +378,7 @@ export default function PaymentsPage() {
                         label: `Socio (${p.name}) (Pendiente)`, 
                         amount: remaining,
                         paid: false,
+                        projectId: p.id,
                         paymentAmount: paidAmount,
                         date: date,
                         currency: p.currency || 'ARS'
@@ -400,8 +462,8 @@ export default function PaymentsPage() {
     const handleContextMenu = (e: React.MouseEvent, event: any) => {
         e.preventDefault();
         e.stopPropagation();
-        // Allow context menu for both IN and OUT if they have paymentId (Manual/Actual transactions)
-        if (!event.paymentId && event.type !== 'IN') return; 
+        // Allow context menu for IN events and ALL OUT events (both projected and actual)
+        if (!event.paymentId && event.type !== 'IN' && event.type !== 'OUT') return; 
         
         let x = e.clientX;
         let y = e.clientY;
@@ -411,6 +473,45 @@ export default function PaymentsPage() {
         if (y + 250 > window.innerHeight) y -= 250;
 
         setContextMenu({ x, y, event });
+    };
+
+    const handleMarkWontPay = async () => {
+        if (!contextMenu?.event) return;
+        const evt = contextMenu.event;
+        setContextMenu(null);
+
+        const eventDate = evt.date ? new Date(evt.date).toISOString() : new Date().toISOString();
+
+        try {
+            if (evt.type === 'IN' && evt.projectId) {
+                // Store cancellation as a zero-amount payment with cancelled flag in metadata
+                await db.payments.create({
+                    clientId: evt.projectId,
+                    amount: 0,
+                    date: eventDate,
+                    type: 'FULL',
+                    notes: 'No se va a pagar (cancelado)',
+                    metadata: { cancelled: true }
+                });
+            } else if (evt.type === 'OUT' && evt.projectId) {
+                // For projected OUT events, store a zero-amount contractor payment as flag
+                // Use the first available contractor, or a sentinel value via Payment with isExpense flag
+                await db.payments.create({
+                    clientId: evt.projectId,
+                    amount: 0,
+                    date: eventDate,
+                    type: 'FULL',
+                    notes: 'Gasto cancelado (no se va a pagar)',
+                    metadata: { cancelled: true, isExpense: true }
+                });
+            }
+
+            const paymentsData = await db.payments.getAll();
+            setPayments(paymentsData);
+        } catch (e) {
+            console.error(e);
+            alert('Error al marcar como cancelado');
+        }
     };
 
     const handleMarkAsPaid = async (type: 'FULL' | 'PARTIAL') => {
@@ -706,7 +807,10 @@ export default function PaymentsPage() {
                                                 // LOGIC FOR COLOR CODING
                                                 let colorClass = '';
 
-                                                if (evt.type === 'IN') {
+                                                if (evt.cancelled) {
+                                                    // CANCELLED: Muted purple/slate with strikethrough
+                                                    colorClass = 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 opacity-60 line-through';
+                                                } else if (evt.type === 'IN') {
                                                     if (evt.paid) {
                                                         // Check if PARTIAL or FULL payment
                                                         const payment = payments.find(p => p.id === evt.paymentId);
@@ -1068,7 +1172,17 @@ export default function PaymentsPage() {
                         </>
                     )}
 
-                    {contextMenu.event.type === 'OUT' && (
+                    {/* Won't Pay - show for any projected (unpaid) event */}
+                    {!contextMenu.event.paid && (
+                        <>
+                            <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                            <button onClick={handleMarkWontPay} className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2">
+                                <Ban className="w-4 h-4" /> No se va a pagar
+                            </button>
+                        </>
+                    )}
+
+                    {contextMenu.event.type === 'OUT' && !contextMenu.event.cancelled && (
                         <>
                             <button onClick={openContractorPaymentModal} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2">
                                 <DollarSign className="w-4 h-4" /> Registrar Pago Socio

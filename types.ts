@@ -117,11 +117,11 @@ export interface Project extends Client {
   // ✅ NUEVO: Datos complementarios de IA
   dailyAdBudget?: string;
   platforms?: string;
-  avgTicket?: number;
+  avgTicket?: string;
   competitors?: string;
   
   // ✅ NUEVO 2.0: Campos de alta de cliente
-  monthlySales?: number;
+  monthlySales?: string;
   differential?: string;
   socialPresence?: string;
   targetRevenue?: string;

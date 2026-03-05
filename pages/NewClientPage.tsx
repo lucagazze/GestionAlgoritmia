@@ -28,8 +28,8 @@ interface NewClientData {
   platforms: string;
   dailyAdBudget: string;
   
-  avgTicket: number;
-  monthlySales: number;
+  avgTicket: string;
+  monthlySales: string;
   targetRevenue: string;
   timeframe: string;
 }
@@ -40,7 +40,7 @@ const defaultData = (): NewClientData => ({
   clientCompetitors: '', clientDifferential: '', clientSocialPresence: '',
   targetAudience: '', proposalObjective: '', painPoint: '', positioning: '',
   platforms: '', dailyAdBudget: '',
-  avgTicket: 0, monthlySales: 0, targetRevenue: '', timeframe: '',
+  avgTicket: '', monthlySales: '', targetRevenue: '', timeframe: '',
 });
 
 // Se quitaron las constraints para permitir creación flexible.
@@ -134,7 +134,6 @@ export default function NewClientPage() {
       const project = await db.projects.create({
         name: data.clientName,
         industry: data.clientIndustry,
-        location: data.clientLocation,
         email: data.clientEmail,
         phone: data.clientPhone,
         proposalUrl: data.clientWebsite,
@@ -148,7 +147,7 @@ export default function NewClientPage() {
         data.targetAudience || data.painPoint || data.proposalObjective || 
         data.dailyAdBudget || data.platforms || data.avgTicket || 
         data.clientCompetitors || data.monthlySales || data.clientDifferential || 
-        data.clientSocialPresence || data.targetRevenue || data.timeframe || data.positioning;
+        data.clientSocialPresence || data.targetRevenue || data.timeframe || data.positioning || data.clientLocation;
 
       if (hasContext) {
         await db.clientProfiles.upsert(project.id, {
@@ -254,10 +253,10 @@ export default function NewClientPage() {
         <Section title="Estructura Comercial" icon={<BarChart3 className="w-4 h-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField label="Ticket promedio ($ / USD)">
-              <input className={inputCls} type="number" value={data.avgTicket || ''} onChange={e => set('avgTicket', Number(e.target.value))} placeholder="50" />
+              <input className={inputCls} type="text" value={data.avgTicket || ''} onChange={e => set('avgTicket', e.target.value)} placeholder="Ej: 50 USD o 15000 ARS" />
             </FormField>
             <FormField label="Facturación mensual estimada (aprox)">
-              <input className={inputCls} type="number" value={data.monthlySales || ''} onChange={e => set('monthlySales', Number(e.target.value))} placeholder="3000" />
+              <input className={inputCls} type="text" value={data.monthlySales || ''} onChange={e => set('monthlySales', e.target.value)} placeholder="Ej: Entre 3000 y 5000" />
             </FormField>
             <FormField label="Principales competidores">
               <input className={inputCls} value={data.clientCompetitors} onChange={e => set('clientCompetitors', e.target.value)} placeholder="Ej: Marca A, Marca B" />
