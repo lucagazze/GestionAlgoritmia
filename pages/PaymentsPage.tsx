@@ -170,17 +170,13 @@ export default function PaymentsPage() {
             setContractors(contractorsData);
             setContractorPayments(contractorPaymentsData);
             setLoading(false);
-
-            // 🐛 DEBUG: Check billingDay and dates
-            console.log("🐛 PAYMENTS PAGE DEBUG:", projectsData.map(p => ({
-                name: p.name,
-                status: p.status,
-                billingDay: p.billingDay,
-                contractStartDate: p.contractStartDate,
-                createdAt: p.createdAt
-            })));
         };
         load();
+
+        // ✅ Recargar datos cuando el usuario VUELVE a esta pestaña/página (e.g. después de aceptar un contrato)
+        const handleVisibility = () => { if (document.visibilityState === 'visible') load(); };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
     }, []);
 
     // --- FINANCIAL DATA COMMON ---
@@ -339,53 +335,52 @@ export default function PaymentsPage() {
             }
         });
 
-        // 4. PROJECTED EXPENSES (OUT) - Only show if NOT paid
-        if (day === 5) {
-            activeProjects.forEach(p => {
-                const projectStart = new Date(p.createdAt);
-                projectStart.setHours(0, 0, 0, 0);
-                const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
-                if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
+        // 4. PROJECTED EXPENSES (OUT) - Only show if NOT paid, using billingDay like income
+        activeProjects.forEach(p => {
+            if (!p.outsourcingCost || p.outsourcingCost <= 0) return;
+            
+            const billDay = p.billingDay || 1;
+            if (billDay !== day) return;
 
-                if (date < projectStart) return;
-                if (projectEnd && date > projectEnd) return;
+            const pStart = p.contractStartDate ? new Date(p.contractStartDate) : new Date(p.createdAt);
+            const projectStart = new Date(pStart);
+            projectStart.setHours(0, 0, 0, 0);
+            const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
+            if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
 
-                if (p.outsourcingCost && p.outsourcingCost > 0) {
-                     const paidAmount = contractorPayments
-                        .filter(cp => {
-                            const cpDate = new Date(cp.date);
-                            return cp.client_id === p.id && cpDate.getMonth() === eventMonth && cpDate.getFullYear() === eventYear;
-                        })
-                        .reduce((sum, cp) => sum + cp.amount, 0);
+            if (date < projectStart) return;
+            if (projectEnd && date > projectEnd) return;
 
-                    // Check if this expense was cancelled for this month
-                    const isExpenseCancelled = payments.some(pay => {
-                        const payDate = new Date(pay.date);
-                        return (pay.clientId === p.id || pay.client_id === p.id)
-                            && payDate.getMonth() === eventMonth
-                            && payDate.getFullYear() === eventYear
-                            && pay.metadata?.cancelled === true
-                            && pay.metadata?.isExpense === true;
-                    });
-                    if (isExpenseCancelled) return; // Already shown as cancelled marker above
+            const paidAmount = contractorPayments
+                .filter(cp => {
+                    const cpDate = new Date(cp.date);
+                    return cp.client_id === p.id && cpDate.getMonth() === eventMonth && cpDate.getFullYear() === eventYear;
+                })
+                .reduce((sum, cp) => sum + cp.amount, 0);
 
-                    if (paidAmount >= p.outsourcingCost) return;
-
-                    const remaining = p.outsourcingCost - paidAmount;
-
-                    events.push({ 
-                        type: 'OUT', 
-                        label: `Socio (${p.name}) (Pendiente)`, 
-                        amount: remaining,
-                        paid: false,
-                        projectId: p.id,
-                        paymentAmount: paidAmount,
-                        date: date,
-                        currency: p.currency || 'ARS'
-                    });
-                }
+            const isExpenseCancelled = payments.some(pay => {
+                const payDate = new Date(pay.date);
+                return (pay.clientId === p.id || pay.client_id === p.id)
+                    && payDate.getMonth() === eventMonth
+                    && payDate.getFullYear() === eventYear
+                    && pay.metadata?.cancelled === true
+                    && pay.metadata?.isExpense === true;
             });
-        }
+            if (isExpenseCancelled) return;
+            if (paidAmount >= p.outsourcingCost) return;
+
+            const remaining = p.outsourcingCost - paidAmount;
+            events.push({ 
+                type: 'OUT', 
+                label: `Socio (${p.name}) (Pendiente)`, 
+                amount: remaining,
+                paid: false,
+                projectId: p.id,
+                paymentAmount: paidAmount,
+                date: date,
+                currency: p.currency || 'ARS'
+            });
+        });
         
         if (day === 1) {
             activeProjects.forEach(p => {
