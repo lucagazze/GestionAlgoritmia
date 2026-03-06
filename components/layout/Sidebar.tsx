@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, Briefcase, Activity, CalendarDays, Calculator, FileText, CheckSquare, 
-  Users, Rocket, Book, MessageSquareMore, LayoutGrid, Workflow, Settings, 
-  X, Sun, Moon, Globe, Megaphone
+import {
+  Home, Briefcase, Activity, CalendarDays, Calculator, FileText, CheckSquare,
+  Users, Rocket, Book, MessageSquareMore, LayoutGrid, Workflow, Settings,
+  X, Sun, Moon, Globe, Megaphone, Target, Sparkles
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
               { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio', color: 'text-gray-900 dark:text-white' },
               { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes', color: 'text-blue-600 dark:text-blue-400' },
               { path: '/audit', icon: <Activity className="w-5 h-5" />, label: 'Auditoría', color: 'text-red-600 dark:text-red-400' },
+              { path: '/meta-ads', icon: <Target className="w-5 h-5" />, label: 'Meta Ads', color: 'text-blue-600 dark:text-blue-400' },
               { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600 dark:text-emerald-400' },
               { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600 dark:text-gray-300' },
               { path: '/quotations', icon: <FileText className="w-5 h-5" />, label: 'Presupuestos', color: 'text-pink-600 dark:text-pink-400' },
@@ -36,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
       {
           title: "ESTRATEGIA",
           items: [
+              { path: '/ai-studio', icon: <Sparkles className="w-5 h-5" />, label: 'AI Studio', color: 'text-violet-600 dark:text-violet-400' },
               { path: '/lab', icon: <Rocket className="w-5 h-5" />, label: 'The Lab', color: 'text-pink-600 dark:text-pink-400' },
               { path: '/playbooks', icon: <Book className="w-5 h-5" />, label: 'Playbooks', color: 'text-amber-600 dark:text-amber-400' },
               { path: '/sales-copilot', icon: <MessageSquareMore className="w-5 h-5" />, label: 'Copiloto IA', color: 'text-indigo-600 dark:text-indigo-400' },
@@ -53,13 +55,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
 
   const NavItem: React.FC<{ path: string, icon: React.ReactNode, label: string, color: string }> = ({ path, icon, label, color }) => {
     const isActive = location.pathname === path || (path === '/projects' && location.pathname.includes('/projects/'));
+    const isAI = path === '/ai-studio';
+
+    if (isAI) {
+      return (
+        <Link
+          to={path}
+          onClick={() => window.innerWidth < 768 && setIsOpen(false)}
+          className={`flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 relative overflow-hidden ${
+            isActive
+              ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30'
+              : 'bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 text-violet-700 dark:text-violet-300 hover:from-violet-100 hover:to-indigo-100 border border-violet-100 dark:border-violet-800/50'
+          }`}
+        >
+          <span>{icon}</span>
+          {label}
+          <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300'}`}>
+            CLAUDE
+          </span>
+        </Link>
+      );
+    }
+
     return (
-      <Link 
-        to={path} 
+      <Link
+        to={path}
         onClick={() => window.innerWidth < 768 && setIsOpen(false)}
         className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group relative ${
-          isActive 
-          ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/20 dark:shadow-white/10' 
+          isActive
+          ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/20 dark:shadow-white/10'
           : 'text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
         }`}
       >

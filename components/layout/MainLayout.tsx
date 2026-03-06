@@ -29,6 +29,8 @@ import ContentIdeasPage from '../../pages/ContentIdeasPage';
 import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage'; // ✅ ADDED
 import MarketingProposalPage from '../../pages/MarketingProposalPage'; // ✅ ADDED
 import NewClientPage from '../../pages/NewClientPage'; // ✅ ADDED
+import MetaAdsPage from '../../pages/MetaAdsPage'; // ✅ ADDED
+import AIStudioPage from '../../pages/AIStudioPage'; // ✅ ADDED
 import { GhostingAlert } from '../GhostingAlert';
 
 export const MainLayout = () => {
@@ -101,6 +103,8 @@ export const MainLayout = () => {
               <Route path="/portal/:token" element={<ClientPortalPage />} />
               <Route path="/audit" element={<AuditPage />} />
               <Route path="/marketing-proposal" element={<MarketingProposalPage />} />
+              <Route path="/meta-ads" element={<MetaAdsPage />} />
+              <Route path="/ai-studio" element={<AIStudioPage />} />
             </Routes>
           </div>
 

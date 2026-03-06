@@ -8,6 +8,7 @@ import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, 
 export default function SettingsPage() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
+    const [claudeApiKey, setClaudeApiKey] = useState('');
     const [oauthClientId, setOauthClientId] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -22,7 +23,10 @@ export default function SettingsPage() {
             setLoading(true);
             const key = await db.settings.getApiKey('google_api_key');
             if (key) setApiKey(key);
-            
+
+            const claudeKey = await db.settings.getApiKey('claude_api_key');
+            if (claudeKey) setClaudeApiKey(claudeKey.slice(0, 10) + '••••••••••••••••••••••••');
+
             const clientId = await db.settings.getApiKey('google_oauth_client_id');
             if (clientId) setOauthClientId(clientId);
         } catch (e) {
@@ -36,6 +40,7 @@ export default function SettingsPage() {
         setSaving(true);
         try {
             if (apiKey.trim()) await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
+            if (claudeApiKey.trim() && !claudeApiKey.includes('••')) await db.settings.setApiKey(claudeApiKey.trim(), 'claude_api_key');
             if (oauthClientId.trim()) await db.settings.setApiKey(oauthClientId.trim(), 'google_oauth_client_id');
             
             setSuccess(true);
@@ -176,6 +181,30 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                {/* Claude API Key */}
+                <Card className="border-violet-100 dark:border-violet-900/50 shadow-lg shadow-violet-500/5 overflow-visible">
+                    <CardHeader className="bg-gradient-to-r from-violet-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-violet-100 dark:border-slate-800">
+                        <CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200">
+                            <Sparkles className="w-5 h-5 text-violet-600" /> Claude AI Studio (Anthropic)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Para usar el AI Studio con propuestas, estrategias y análisis inteligente de campañas.</p>
+                        <div className="space-y-3">
+                            <Label>Anthropic (Claude) API Key</Label>
+                            <Input
+                                type="password"
+                                value={claudeApiKey}
+                                onChange={(e) => setClaudeApiKey(e.target.value)}
+                                placeholder="sk-ant-..."
+                                className="font-mono text-sm"
+                            />
+                            <p className="text-xs text-gray-400">Conseguí tu key en <span className="text-violet-500 font-medium">console.anthropic.com</span></p>
+                        </div>
+                    </CardContent>
+                </Card>
+
                  {/* Google API Key (GEMINI) */}
                 <Card className="border-indigo-100 dark:border-indigo-900/50 shadow-lg shadow-indigo-500/5 overflow-visible">
                     <CardHeader className="bg-gradient-to-r from-indigo-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-indigo-100 dark:border-slate-800">
@@ -186,11 +215,11 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
                     <CardContent className="space-y-6 pt-6">
                         <div className="space-y-3">
                             <Label>Google Gemini API Key</Label>
-                            <Input 
-                                type="password" 
-                                value={apiKey} 
-                                onChange={(e) => setApiKey(e.target.value)} 
-                                placeholder="AIzaSy..." 
+                            <Input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="AIzaSy..."
                                 className="font-mono text-sm"
                             />
                             <p className="text-xs text-gray-400">Usado para el Copiloto de Ventas y el Asistente.</p>

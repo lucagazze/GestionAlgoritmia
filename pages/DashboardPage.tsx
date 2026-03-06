@@ -195,19 +195,39 @@ export default function DashboardPage() {
                   </h3>
               </div>
               <div className="p-2 space-y-1">
-                  {activeProjects.sort((a,b) => (a.billingDay||1) - (b.billingDay||1)).slice(0, 3).map(p => (
-                      <div key={p.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-default">
-                          <div className="flex items-center gap-3">
-                              <div className="font-bold text-gray-500 w-6 text-center text-xs bg-gray-100 dark:bg-slate-700 rounded px-1">
-                                  {p.billingDay}
+                  {(() => {
+                      const today = new Date();
+                      const todayDay = today.getDate();
+                      const withDates = activeProjects.map(p => {
+                          const day = p.billingDay || 1;
+                          // Next occurrence of billingDay
+                          let next = new Date(today.getFullYear(), today.getMonth(), day);
+                          if (next <= today) next = new Date(today.getFullYear(), today.getMonth() + 1, day);
+                          const diffDays = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          return { ...p, nextDate: next, diffDays };
+                      });
+                      return withDates
+                          .sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())
+                          .slice(0, 5)
+                          .map(p => (
+                              <div key={p.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-default">
+                                  <div className="flex items-center gap-3">
+                                      <div className={`font-bold w-8 text-center text-xs rounded px-1 py-0.5 ${
+                                          p.diffDays <= 3 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                          p.diffDays <= 7 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                                          'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'
+                                      }`}>
+                                          {p.diffDays === 0 ? 'HOY' : `${p.diffDays}d`}
+                                      </div>
+                                      <div>
+                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
+                                          <p className="text-[10px] text-gray-400">{p.nextDate.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</p>
+                                      </div>
+                                  </div>
+                                  <span className="text-xs font-mono text-gray-500 font-bold">{formatMoney(p.monthlyRevenue, p.currency)}</span>
                               </div>
-                              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-gray-500 font-bold">{formatMoney(p.monthlyRevenue, p.currency)}</span>
-                          </div>
-                      </div>
-                  ))}
+                          ));
+                  })()}
               </div>
               <div className="mt-auto p-4 border-t border-gray-100/50 dark:border-gray-800">
                   <Link to="/payments">
@@ -216,30 +236,57 @@ export default function DashboardPage() {
               </div>
           </Card>
 
-          {/* Recent Activity / Focus */}
+          {/* Foco de Hoy */}
           <Card className="flex flex-col border-indigo-100 dark:border-indigo-900/30">
               <div className="p-6 border-b border-gray-100/50 dark:border-gray-800 flex justify-between items-center bg-indigo-50/50 dark:bg-indigo-900/10">
                   <div className="flex items-center gap-3">
                       <div className="p-2 bg-indigo-600 text-white rounded-lg"><Zap className="w-4 h-4" /></div>
                       <div>
                           <h3 className="font-bold text-indigo-900 dark:text-indigo-200">Foco de Hoy</h3>
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400">Tareas prioritarias</p>
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                              {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          </p>
                       </div>
                   </div>
                   <Link to="/tasks" className="text-xs font-semibold text-gray-400 hover:text-black dark:hover:text-white transition-colors">Ver Todo</Link>
               </div>
-              <div className="p-4 flex-1 overflow-y-auto space-y-3 bg-gray-50/30 dark:bg-slate-900/30">
-                  {tasks.filter(t => t.status !== TaskStatus.DONE).slice(0,3).map(t => (
-                      <div key={t.id} className="group bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all flex items-start gap-4">
-                          <div className="flex-1">
-                              <div className="flex justify-between">
-                                  <p className="font-semibold text-gray-800 dark:text-white text-sm">{t.title}</p>
-                                  {t.priority === 'HIGH' && <Badge variant="outline" className="text-[10px] text-red-600 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900">Alta</Badge>}
+              <div className="p-4 flex-1 overflow-y-auto space-y-2 bg-gray-50/30 dark:bg-slate-900/30">
+                  {(() => {
+                      const today = new Date();
+                      const todayStr = today.toISOString().split('T')[0];
+                      const pending = tasks.filter(t => t.status !== TaskStatus.DONE);
+
+                      // Hoy primero, luego por fecha, luego sin fecha, ordenados por prioridad
+                      const todayTasks = pending.filter(t => t.dueDate && t.dueDate.startsWith(todayStr));
+                      const overdue = pending.filter(t => t.dueDate && t.dueDate < todayStr);
+                      const upcoming = pending.filter(t => !t.dueDate || (!t.dueDate.startsWith(todayStr) && t.dueDate >= todayStr));
+                      const sorted = [...overdue, ...todayTasks, ...upcoming].slice(0, 4);
+
+                      if (sorted.length === 0) return <p className="text-center text-gray-400 text-xs py-4">Todo al día. 🎉</p>;
+
+                      return sorted.map(t => {
+                          const isOverdue = t.dueDate && t.dueDate < todayStr;
+                          const isToday = t.dueDate && t.dueDate.startsWith(todayStr);
+                          return (
+                              <div key={t.id} className="group bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all flex items-start gap-3">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                      t.priority === 'HIGH' ? 'bg-red-500' :
+                                      t.priority === 'MEDIUM' ? 'bg-amber-500' : 'bg-gray-300'
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-gray-800 dark:text-white text-sm truncate">{t.title}</p>
+                                      {t.dueDate && (
+                                          <p className={`text-[10px] font-bold mt-0.5 ${
+                                              isOverdue ? 'text-red-500' : isToday ? 'text-indigo-500' : 'text-gray-400'
+                                          }`}>
+                                              {isOverdue ? '⚠ Vencida' : isToday ? 'Hoy' : new Date(t.dueDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                          </p>
+                                      )}
+                                  </div>
                               </div>
-                          </div>
-                      </div>
-                  ))}
-                  {tasks.filter(t => t.status !== TaskStatus.DONE).length === 0 && <p className="text-center text-gray-400 text-xs py-4">Todo al día.</p>}
+                          );
+                      });
+                  })()}
               </div>
           </Card>
       </div>

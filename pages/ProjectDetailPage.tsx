@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast';
 import { ProjectProfileTab } from '../components/tabs/ProjectProfileTab';
 import { EditProjectModal } from '../components/modals/EditProjectModal';
 import { Edit } from 'lucide-react';
+import { metaAds, CLIENT_META_MAP } from '../services/metaAds';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +29,12 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   
   // Tabs
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PROFILE' | 'ACTION_PLAN' | 'HISTORY'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'PROFILE' | 'ACTION_PLAN' | 'HISTORY' | 'INSTAGRAM'>('OVERVIEW');
+
+  // Instagram / Meta state
+  const [igProfile, setIgProfile] = useState<any>(null);
+  const [igMedia, setIgMedia] = useState<any[]>([]);
+  const [igLoading, setIgLoading] = useState(false);
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [activeItems, setActiveItems] = useState<ProposalItem[]>([]);
@@ -100,6 +106,21 @@ export default function ProjectDetailPage() {
       setActiveItems(items);
 
       setLoading(false);
+  };
+
+  // Load Instagram data when tab is selected
+  const loadInstagram = async () => {
+      if (!id) return;
+      const meta = CLIENT_META_MAP[id];
+      if (!meta?.igId) return;
+      setIgLoading(true);
+      const [prof, med] = await Promise.all([
+          metaAds.getInstagramProfile(meta.igId),
+          metaAds.getInstagramMedia(meta.igId, 12),
+      ]);
+      setIgProfile(prof);
+      setIgMedia(med.data || []);
+      setIgLoading(false);
   };
 
   const handleSave = async () => {
@@ -228,12 +249,16 @@ export default function ProjectDetailPage() {
                     { id: 'PROFILE', label: 'Perfil', icon: User },
                     { id: 'ACTION_PLAN', label: 'Evolución', icon: TrendingUp },
                     { id: 'HISTORY', label: 'Historial', icon: ListTodo },
+                    ...(id && CLIENT_META_MAP[id] ? [{ id: 'INSTAGRAM', label: CLIENT_META_MAP[id]?.igId ? 'Instagram' : 'Meta Ads', icon: Globe }] : []),
                 ].map(tab => {
                     const Icon = tab.icon;
                     return (
-                        <button 
+                        <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => {
+                                setActiveTab(tab.id as any);
+                                if (tab.id === 'INSTAGRAM' && !igProfile && !igLoading) loadInstagram();
+                            }}
                             className={`
                                 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all
                                 ${activeTab === tab.id 
@@ -393,6 +418,90 @@ export default function ProjectDetailPage() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* INSTAGRAM TAB */}
+                {activeTab === 'INSTAGRAM' && (
+                    <div className="animate-in fade-in space-y-6 max-w-3xl mx-auto">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Globe className="w-5 h-5 text-indigo-500" />
+                            {CLIENT_META_MAP[id!]?.igId ? 'Instagram' : 'Meta Ads'}
+                        </h2>
+
+                        {igLoading && (
+                            <div className="flex justify-center py-12">
+                                <Loader2 className="animate-spin text-indigo-400 w-7 h-7" />
+                            </div>
+                        )}
+
+                        {!igLoading && igProfile && !igProfile.error && (
+                            <>
+                                {/* Profile card */}
+                                <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-5 flex items-center gap-5">
+                                    {igProfile.profile_picture_url && (
+                                        <img src={igProfile.profile_picture_url} alt={igProfile.username}
+                                            className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-gray-900 dark:text-white text-lg">@{igProfile.username}</p>
+                                        {igProfile.biography && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{igProfile.biography}</p>}
+                                        {igProfile.website && <a href={igProfile.website} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline">{igProfile.website}</a>}
+                                    </div>
+                                    <div className="flex gap-6 text-center flex-shrink-0">
+                                        <div>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{(igProfile.followers_count || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-gray-500">seguidores</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{igProfile.media_count || 0}</p>
+                                            <p className="text-xs text-gray-500">posts</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{igProfile.follows_count || 0}</p>
+                                            <p className="text-xs text-gray-500">siguiendo</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Grid de posts */}
+                                {igMedia.length > 0 ? (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {igMedia.map((m: any) => (
+                                            <a key={m.id} href={m.permalink} target="_blank" rel="noreferrer"
+                                                className="aspect-square bg-gray-100 dark:bg-slate-800 rounded-xl overflow-hidden relative group block">
+                                                {(m.media_url || m.thumbnail_url) && (
+                                                    <img src={m.media_url || m.thumbnail_url} alt=""
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                )}
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 text-white text-xs font-bold">
+                                                    {m.like_count > 0 && <span>❤️ {m.like_count}</span>}
+                                                    {m.comments_count > 0 && <span>💬 {m.comments_count}</span>}
+                                                </div>
+                                                <div className="absolute bottom-1 right-1 text-[9px] text-white/70 font-mono">
+                                                    {new Date(m.timestamp).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 text-gray-400 text-sm">Sin publicaciones recientes</div>
+                                )}
+
+                                <button onClick={loadInstagram}
+                                    className="w-full py-2 text-xs text-gray-400 hover:text-indigo-500 transition-colors font-medium">
+                                    Actualizar datos
+                                </button>
+                            </>
+                        )}
+
+                        {!igLoading && (!igProfile || igProfile.error) && (
+                            <div className="text-center py-12 text-gray-400">
+                                <Globe className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                                <p className="text-sm">No hay cuenta de Instagram vinculada o no hay acceso con este token.</p>
+                                <p className="text-xs mt-1">Verificá el CLIENT_META_MAP en services/metaAds.ts</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
