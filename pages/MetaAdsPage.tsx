@@ -5,10 +5,11 @@ import {
   daysAgo, today, getPrevPeriod, presetToRange,
   type DatePreset, type TimeRange,
 } from '../services/metaAds';
+import { db } from '../services/db';
 import {
   RefreshCw, Target, Loader2, ChevronDown, ChevronUp, ExternalLink,
   Search, Activity, ArrowLeft, Building2, Instagram, Calendar,
-  AlertCircle, AlertTriangle, CheckCircle, XCircle, ImageIcon, Play, Pause,
+  AlertCircle, AlertTriangle, CheckCircle, XCircle, ImageIcon, Play, Pause, Sparkles,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -793,6 +794,8 @@ export default function MetaAdsPage() {
   const [accountIns, setAccountIns]           = useState<any>(null);
   const [insightsMap, setInsightsMap]         = useState<Record<string, Pair>>({});
   const [accountFilter, setAccountFilter]     = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ACTIVE');
+  const [aiSummary, setAiSummary]             = useState<string | null>(null);
+  const [analyzingAI, setAnalyzingAI]         = useState(false);
   const [campaignFilter, setCampaignFilter]   = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ACTIVE');
   const [search, setSearch]                   = useState('');
   const [loading, setLoading]                 = useState(true);
@@ -804,18 +807,47 @@ export default function MetaAdsPage() {
   const [since, setSince]                     = useState(daysAgo(28));
   const [until, setUntil]                     = useState(today());
 
+  const analyzeAccountsWithAI = useCallback(async (accs: any[]) => {
+    const apiKey = await db.settings.getApiKey('claude_api_key').catch(() => null);
+    if (!apiKey) return;
+    setAnalyzingAI(true);
+    setAiSummary(null);
+    const active = accs.filter(a => a.spend15d > 0);
+    const lines = active.map(a =>
+      `- ${a.name} (${a.currency}): gasto 15d $${a.spend15d.toFixed(0)}, campañas activas: ${a.activeCamps}`
+    ).join('\n');
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: `Sos un experto en Meta Ads. Analizá estas cuentas publicitarias y decime brevemente a cuáles debo prestarles atención hoy y por qué. Sé directo y concreto, máximo 4 puntos cortos.\n\n${lines}`,
+          }],
+        }),
+      });
+      const data = await res.json();
+      setAiSummary(data?.content?.[0]?.text || null);
+    } catch { /* ignore */ }
+    setAnalyzingAI(false);
+  }, []);
+
   // Load all ad accounts the token has access to
   const loadAccounts = useCallback(async () => {
     setLoading(true);
     try {
       const allRes = await metaAds.getAllAdAccounts().catch(() => null);
       const allAccounts: any[] = allRes?.data?.length ? allRes.data : [{ id: META_AD_ACCOUNT, name: 'Algoritmia Ads', currency: 'USD', account_status: 1 }];
-      const accountList = allAccounts;
-
-
       const tr15: TimeRange = { since: daysAgo(15), until: today() };
       const enriched = await Promise.all(
-        accountList.map(async (acc: any) => {
+        allAccounts.map(async (acc: any) => {
           const [ins15, campsRes] = await Promise.all([
             metaAds.getInsights(acc.id, 'spend', undefined, tr15).catch(() => null),
             metaAds.getCampaigns(acc.id).catch(() => null),
@@ -828,13 +860,14 @@ export default function MetaAdsPage() {
         })
       );
       setAccounts(enriched);
+      analyzeAccountsWithAI(enriched);
     } catch (e) {
       console.error('loadAccounts error', e);
       setAccounts([{ id: META_AD_ACCOUNT, name: 'Algoritmia Ads', currency: 'USD', account_status: 1, amount_spent: '0', spend15d: 0, activeCamps: 0 }]);
     }
     setLastUpdated(new Date());
     setLoading(false);
-  }, []);
+  }, [analyzeAccountsWithAI]);
 
   useEffect(() => { loadAccounts(); }, [loadAccounts]);
 
@@ -1010,6 +1043,26 @@ export default function MetaAdsPage() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* AI Summary */}
+              {(analyzingAI || aiSummary) && (
+                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-violet-100 dark:border-violet-500/20 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-violet-50 dark:border-violet-500/10 flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-500" />
+                    <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Análisis IA · Resumen de cuentas</span>
+                  </div>
+                  <div className="px-5 py-4">
+                    {analyzingAI ? (
+                      <div className="flex items-center gap-2 text-[13px] text-zinc-400">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
+                        Analizando cuentas...
+                      </div>
+                    ) : (
+                      <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5">
                   {([
