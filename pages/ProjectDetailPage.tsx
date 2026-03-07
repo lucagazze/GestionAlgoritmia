@@ -216,24 +216,24 @@ export default function ProjectDetailPage() {
 
 
 
-  if (loading || !project) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-gray-300 w-8 h-8"/></div>;
+  if (loading || !project) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-zinc-300 w-8 h-8"/></div>;
 
   return (
     <div className="bg-[#FAFAFA] dark:bg-[#020617] min-h-screen pb-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
         
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 px-6 py-4 flex justify-between items-center">
+        <div className="sticky top-0 z-20 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 px-6 py-4 flex justify-between items-center">
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/projects')} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors"><ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400"/></button>
+                <button onClick={() => navigate('/projects')} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"><ArrowLeft className="w-5 h-5 text-zinc-500 dark:text-zinc-400"/></button>
                 <div>
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                         {formData.name} 
-                        <button onClick={() => setIsEditModalOpen(true)} className="p-1 text-gray-400 hover:text-indigo-500 transition-colors">
+                        <button onClick={() => setIsEditModalOpen(true)} className="p-1 text-zinc-400 hover:text-indigo-500 transition-colors">
                             <Edit className="w-4 h-4" />
                         </button>
                         <Badge variant={formData.status === 'ACTIVE' ? 'green' : 'outline'}>{formData.status}</Badge>
                     </h1>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{formData.industry || 'Sin rubro'} • Fee: ${formData.monthlyRevenue?.toLocaleString()}/mes</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">{formData.industry || 'Sin rubro'} • Fee: ${formData.monthlyRevenue?.toLocaleString()}/mes</p>
                 </div>
             </div>
             <div className="flex gap-2">
@@ -263,7 +263,7 @@ export default function ProjectDetailPage() {
                                 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all
                                 ${activeTab === tab.id 
                                     ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/10 dark:shadow-white/10' 
-                                    : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800'
+                                    : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                 }
                             `}
                         >
@@ -282,50 +282,50 @@ export default function ProjectDetailPage() {
                     <div className="animate-in fade-in space-y-6">
                         {/* 1. STATUS CARDS */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-blue-500">
+                            <Card className="bg-white dark:bg-zinc-900 border-l-4 border-l-blue-500">
                                 <CardContent className="p-5">
                                     <div className="flex justify-between items-start mb-2">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Facturación</p>
+                                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Facturación</p>
                                         <Wallet className="w-4 h-4 text-blue-500" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                                        ${formData.monthlyRevenue?.toLocaleString()} <span className="text-sm font-normal text-gray-400">/mes</span>
+                                    <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
+                                        ${formData.monthlyRevenue?.toLocaleString()} <span className="text-sm font-normal text-zinc-400">/mes</span>
                                     </h3>
                                     <div className="flex items-center gap-2 mt-2">
                                         <div className={`w-2 h-2 rounded-full ${formData.lastPaymentDate && new Date(formData.lastPaymentDate).getMonth() === new Date().getMonth() ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                        <p className="text-xs text-gray-500">
+                                        <p className="text-xs text-zinc-500">
                                             {formData.lastPaymentDate && new Date(formData.lastPaymentDate).getMonth() === new Date().getMonth() ? 'Pago al día' : 'Pago pendiente'}
                                         </p>
                                     </div>
-                                    <p className="text-xs text-gray-400 mt-1">Día de cobro: {formData.billingDay || 1}</p>
+                                    <p className="text-xs text-zinc-400 mt-1">Día de cobro: {formData.billingDay || 1}</p>
                                 </CardContent>
                             </Card>
 
-                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-purple-500">
+                            <Card className="bg-white dark:bg-zinc-900 border-l-4 border-l-purple-500">
                                 <CardContent className="p-5">
                                     <div className="flex justify-between items-start mb-2">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Servicios Activos</p>
+                                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Servicios Activos</p>
                                         <Layers className="w-4 h-4 text-purple-500" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                                    <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
                                         {activeItems.length}
                                     </h3>
-                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
                                         {activeItems.map(i => i.serviceSnapshotName).join(', ') || 'Sin servicios activos'}
                                     </p>
                                 </CardContent>
                             </Card>
 
-                            <Card className="bg-white dark:bg-slate-900 border-l-4 border-l-orange-500">
+                            <Card className="bg-white dark:bg-zinc-900 border-l-4 border-l-orange-500">
                                 <CardContent className="p-5">
                                     <div className="flex justify-between items-start mb-2">
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Tareas Pendientes</p>
+                                        <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Tareas Pendientes</p>
                                         <ListTodo className="w-4 h-4 text-orange-500" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                                    <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-1">
                                         {clientTasks.filter(t => t.status === 'TODO').length}
                                     </h3>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-zinc-500 mt-1">
                                         Próxima entrega: {clientTasks.find(t => t.status === 'TODO' && t.dueDate)?.dueDate ? new Date(clientTasks.find(t => t.status === 'TODO' && t.dueDate)!.dueDate!).toLocaleDateString() : 'Sin fecha'}
                                     </p>
                                 </CardContent>
@@ -334,19 +334,19 @@ export default function ProjectDetailPage() {
 
                         {/* 2. SERVICES LIST */}
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                 <Sparkles className="w-4 h-4 text-yellow-500"/> Servicios & Entregables
                             </h3>
-                            <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden">
+                            <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
                                 {activeItems.length === 0 ? (
-                                    <div className="p-8 text-center text-gray-400">No hay servicios activados en este momento.</div>
+                                    <div className="p-8 text-center text-zinc-400">No hay servicios activados en este momento.</div>
                                 ) : (
-                                    <div className="divide-y divide-gray-50 dark:divide-slate-800">
+                                    <div className="divide-y divide-zinc-50 dark:divide-zinc-800">
                                         {activeItems.map((item, i) => (
                                             <div key={i} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                                 <div>
-                                                    <p className="font-bold text-gray-900 dark:text-white">{item.serviceSnapshotName}</p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">{item.serviceSnapshotDescription}</p>
+                                                    <p className="font-bold text-zinc-900 dark:text-white">{item.serviceSnapshotName}</p>
+                                                    <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-1">{item.serviceSnapshotDescription}</p>
                                                 </div>
                                                 <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'outline'}>
                                                     {item.serviceSnapshotType === 'RECURRING' ? 'Recurrente' : 'One Shot'}
@@ -361,19 +361,19 @@ export default function ProjectDetailPage() {
                          {/* 3. RECENT DELIVERABLES */}
                          {deliverables.length > 0 && (
                             <div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                     <ExternalLink className="w-4 h-4 text-blue-500"/> Entregables Recientes
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {deliverables.slice(0, 4).map(d => (
-                                        <a href={d.url} target="_blank" rel="noreferrer" key={d.id} className="block p-4 bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors group">
+                                        <a href={d.url} target="_blank" rel="noreferrer" key={d.id} className="block p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors group">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
                                                     <FileText className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-gray-900 dark:text-white text-sm">{d.name}</p>
-                                                    <p className="text-xs text-gray-500">{new Date(d.createdAt).toLocaleDateString()}</p>
+                                                    <p className="font-bold text-zinc-900 dark:text-white text-sm">{d.name}</p>
+                                                    <p className="text-xs text-zinc-500">{new Date(d.createdAt).toLocaleDateString()}</p>
                                                 </div>
                                             </div>
                                         </a>
@@ -396,24 +396,24 @@ export default function ProjectDetailPage() {
                     <div className="max-w-3xl mx-auto animate-in fade-in space-y-6">
                          <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Evolución & Progreso</h2>
-                                <p className="text-sm text-gray-500">Bitácora de crecimiento y resultados.</p>
+                                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Evolución & Progreso</h2>
+                                <p className="text-sm text-zinc-500">Bitácora de crecimiento y resultados.</p>
                             </div>
                             <Button onClick={() => setIsProgressModalOpen(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white"><Plus className="w-4 h-4 mr-2"/> Registrar Avance</Button>
                         </div>
 
                         <div className="relative border-l-2 border-blue-200 dark:border-blue-900 ml-4 space-y-8 pl-8 py-2">
-                            {clientNotes.filter(n => n.type === 'PROGRESS').length === 0 && <div className="text-gray-400 italic">No hay registros de progreso aún.</div>}
+                            {clientNotes.filter(n => n.type === 'PROGRESS').length === 0 && <div className="text-zinc-400 italic">No hay registros de progreso aún.</div>}
                             
                             {clientNotes.filter(n => n.type === 'PROGRESS').map((note, idx) => (
                                 <div key={idx} className="relative group">
-                                     <div className="absolute -left-[41px] w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 shadow-sm bg-blue-500"></div>
-                                     <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
+                                     <div className="absolute -left-[41px] w-5 h-5 rounded-full border-4 border-white dark:border-zinc-900 shadow-sm bg-blue-500"></div>
+                                     <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-shadow">
                                         <div className="flex justify-between items-start mb-2">
                                             <Badge variant="blue">Progreso</Badge>
-                                            <span className="text-xs text-gray-400 font-mono">{new Date(note.createdAt).toLocaleDateString()}</span>
+                                            <span className="text-xs text-zinc-400 font-mono">{new Date(note.createdAt).toLocaleDateString()}</span>
                                         </div>
-                                        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-medium">{note.content}</p>
+                                        <p className="text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap font-medium">{note.content}</p>
                                      </div>
                                 </div>
                             ))}
@@ -424,7 +424,7 @@ export default function ProjectDetailPage() {
                 {/* INSTAGRAM TAB */}
                 {activeTab === 'INSTAGRAM' && (
                     <div className="animate-in fade-in space-y-6 max-w-3xl mx-auto">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                             <Globe className="w-5 h-5 text-indigo-500" />
                             {CLIENT_META_MAP[id!]?.igId ? 'Instagram' : 'Meta Ads'}
                         </h2>
@@ -438,28 +438,28 @@ export default function ProjectDetailPage() {
                         {!igLoading && igProfile && !igProfile.error && (
                             <>
                                 {/* Profile card */}
-                                <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 p-5 flex items-center gap-5">
+                                <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 p-5 flex items-center gap-5">
                                     {igProfile.profile_picture_url && (
                                         <img src={igProfile.profile_picture_url} alt={igProfile.username}
                                             className="w-16 h-16 rounded-full object-cover border-2 border-indigo-200 flex-shrink-0" />
                                     )}
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-gray-900 dark:text-white text-lg">@{igProfile.username}</p>
-                                        {igProfile.biography && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{igProfile.biography}</p>}
+                                        <p className="font-bold text-zinc-900 dark:text-white text-lg">@{igProfile.username}</p>
+                                        {igProfile.biography && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{igProfile.biography}</p>}
                                         {igProfile.website && <a href={igProfile.website} target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline">{igProfile.website}</a>}
                                     </div>
                                     <div className="flex gap-6 text-center flex-shrink-0">
                                         <div>
-                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{(igProfile.followers_count || 0).toLocaleString()}</p>
-                                            <p className="text-xs text-gray-500">seguidores</p>
+                                            <p className="text-2xl font-black text-zinc-900 dark:text-white">{(igProfile.followers_count || 0).toLocaleString()}</p>
+                                            <p className="text-xs text-zinc-500">seguidores</p>
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{igProfile.media_count || 0}</p>
-                                            <p className="text-xs text-gray-500">posts</p>
+                                            <p className="text-2xl font-black text-zinc-900 dark:text-white">{igProfile.media_count || 0}</p>
+                                            <p className="text-xs text-zinc-500">posts</p>
                                         </div>
                                         <div>
-                                            <p className="text-2xl font-black text-gray-900 dark:text-white">{igProfile.follows_count || 0}</p>
-                                            <p className="text-xs text-gray-500">siguiendo</p>
+                                            <p className="text-2xl font-black text-zinc-900 dark:text-white">{igProfile.follows_count || 0}</p>
+                                            <p className="text-xs text-zinc-500">siguiendo</p>
                                         </div>
                                     </div>
                                 </div>
@@ -469,7 +469,7 @@ export default function ProjectDetailPage() {
                                     <div className="grid grid-cols-3 gap-2">
                                         {igMedia.map((m: any) => (
                                             <a key={m.id} href={m.permalink} target="_blank" rel="noreferrer"
-                                                className="aspect-square bg-gray-100 dark:bg-slate-800 rounded-xl overflow-hidden relative group block">
+                                                className="aspect-square bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden relative group block">
                                                 {(m.media_url || m.thumbnail_url) && (
                                                     <img src={m.media_url || m.thumbnail_url} alt=""
                                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -485,18 +485,18 @@ export default function ProjectDetailPage() {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-center py-8 text-gray-400 text-sm">Sin publicaciones recientes</div>
+                                    <div className="text-center py-8 text-zinc-400 text-sm">Sin publicaciones recientes</div>
                                 )}
 
                                 <button onClick={loadInstagram}
-                                    className="w-full py-2 text-xs text-gray-400 hover:text-indigo-500 transition-colors font-medium">
+                                    className="w-full py-2 text-xs text-zinc-400 hover:text-indigo-500 transition-colors font-medium">
                                     Actualizar datos
                                 </button>
                             </>
                         )}
 
                         {!igLoading && (!igProfile || igProfile.error) && (
-                            <div className="text-center py-12 text-gray-400">
+                            <div className="text-center py-12 text-zinc-400">
                                 <Globe className="w-8 h-8 mx-auto mb-2 opacity-40" />
                                 <p className="text-sm">No hay cuenta de Instagram vinculada o no hay acceso con este token.</p>
                                 <p className="text-xs mt-1">Verificá el CLIENT_META_MAP en services/metaAds.ts</p>
@@ -515,15 +515,15 @@ export default function ProjectDetailPage() {
                             <button onClick={() => handleQuickAction('MEETING')} className="flex items-center gap-2 px-4 py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-300 rounded-full text-sm font-bold hover:bg-purple-100 transition-colors"><Mic2 className="w-4 h-4"/> Reunión</button>
                         </div>
                         
-                        <div className="relative border-l-2 border-gray-200 dark:border-slate-800 ml-4 space-y-8 pl-8 py-4">
-                            {clientTasks.filter(t => t.status === 'DONE').length === 0 && clientNotes.length === 0 && <p className="text-gray-400 italic">No hay historial aún.</p>}
+                        <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 ml-4 space-y-8 pl-8 py-4">
+                            {clientTasks.filter(t => t.status === 'DONE').length === 0 && clientNotes.length === 0 && <p className="text-zinc-400 italic">No hay historial aún.</p>}
                             {[...clientNotes.map(n => ({type:'NOTE', data:n, date: n.createdAt})), ...clientTasks.filter(t => t.status === 'DONE').map(t => ({type:'TASK', data:t, date: t.created_at}))]
                                 .sort((a,b) => new Date(b.date!).getTime() - new Date(a.date!).getTime())
                                 .map((item, idx) => (
                                     <div key={idx} className="relative">
-                                        <div className={`absolute -left-[41px] w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 shadow-sm ${item.type === 'TASK' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
-                                        <p className="text-xs text-gray-400 font-mono mb-1">{new Date(item.date!).toLocaleString()}</p>
-                                        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                                        <div className={`absolute -left-[41px] w-5 h-5 rounded-full border-4 border-white dark:border-zinc-900 shadow-sm ${item.type === 'TASK' ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                                        <p className="text-xs text-zinc-400 font-mono mb-1">{new Date(item.date!).toLocaleString()}</p>
+                                        <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-sm text-sm text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap">
                                             {item.type === 'TASK' ? (
                                                 <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600"/> <span className="line-through opacity-70">{(item.data as any).title}</span></div>
                                             ) : (item.data as any).content}

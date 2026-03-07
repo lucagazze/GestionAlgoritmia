@@ -44,9 +44,9 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                         <div className="relative z-10 space-y-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Cliente / Proyecto</Label>
+                                    <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider">Cliente / Proyecto</Label>
                                     <Input 
-                                        className="text-3xl md:text-4xl font-black bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 mt-2 text-gray-900 dark:text-white placeholder:text-gray-200" 
+                                        className="text-3xl md:text-4xl font-black bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 mt-2 text-zinc-900 dark:text-white placeholder:text-zinc-200" 
                                         value={formData.name || ''} 
                                         onChange={e => setFormData({...formData, name: e.target.value})} 
                                         placeholder="Nombre del Cliente" 
@@ -54,11 +54,11 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                 </div>
                             </div>
                             <div>
-                                <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Industria</Label>
+                                <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider">Industria</Label>
                                 <div className="flex items-center gap-2 mt-2">
-                                    <Building className="w-5 h-5 text-gray-400"/>
+                                    <Building className="w-5 h-5 text-zinc-400"/>
                                     <Input 
-                                        className="font-medium bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-xl text-gray-700 dark:text-gray-300 placeholder:text-gray-300"
+                                        className="font-medium bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-xl text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-300"
                                         value={formData.industry || ''}
                                         onChange={e => setFormData({...formData, industry: e.target.value})}
                                         placeholder="Ej: E-commerce, SaaS, Inmobiliaria..."
@@ -66,11 +66,11 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                 </div>
                             </div>
                             <div>
-                                <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider">Ubicación</Label>
+                                <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider">Ubicación</Label>
                                 <div className="flex items-center gap-2 mt-2">
-                                    <MapPin className="w-5 h-5 text-gray-400"/>
+                                    <MapPin className="w-5 h-5 text-zinc-400"/>
                                     <Input 
-                                        className="font-medium bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-gray-700 dark:text-gray-300 placeholder:text-gray-300"
+                                        className="font-medium bg-transparent border-none shadow-none p-0 h-auto focus-visible:ring-0 text-zinc-700 dark:text-zinc-300 placeholder:text-zinc-300"
                                         value={formData.location || ''}
                                         onChange={e => setFormData({...formData, location: e.target.value})}
                                         placeholder="Ciudad, País"
@@ -82,17 +82,17 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                 </div>
 
                 {/* 2. SERVICE AGREEMENT CARD (Compact & Unified) */}
-                <Card className="h-full p-6 border-none shadow-lg bg-white dark:bg-slate-900 rounded-3xl relative overflow-hidden flex flex-col justify-between">
+                <Card className="h-full p-6 border-none shadow-lg bg-white dark:bg-zinc-900 rounded-3xl relative overflow-hidden flex flex-col justify-between">
                     <div className="space-y-6 relative z-10">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-emerald-100/50 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400"><Wallet className="w-6 h-6"/></div>
                             <div>
-                                <Label className="uppercase text-[10px] font-bold text-gray-400 tracking-widest">Fee Mensual</Label>
+                                <Label className="uppercase text-[10px] font-bold text-zinc-400 tracking-widest">Fee Mensual</Label>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-sm font-medium text-gray-400">$</span>
+                                    <span className="text-sm font-medium text-zinc-400">$</span>
                                     <Input 
                                         type="number"
-                                        className="text-3xl font-black bg-transparent border-none shadow-none p-0 w-32 focus-visible:ring-0 text-gray-900 dark:text-white"
+                                        className="text-3xl font-black bg-transparent border-none shadow-none p-0 w-32 focus-visible:ring-0 text-zinc-900 dark:text-white"
                                         value={formData.monthlyRevenue || 0}
                                         onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})}
                                     />
@@ -100,11 +100,11 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                             </div>
                         </div>
 
-                        <div className="border-t border-gray-100 dark:border-slate-800 pt-4 space-y-4">
+                        <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 space-y-4">
                             <div>
-                                <Label className="flex items-center gap-2 text-xs font-bold text-gray-500 mb-1"><BarChart3 className="w-3 h-3"/> Detalle del Servicio</Label>
+                                <Label className="flex items-center gap-2 text-xs font-bold text-zinc-500 mb-1"><BarChart3 className="w-3 h-3"/> Detalle del Servicio</Label>
                                 <Textarea 
-                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none text-xs h-20" 
+                                    className="bg-zinc-50 dark:bg-zinc-800 border-none resize-none text-xs h-20" 
                                     placeholder="Ej: Community Manager + Ads (3 campañas)..."
                                     value={formData.serviceDetails || ''} // Assuming serviceDetails exists on Project/Client type based on earlier logs but confirming... formData is Partial<Project>, Project extends Client. Client has no serviceDetails in types.ts seen earlier? Wait.
                                     // Step 917 types.ts content for Client/Project: 
@@ -116,18 +116,18 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label className="flex items-center gap-2 text-[10px] font-bold text-gray-400"><Clock className="w-3 h-3"/> Día de Cobro</Label>
+                                    <Label className="flex items-center gap-2 text-[10px] font-bold text-zinc-400"><Clock className="w-3 h-3"/> Día de Cobro</Label>
                                     <Input 
                                         type="number" 
-                                        className="h-8 bg-gray-50 dark:bg-slate-800 border-none font-bold text-center" 
+                                        className="h-8 bg-zinc-50 dark:bg-zinc-800 border-none font-bold text-center" 
                                         value={formData.billingDay || 1} 
                                         onChange={e => setFormData({...formData, billingDay: parseInt(e.target.value)})}
                                     />
                                 </div>
                                 <div>
-                                    <Label className="flex items-center gap-2 text-[10px] font-bold text-gray-400"><User className="w-3 h-3"/> Partner</Label>
+                                    <Label className="flex items-center gap-2 text-[10px] font-bold text-zinc-400"><User className="w-3 h-3"/> Partner</Label>
                                     <Input // Ideally a select but keeping simple for refactor
-                                        className="h-8 bg-gray-50 dark:bg-slate-800 border-none font-bold text-center text-xs" 
+                                        className="h-8 bg-zinc-50 dark:bg-zinc-800 border-none font-bold text-center text-xs" 
                                         value={formData.partnerName || 'Sin asignar'}
                                         disabled
                                     />
@@ -145,7 +145,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                 
                 {/* COLUMNA IZQUIERDA: EL CEREBRO DEL CLIENTE */}
                 <div className="space-y-6">
-                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
                         <Label className="uppercase text-xs font-bold text-indigo-500 tracking-wider mb-4 flex items-center gap-2">
                             <span className="bg-indigo-100 dark:bg-indigo-900/30 p-1 rounded">🎯</span> El Norte Estratégico
@@ -153,32 +153,32 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                         
                         <div className="space-y-4">
                             <div>
-                                <Label className="text-xs text-gray-500 mb-1">Objetivo Principal</Label>
+                                <Label className="text-xs text-zinc-500 mb-1">Objetivo Principal</Label>
                                 <Textarea 
-                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[80px] text-sm font-medium" 
+                                    className="bg-zinc-50 dark:bg-zinc-800 border-none resize-none min-h-[80px] text-sm font-medium" 
                                     placeholder="¿Qué quieren lograr? (Punto B)"
                                     value={formData.contextObjectives || ''} 
                                     onChange={e => setFormData({...formData, contextObjectives: e.target.value})} 
                                 />
                             </div>
                             <div>
-                                <Label className="text-xs text-gray-500 mb-1">Situación Actual (Dolores)</Label>
+                                <Label className="text-xs text-zinc-500 mb-1">Situación Actual (Dolores)</Label>
                                 <Textarea 
-                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[80px] text-sm" 
+                                    className="bg-zinc-50 dark:bg-zinc-800 border-none resize-none min-h-[80px] text-sm" 
                                     placeholder="¿Qué les duele hoy? (Punto A)"
                                     value={formData.contextProblem || ''}
                                     onChange={e => setFormData({...formData, contextProblem: e.target.value})}
                                 />
                             </div>
-                            <div className="border-t border-gray-100 dark:border-slate-800 pt-4 mt-2">
-                                <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Datos Comerciales</Label>
+                            <div className="border-t border-zinc-100 dark:border-zinc-800 pt-4 mt-2">
+                                <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider mb-2 block">Datos Comerciales</Label>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <Label className="text-[10px] text-gray-500">Presupuesto Diario Ads</Label>
+                                        <Label className="text-[10px] text-zinc-500">Presupuesto Diario Ads</Label>
                                         <div className="flex items-center gap-1">
-                                            <span className="text-gray-400 font-bold">$</span>
+                                            <span className="text-zinc-400 font-bold">$</span>
                                             <Input 
-                                            className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none w-full text-right"
+                                            className="bg-transparent border-b border-zinc-200 dark:border-zinc-700 shadow-none font-medium p-0 focus:ring-0 rounded-none w-full text-right"
                                             value={formData.dailyAdBudget || ''}
                                             onChange={e => setFormData({...formData, dailyAdBudget: e.target.value})}
                                             placeholder="Eg: Aprox $100K"
@@ -186,9 +186,9 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                         </div>
                                     </div>
                                     <div>
-                                        <Label className="text-[10px] text-gray-500">Ticket Promedio</Label>
+                                        <Label className="text-[10px] text-zinc-500">Ticket Promedio</Label>
                                         <div className="flex items-center gap-1">
-                                            <span className="text-gray-400 font-bold">$</span>
+                                            <span className="text-zinc-400 font-bold">$</span>
                                             <Input 
                                                 className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
                                                 value={formData.avgTicket || ''}
@@ -197,7 +197,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                         </div>
                                     </div>
                                     <div className="col-span-2">
-                                        <Label className="text-[10px] text-gray-500">Plataformas</Label>
+                                        <Label className="text-[10px] text-zinc-500">Plataformas</Label>
                                         <Input 
                                             className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
                                             placeholder="Meta Ads, Google Ads..."
@@ -206,7 +206,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <Label className="text-[10px] text-gray-500">Competidores Mencionados</Label>
+                                        <Label className="text-[10px] text-zinc-500">Competidores Mencionados</Label>
                                         <Input 
                                             className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
                                             placeholder="Nombres de competencia..."
@@ -215,7 +215,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <Label className="text-[10px] text-gray-500">Presencia en Redes</Label>
+                                        <Label className="text-[10px] text-zinc-500">Presencia en Redes</Label>
                                         <Input 
                                             className="bg-transparent border-none shadow-none font-medium p-0 focus:ring-0"
                                             placeholder="Instagram 5k, TikTok..."
@@ -228,36 +228,36 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                         </div>
                      </Card>
                      
-                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
                         <Label className="uppercase text-xs font-bold text-green-500 tracking-wider mb-4 flex items-center gap-2">
                             <span className="bg-green-100 dark:bg-green-900/30 p-1 rounded">📈</span> Proyecciones de Crecimiento
                         </Label>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <Label className="text-[10px] text-gray-500">Facturación Actual Aprox.</Label>
+                                <Label className="text-[10px] text-zinc-500">Facturación Actual Aprox.</Label>
                                 <div className="flex items-center gap-1">
-                                    <span className="text-gray-400 font-bold">$</span>
+                                    <span className="text-zinc-400 font-bold">$</span>
                                     <Input 
-                                        className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                        className="bg-transparent border-b border-zinc-200 dark:border-zinc-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
                                         value={formData.monthlySales || ''}
                                         onChange={e => setFormData({...formData, monthlySales: e.target.value})}
                                     />
                                 </div>
                             </div>
                             <div>
-                                <Label className="text-[10px] text-gray-500">Meta Numérica / Deseo</Label>
+                                <Label className="text-[10px] text-zinc-500">Meta Numérica / Deseo</Label>
                                 <Input 
-                                    className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                    className="bg-transparent border-b border-zinc-200 dark:border-zinc-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
                                     placeholder="Llegar a $10M"
                                     value={formData.targetRevenue || ''}
                                     onChange={e => setFormData({...formData, targetRevenue: e.target.value})}
                                 />
                             </div>
                             <div className="col-span-2">
-                                <Label className="text-[10px] text-gray-500">Plazo Esperado</Label>
+                                <Label className="text-[10px] text-zinc-500">Plazo Esperado</Label>
                                 <Input 
-                                    className="bg-transparent border-b border-gray-200 dark:border-slate-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
+                                    className="bg-transparent border-b border-zinc-200 dark:border-zinc-700 shadow-none font-medium p-0 focus:ring-0 rounded-none"
                                     placeholder="3 a 6 meses"
                                     value={formData.timeframe || ''}
                                     onChange={e => setFormData({...formData, timeframe: e.target.value})}
@@ -266,10 +266,10 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                         </div>
                      </Card>
 
-                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
-                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Público Objetivo</Label>
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl">
+                        <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider mb-2 block">Público Objetivo</Label>
                         <Input 
-                            className="bg-gray-50 dark:bg-slate-800 border-none font-medium"
+                            className="bg-zinc-50 dark:bg-zinc-800 border-none font-medium"
                             placeholder="¿A quién le venden?"
                             value={formData.targetAudience || ''}
                             onChange={e => setFormData({...formData, targetAudience: e.target.value})}
@@ -277,34 +277,34 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                      </Card>
 
                      {/* Mantenemos la Estrategia de Crecimiento que ya tenías */}
-                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
-                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider mb-2 block">Estrategia Macro</Label>
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl">
+                        <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider mb-2 block">Estrategia Macro</Label>
                         <Textarea 
-                            className="bg-gray-50 dark:bg-slate-800 border-none resize-none h-24 text-sm leading-relaxed" 
+                            className="bg-zinc-50 dark:bg-zinc-800 border-none resize-none h-24 text-sm leading-relaxed" 
                             placeholder="Roadmap a largo plazo..."
                             value={formData.growthStrategy || ''}
                             onChange={e => setFormData({...formData, growthStrategy: e.target.value})}
                         />
                      </Card>
 
-                    <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
-                        <Label className="uppercase text-xs font-bold text-gray-500 tracking-wider mb-4 flex items-center gap-2">
+                    <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl relative overflow-hidden">
+                        <Label className="uppercase text-xs font-bold text-zinc-500 tracking-wider mb-4 flex items-center gap-2">
                             <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 p-1 rounded">🛒</span> Posicionamiento y Competencia
                         </Label>
                         <div className="space-y-4">
                             <div>
-                                <Label className="text-xs text-gray-500 mb-1">Diferencial / Ventaja</Label>
+                                <Label className="text-xs text-zinc-500 mb-1">Diferencial / Ventaja</Label>
                                 <Textarea 
-                                    className="bg-gray-50 dark:bg-slate-800 border-none resize-none min-h-[60px] text-sm" 
+                                    className="bg-zinc-50 dark:bg-zinc-800 border-none resize-none min-h-[60px] text-sm" 
                                     placeholder="¿Por qué elegirlos a ellos?"
                                     value={formData.differential || ''}
                                     onChange={e => setFormData({...formData, differential: e.target.value})}
                                 />
                             </div>
                             <div>
-                                <Label className="text-xs text-gray-500 mb-1">Posicionamiento Deseado</Label>
+                                <Label className="text-xs text-zinc-500 mb-1">Posicionamiento Deseado</Label>
                                 <Input 
-                                    className="bg-gray-50 dark:bg-slate-800 border-none font-medium text-sm" 
+                                    className="bg-zinc-50 dark:bg-zinc-800 border-none font-medium text-sm" 
                                     placeholder="Calidad premium, Precio..."
                                     value={formData.positioning || ''}
                                     onChange={e => setFormData({...formData, positioning: e.target.value})}
@@ -317,10 +317,10 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                 {/* COLUMNA DERECHA: CONTACTO & BRAND (Lo que ya tenías) */}
                 <div className="space-y-6">
                     {/* CONTACT INFO */}
-                    <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
-                        <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Phone className="w-5 h-5 text-green-500"/> Contacto Directo</h3>
+                    <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl">
+                        <h3 className="font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2"><Phone className="w-5 h-5 text-green-500"/> Contacto Directo</h3>
                         <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                            <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl">
                                 <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
                                     <Phone className="w-5 h-5"/>
                                 </div>
@@ -331,7 +331,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                     placeholder="+54 9 11..." 
                                 />
                             </div>
-                            <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-800 rounded-xl">
+                            <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-xl">
                                  <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                                     <User className="w-5 h-5"/>
                                 </div>
@@ -346,9 +346,9 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                     </Card>
 
                     {/* BRAND KIT */}
-                     <Card className="p-6 border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl relative overflow-hidden">
+                     <Card className="p-6 border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl relative overflow-hidden">
                          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full -mr-10 -mt-10"></div>
-                        <h3 className="font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2 relative z-10"><Palette className="w-5 h-5 text-purple-500"/> Identidad Visual</h3>
+                        <h3 className="font-bold text-zinc-900 dark:text-white mb-4 flex items-center gap-2 relative z-10"><Palette className="w-5 h-5 text-purple-500"/> Identidad Visual</h3>
                         <div className="flex gap-3 relative z-10 flex-wrap">
                             {(formData.brandColors || ['#000000', '#ffffff']).map((color, i) => (
                                 <div key={i} className="group relative w-12 h-12">
@@ -365,7 +365,7 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
                                 </div>
                             ))}
                             <button 
-                                className="w-12 h-12 rounded-full border-2 border-dashed border-gray-300 dark:border-slate-700 flex items-center justify-center text-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
+                                className="w-12 h-12 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-zinc-400 hover:border-blue-500 hover:text-blue-500 transition-colors"
                                 onClick={handleAddColor}
                             >
                                 <Plus className="w-4 h-4"/>
@@ -376,22 +376,22 @@ export function ProjectProfileTab({ formData, setFormData, project, onSave }: Pr
             </div>
 
             {/* RESOURCES SECTION */}
-            <Card className="p-6 space-y-4 h-full border-none shadow-md bg-white dark:bg-slate-900 rounded-2xl">
-                 <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-2">
-                    <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> Recursos (The Vault)</h3>
+            <Card className="p-6 space-y-4 h-full border-none shadow-md bg-white dark:bg-zinc-900 rounded-2xl">
+                 <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                    <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2"><ExternalLink className="w-4 h-4"/> Recursos (The Vault)</h3>
                     <button onClick={() => setFormData({...formData, resources: [...(formData.resources||[]), {id: Date.now().toString(), name: 'Nuevo Link', url: '', type: 'OTHER'}]})} className="text-xs bg-black dark:bg-white text-white dark:text-black px-2 py-1 rounded flex items-center"><Plus className="w-3 h-3 mr-1"/> Agregar</button>
                 </div>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
-                    {formData.resources?.length === 0 && <p className="text-gray-400 text-xs italic">Sin recursos guardados.</p>}
+                    {formData.resources?.length === 0 && <p className="text-zinc-400 text-xs italic">Sin recursos guardados.</p>}
                     {formData.resources?.map((r, idx) => (
-                        <div key={idx} className="flex items-center gap-2 bg-gray-50 dark:bg-slate-800 p-2 rounded-lg border border-gray-100 dark:border-slate-700 group">
-                            <div className="p-2 bg-white dark:bg-slate-900 rounded shadow-sm"><Globe className="w-4 h-4 text-gray-400"/></div>
+                        <div key={idx} className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg border border-zinc-100 dark:border-zinc-700 group">
+                            <div className="p-2 bg-white dark:bg-zinc-900 rounded shadow-sm"><Globe className="w-4 h-4 text-zinc-400"/></div>
                             <div className="flex-1">
-                                <input className="text-xs font-bold bg-transparent border-none w-full focus:ring-0 p-0 text-gray-900 dark:text-white" value={r.name} onChange={e => {const n=[...formData.resources!]; n[idx].name=e.target.value; setFormData({...formData, resources:n})}} />
+                                <input className="text-xs font-bold bg-transparent border-none w-full focus:ring-0 p-0 text-zinc-900 dark:text-white" value={r.name} onChange={e => {const n=[...formData.resources!]; n[idx].name=e.target.value; setFormData({...formData, resources:n})}} />
                                 <input className="text-[10px] text-blue-500 bg-transparent border-none w-full focus:ring-0 p-0" value={r.url} placeholder="https://..." onChange={e => {const n=[...formData.resources!]; n[idx].url=e.target.value; setFormData({...formData, resources:n})}} />
                             </div>
-                            <a href={r.url} target="_blank" className="p-1 text-gray-400 hover:text-blue-500"><ExternalLink className="w-3 h-3"/></a>
-                            <button onClick={() => {const n=[...formData.resources!]; n.splice(idx,1); setFormData({...formData, resources:n})}} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
+                            <a href={r.url} target="_blank" className="p-1 text-zinc-400 hover:text-blue-500"><ExternalLink className="w-3 h-3"/></a>
+                            <button onClick={() => {const n=[...formData.resources!]; n.splice(idx,1); setFormData({...formData, resources:n})}} className="p-1 text-zinc-300 hover:text-red-500"><Trash2 className="w-3 h-3"/></button>
                         </div>
                     ))}
                 </div>

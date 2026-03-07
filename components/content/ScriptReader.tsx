@@ -98,7 +98,7 @@ export const ScriptReader: React.FC<ScriptReaderProps> = ({
             <span 
                 key={idx} 
                 ref={isCurrent ? activeWordRef : null}
-                className={`transition-colors duration-300 ${isSpoken ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-gray-400 dark:text-gray-600'} ${isCurrent ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
+                className={`transition-colors duration-300 ${isSpoken ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-zinc-400 dark:text-zinc-600'} ${isCurrent ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}`}
             >
                 {token}
             </span>

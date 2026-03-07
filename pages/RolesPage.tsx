@@ -24,23 +24,23 @@ import { motion } from 'framer-motion';
 const DEPARTMENTS = ['DIRECCIÓN', 'VENTAS', 'OPERACIONES', 'DESARROLLO', 'MARKETING', 'CONTENIDO', 'ADMIN'] as const;
 
 const DEPT_COLORS: Record<string, string> = {
-    'DIRECCIÓN': 'bg-slate-800 text-white border-slate-700',
+    'DIRECCIÓN': 'bg-zinc-800 text-white border-zinc-700',
     'VENTAS': 'bg-emerald-600 text-white border-emerald-500',
     'OPERACIONES': 'bg-blue-600 text-white border-blue-500',
     'DESARROLLO': 'bg-indigo-600 text-white border-indigo-500',
     'MARKETING': 'bg-purple-600 text-white border-purple-500',
     'CONTENIDO': 'bg-pink-600 text-white border-pink-500',
-    'ADMIN': 'bg-gray-600 text-white border-gray-500',
+    'ADMIN': 'bg-zinc-600 text-white border-zinc-500',
 };
 
 const DEPT_BG_COLORS: Record<string, string> = {
-    'DIRECCIÓN': 'bg-slate-50 dark:bg-slate-900/50',
+    'DIRECCIÓN': 'bg-slate-50 dark:bg-zinc-900/50',
     'VENTAS': 'bg-emerald-50 dark:bg-emerald-900/10',
     'OPERACIONES': 'bg-blue-50 dark:bg-blue-900/10',
     'DESARROLLO': 'bg-indigo-50 dark:bg-indigo-900/10',
     'MARKETING': 'bg-purple-50 dark:bg-purple-900/10',
     'CONTENIDO': 'bg-pink-50 dark:bg-pink-900/10',
-    'ADMIN': 'bg-gray-50 dark:bg-gray-900/10',
+    'ADMIN': 'bg-zinc-50 dark:bg-zinc-900/10',
 };
 
 export default function RolesPage() {
@@ -218,7 +218,7 @@ export default function RolesPage() {
       }
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><RefreshCw className="w-6 h-6 animate-spin text-gray-400"/></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center"><RefreshCw className="w-6 h-6 animate-spin text-zinc-400"/></div>;
 
   return (
     <div className="p-6 max-w-[1800px] mx-auto space-y-8 pb-20">
@@ -227,10 +227,10 @@ export default function RolesPage() {
       <div className="flex flex-col gap-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+              <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
                   <LayoutList className="w-8 h-8 text-teal-600" /> Matriz de Roles
               </h1>
-              <p className="text-gray-500 mt-1">Mapa organizacional de responsabilidades y equipo.</p>
+              <p className="text-zinc-500 mt-1">Mapa organizacional de responsabilidades y equipo.</p>
             </div>
             <div className="flex gap-2">
                 <Button onClick={handleHardReset} variant="outline" className="text-red-500 hover:text-red-600 border-red-200 hover:bg-red-50">
@@ -243,12 +243,12 @@ export default function RolesPage() {
           </div>
 
           {/* FILTERS TOOLBAR */}
-          <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                 <Input 
                     placeholder="Buscar por rol, tarea o descripción..." 
-                    className="pl-10 h-10 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800" 
+                    className="pl-10 h-10 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800" 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -257,7 +257,7 @@ export default function RolesPage() {
              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
                 <button 
                     onClick={() => setSelectedDept('ALL')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${selectedDept === 'ALL' ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-800 dark:text-gray-400'}`}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${selectedDept === 'ALL' ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400'}`}
                 >
                     Todos
                 </button>
@@ -265,7 +265,7 @@ export default function RolesPage() {
                     <button 
                         key={dept}
                         onClick={() => setSelectedDept(dept)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap ${selectedDept === dept ? DEPT_COLORS[dept] : 'bg-transparent border-transparent text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800'}`}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap ${selectedDept === dept ? DEPT_COLORS[dept] : 'bg-transparent border-transparent text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'}`}
                     >
                         {dept}
                     </button>
@@ -281,9 +281,9 @@ export default function RolesPage() {
             if (!departmentRoles) return null;
 
             return (
-                <div key={dept} className={`rounded-3xl border border-gray-200 dark:border-slate-800 overflow-hidden shadow-sm ${DEPT_BG_COLORS[dept]}`}>
+                <div key={dept} className={`rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm ${DEPT_BG_COLORS[dept]}`}>
                     {/* Header Depto */}
-                    <div className={`px-6 py-4 border-b border-gray-200 dark:border-slate-800/50 flex items-center justify-between ${DEPT_COLORS[dept]} bg-opacity-90 backdrop-blur-sm`}>
+                    <div className={`px-6 py-4 border-b border-zinc-200 dark:border-zinc-800/50 flex items-center justify-between ${DEPT_COLORS[dept]} bg-opacity-90 backdrop-blur-sm`}>
                          <div className="flex items-center gap-3">
                              <h2 className="text-lg font-bold tracking-widest">{dept}</h2>
                              <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-mono">{departmentRoles.length}</span>
@@ -293,27 +293,27 @@ export default function RolesPage() {
                     {/* Table */}
                     <div className="overflow-x-auto">
                         <table className="w-full text-xs text-left">
-                             <thead className="bg-white/50 dark:bg-slate-900/50 border-b border-gray-200 dark:border-slate-800 text-[10px] uppercase text-gray-500 font-semibold tracking-wider">
+                             <thead className="bg-white/50 dark:bg-zinc-900/50 border-b border-zinc-200 dark:border-zinc-800 text-[10px] uppercase text-zinc-500 font-semibold tracking-wider">
                                 <tr>
-                                    <th className="px-3 py-2 w-[200px] cursor-pointer hover:text-gray-700" onClick={() => handleSort('roleName')}>
+                                    <th className="px-3 py-2 w-[200px] cursor-pointer hover:text-zinc-700" onClick={() => handleSort('roleName')}>
                                         <div className="flex items-center gap-1">Rol {sortConfig.key === 'roleName' && <ArrowUpDown className="w-3 h-3"/>}</div>
                                     </th>
                                     <th className="px-3 py-2 w-[200px]">Propósito (Meta)</th>
                                     <th className="px-3 py-2 min-w-[250px]">Responsabilidades (Día a Día)</th>
-                                    <th className="px-3 py-2 w-[180px] cursor-pointer hover:text-gray-700" onClick={() => handleSort('currentOwner')}>
+                                    <th className="px-3 py-2 w-[180px] cursor-pointer hover:text-zinc-700" onClick={() => handleSort('currentOwner')}>
                                         <div className="flex items-center gap-1">Owner {sortConfig.key === 'currentOwner' && <ArrowUpDown className="w-3 h-3"/>}</div>
                                     </th>
-                                    <th className="px-3 py-2 w-[200px] cursor-pointer hover:text-gray-700" onClick={() => handleSort('priority')}>
+                                    <th className="px-3 py-2 w-[200px] cursor-pointer hover:text-zinc-700" onClick={() => handleSort('priority')}>
                                          <div className="flex items-center gap-1">Señal Contratación {sortConfig.key === 'priority' && <ArrowUpDown className="w-3 h-3"/>}</div>
                                     </th>
                                     <th className="px-3 py-2 w-[60px] text-right"></th>
                                 </tr>
                              </thead>
-                             <tbody className="divide-y divide-gray-100 dark:divide-slate-800/50">
+                             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                                 {departmentRoles.map(role => {
                                     const isEditing = editingId === role.id;
                                     return (
-                                        <tr key={role.id} className={`group hover:bg-white dark:hover:bg-slate-800/80 transition-colors ${isEditing ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
+                                        <tr key={role.id} className={`group hover:bg-white dark:hover:bg-zinc-800/80 transition-colors ${isEditing ? 'bg-indigo-50/50 dark:bg-indigo-900/20' : ''}`}>
                                             
                                             {/* ROL */}
                                             <td className="px-3 py-2 align-top">
@@ -324,15 +324,15 @@ export default function RolesPage() {
                                                         className="h-7 text-xs font-bold"
                                                     />
                                                 ) : (
-                                                    <div className="font-bold text-gray-900 dark:text-white text-xs">{role.roleName}</div>
+                                                    <div className="font-bold text-zinc-900 dark:text-white text-xs">{role.roleName}</div>
                                                 )}
                                             </td>
 
                                             {/* META */}
-                                            <td className="px-3 py-2 align-top text-gray-600 dark:text-gray-400">
+                                            <td className="px-3 py-2 align-top text-zinc-600 dark:text-zinc-400">
                                                 {isEditing ? (
                                                     <textarea 
-                                                        className="w-full rounded-md border-gray-300 dark:border-slate-700 bg-transparent text-[11px] p-1.5 min-h-[50px] resize-y leading-tight"
+                                                        className="w-full rounded-md border-zinc-300 dark:border-zinc-700 bg-transparent text-[11px] p-1.5 min-h-[50px] resize-y leading-tight"
                                                         value={editForm.description}
                                                         onChange={e => setEditForm({...editForm, description: e.target.value})}
                                                     />
@@ -340,10 +340,10 @@ export default function RolesPage() {
                                             </td>
 
                                             {/* TASKS */}
-                                            <td className="px-3 py-2 align-top text-gray-600 dark:text-gray-300">
+                                            <td className="px-3 py-2 align-top text-zinc-600 dark:text-zinc-300">
                                                 {isEditing ? (
                                                     <textarea 
-                                                        className="w-full rounded-md border-gray-300 dark:border-slate-700 bg-transparent text-[11px] p-1.5 min-h-[80px] leading-tight"
+                                                        className="w-full rounded-md border-zinc-300 dark:border-zinc-700 bg-transparent text-[11px] p-1.5 min-h-[80px] leading-tight"
                                                         value={editForm.tasks}
                                                         onChange={e => setEditForm({...editForm, tasks: e.target.value})}
                                                     />
@@ -357,16 +357,16 @@ export default function RolesPage() {
                                             {/* OWNER */}
                                             <td className="px-3 py-2 align-top">
                                                 {isEditing ? (
-                                                    <div className="space-y-1 max-h-[120px] overflow-y-auto p-1.5 border rounded-md custom-scrollbar bg-white dark:bg-slate-800 shadow-sm">
+                                                    <div className="space-y-1 max-h-[120px] overflow-y-auto p-1.5 border rounded-md custom-scrollbar bg-white dark:bg-zinc-800 shadow-sm">
                                                         {contractors.map(c => {
                                                             const isSelected = editForm.currentOwner?.includes(c.name);
                                                             return (
                                                                 <div 
                                                                     key={c.id} 
                                                                     onClick={() => toggleOwner(c.name)}
-                                                                    className={`flex items-center gap-2 text-[10px] p-1 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                                                                    className={`flex items-center gap-2 text-[10px] p-1 rounded cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-zinc-50 dark:hover:bg-zinc-700'}`}
                                                                 >
-                                                                    <div className={`w-2.5 h-2.5 border rounded flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                                                    <div className={`w-2.5 h-2.5 border rounded flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-300'}`}>
                                                                         {isSelected && <Check className="w-1.5 h-1.5 text-white" />}
                                                                     </div>
                                                                     {c.name}
@@ -384,10 +384,10 @@ export default function RolesPage() {
                                                 ) : (
                                                     <div className="flex flex-wrap gap-1">
                                                         {role.currentOwner ? role.currentOwner.split(',').map((owner, i) => (
-                                                            <Badge key={i} variant="outline" className="bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700 shadow-sm text-[10px] px-1.5 py-0 h-5">
+                                                            <Badge key={i} variant="outline" className="bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 shadow-sm text-[10px] px-1.5 py-0 h-5">
                                                                 {owner.trim()}
                                                             </Badge>
-                                                        )) : <span className="text-gray-400 italic text-[10px]">Sin asignar</span>}
+                                                        )) : <span className="text-zinc-400 italic text-[10px]">Sin asignar</span>}
                                                     </div>
                                                 )}
                                             </td>
@@ -396,12 +396,12 @@ export default function RolesPage() {
                                             <td className="px-3 py-2 align-top">
                                                 {isEditing ? (
                                                     <textarea 
-                                                        className="w-full rounded-md border-gray-300 dark:border-slate-700 bg-transparent text-[11px] p-1.5 min-h-[50px] leading-tight"
+                                                        className="w-full rounded-md border-zinc-300 dark:border-zinc-700 bg-transparent text-[11px] p-1.5 min-h-[50px] leading-tight"
                                                         value={editForm.hiringTrigger}
                                                         onChange={e => setEditForm({...editForm, hiringTrigger: e.target.value})}
                                                     />
                                                 ) : (
-                                                    <p className={`text-[11px] italic leading-snug ${role.hiringTrigger?.includes('PRIORIDAD') ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                                                    <p className={`text-[11px] italic leading-snug ${role.hiringTrigger?.includes('PRIORIDAD') ? 'text-red-600 font-bold' : 'text-zinc-500'}`}>
                                                         {role.hiringTrigger}
                                                     </p>
                                                 )}
@@ -412,7 +412,7 @@ export default function RolesPage() {
                                                 {isEditing ? (
                                                     <div className="flex flex-col gap-1 items-end">
                                                         <Button size="sm" variant="primary" onClick={saveEdit} className="h-6 w-6 p-0 rounded-full shadow-md"><Save className="w-3 h-3"/></Button>
-                                                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-6 w-6 p-0 rounded-full text-gray-400 hover:bg-gray-100"><X className="w-3 h-3"/></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-6 w-6 p-0 rounded-full text-zinc-400 hover:bg-zinc-100"><X className="w-3 h-3"/></Button>
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col gap-1 items-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -432,9 +432,9 @@ export default function RolesPage() {
         })}
 
         {processedRoles.length === 0 && (
-             <div className="p-12 text-center border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-xl">
-                 <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                 <p className="text-gray-500 font-medium">No se encontraron roles.</p>
+             <div className="p-12 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
+                 <Users className="w-12 h-12 text-zinc-300 mx-auto mb-3" />
+                 <p className="text-zinc-500 font-medium">No se encontraron roles.</p>
                  <Button variant="ghost" onClick={() => setSearchTerm('')} className="mt-2 text-teal-600">Limpiar filtros</Button>
              </div>
         )}

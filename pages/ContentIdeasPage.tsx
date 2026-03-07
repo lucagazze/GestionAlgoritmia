@@ -46,38 +46,38 @@ function NewFolderModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-gray-100 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-zinc-100 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-lg text-gray-900 dark:text-white">Nueva Carpeta</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1"><X className="w-4 h-4" /></button>
+          <h3 className="font-bold text-lg text-zinc-900 dark:text-white">Nueva Carpeta</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 p-1"><X className="w-4 h-4" /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Preview */}
           <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: color + '18' }}>
             <span className="text-2xl">{icon}</span>
-            <span className="font-semibold text-gray-800 dark:text-white">{name || 'Sin nombre'}</span>
+            <span className="font-semibold text-zinc-800 dark:text-white">{name || 'Sin nombre'}</span>
           </div>
 
           {/* Nombre */}
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Nombre</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Nombre</label>
             <input
               autoFocus
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="ej: Empresa X, Cliente Y..."
-              className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm"
+              className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm"
             />
           </div>
 
           {/* Ícono */}
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Ícono</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Ícono</label>
             <div className="flex flex-wrap gap-2">
               {FOLDER_ICONS.map(ic => (
                 <button
                   key={ic} type="button" onClick={() => setIcon(ic)}
-                  className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all ${icon === ic ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' : 'bg-gray-100 dark:bg-slate-800 hover:bg-gray-200'}`}
+                  className={`w-9 h-9 rounded-lg text-xl flex items-center justify-center transition-all ${icon === ic ? 'ring-2 ring-indigo-500 bg-indigo-50 dark:bg-indigo-900/30' : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200'}`}
                 >{ic}</button>
               ))}
             </div>
@@ -85,7 +85,7 @@ function NewFolderModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
 
           {/* Color */}
           <div>
-            <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Color</label>
+            <label className="text-xs font-bold text-zinc-400 uppercase mb-1 block">Color</label>
             <div className="flex flex-wrap gap-2">
               {FOLDER_COLORS.map(c => (
                 <button
@@ -228,12 +228,12 @@ export default function ContentIdeasPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'IDEA': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      case 'IDEA': return 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300';
       case 'SCRIPTED': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
       case 'FILMED': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
       case 'EDITED': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
       case 'POSTED': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-zinc-100 text-zinc-800';
     }
   };
 
@@ -245,12 +245,12 @@ export default function ContentIdeasPage() {
   };
 
   return (
-    <div className="h-full flex bg-gray-50/50 dark:bg-slate-950/50 overflow-hidden">
+    <div className="h-full flex bg-zinc-50/50 dark:bg-zinc-950/50 overflow-hidden">
 
       {/* ── Sidebar de Carpetas ─────────────────────────────────────────── */}
-      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900/70 overflow-y-auto">
-        <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Carpetas</span>
+      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900/70 overflow-y-auto">
+        <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Carpetas</span>
           <button
             onClick={() => setShowNewFolder(true)}
             title="Nueva carpeta"
@@ -267,7 +267,7 @@ export default function ContentIdeasPage() {
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all group ${
               selectedFolderId === null
                 ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
             }`}
           >
             {selectedFolderId === null
@@ -275,7 +275,7 @@ export default function ContentIdeasPage() {
               : <Folder className="w-4 h-4" />
             }
             <span className="flex-1 text-left truncate">Todas</span>
-            <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-300 rounded-full px-1.5 py-0.5 font-semibold">
+            <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300 rounded-full px-1.5 py-0.5 font-semibold">
               {countInFolder(null)}
             </span>
           </button>
@@ -285,20 +285,20 @@ export default function ContentIdeasPage() {
             onClick={() => setSelectedFolderId('__none__')}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all group ${
               selectedFolderId === '__none__'
-                ? 'bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-gray-200'
-                : 'text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800'
+                ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200'
+                : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'
             }`}
           >
             <Folder className="w-4 h-4 opacity-40" />
             <span className="flex-1 text-left truncate">Sin carpeta</span>
-            <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-300 rounded-full px-1.5 py-0.5 font-semibold">
+            <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300 rounded-full px-1.5 py-0.5 font-semibold">
               {ideas.filter(i => !i.folderId).length}
             </span>
           </button>
 
           {folders.length > 0 && (
             <div className="pt-2 pb-1 px-3">
-              <div className="h-px bg-gray-100 dark:bg-slate-800" />
+              <div className="h-px bg-zinc-100 dark:bg-zinc-800" />
             </div>
           )}
 
@@ -310,7 +310,7 @@ export default function ContentIdeasPage() {
               className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all group ${
                 selectedFolderId === folder.id
                   ? 'text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
               }`}
               style={selectedFolderId === folder.id ? { backgroundColor: folder.color } : {}}
             >
@@ -319,14 +319,14 @@ export default function ContentIdeasPage() {
               <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold ${
                 selectedFolderId === folder.id
                   ? 'bg-white/20 text-white'
-                  : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-300'
+                  : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-300'
               }`}>
                 {countInFolder(folder.id)}
               </span>
               <button
                 onClick={(e) => handleDeleteFolder(folder.id, e)}
                 className={`opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all ${
-                  selectedFolderId === folder.id ? 'text-white hover:bg-white/20' : 'text-gray-400 hover:text-red-500'
+                  selectedFolderId === folder.id ? 'text-white hover:bg-white/20' : 'text-zinc-400 hover:text-red-500'
                 }`}
               >
                 <X className="w-3 h-3" />
@@ -335,7 +335,7 @@ export default function ContentIdeasPage() {
           ))}
 
           {folders.length === 0 && (
-            <div className="text-center pt-4 pb-2 text-xs text-gray-400">
+            <div className="text-center pt-4 pb-2 text-xs text-zinc-400">
               <FolderPlus className="w-6 h-6 mx-auto mb-1 opacity-40" />
               <p>Crea una carpeta<br />para organizar</p>
             </div>
@@ -349,7 +349,7 @@ export default function ContentIdeasPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 md:px-8 pb-0 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-3">
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white mb-1 flex items-center gap-2">
               {selectedFolderId && selectedFolderId !== '__none__' && getFolderById(selectedFolderId) ? (
                 <>
                   <span className="text-2xl">{getFolderById(selectedFolderId)!.icon}</span>
@@ -357,14 +357,14 @@ export default function ContentIdeasPage() {
                 </>
               ) : selectedFolderId === '__none__' ? (
                 <>
-                  <Folder className="w-7 h-7 text-gray-400" />
+                  <Folder className="w-7 h-7 text-zinc-400" />
                   Sin Carpeta
                 </>
               ) : (
                 'Generador de Ideas'
               )}
             </h1>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">
               {selectedFolderId === null
                 ? `${ideas.length} guiones en total`
                 : `${filteredIdeas.length} guiones`
@@ -381,36 +381,36 @@ export default function ContentIdeasPage() {
 
           {/* Search */}
           <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400 w-4 h-4" />
             <input 
               type="text" 
               placeholder="Buscar ideas..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
             />
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto items-center">
               
               {/* Type Filter */}
-              <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                   <button 
                       onClick={() => setTypeFilter('ALL')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'ALL' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'ALL' ? 'bg-white dark:bg-zinc-700 shadow text-black dark:text-white' : 'text-zinc-500 hover:text-zinc-700'}`}
                   >Todos</button>
                   <button 
                       onClick={() => setTypeFilter('POST')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'POST' ? 'bg-white dark:bg-slate-700 shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'POST' ? 'bg-white dark:bg-zinc-700 shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700'}`}
                   >Post</button>
                   <button 
                       onClick={() => setTypeFilter('AD')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'AD' ? 'bg-white dark:bg-slate-700 shadow text-purple-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${typeFilter === 'AD' ? 'bg-white dark:bg-zinc-700 shadow text-purple-600' : 'text-zinc-500 hover:text-zinc-700'}`}
                   >Ads</button>
               </div>
 
               {/* Status Filter */}
-              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto bg-white dark:bg-slate-900 p-1 rounded-xl border border-gray-100 dark:border-slate-800">
+              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 w-full md:w-auto bg-white dark:bg-zinc-900 p-1 rounded-xl border border-zinc-100 dark:border-zinc-800">
                {[
                   { id: 'ALL', label: 'Todos' },
                   { id: 'UNPUBLISHED', label: 'No Publicado' },
@@ -422,7 +422,7 @@ export default function ContentIdeasPage() {
                   className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                       statusFilter === filter.id 
                       ? 'bg-black dark:bg-white text-white dark:text-black shadow-sm' 
-                      : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800'
+                      : 'text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800'
                   }`}
                   >
                   {filter.label}
@@ -431,15 +431,15 @@ export default function ContentIdeasPage() {
               </div>
 
               {/* Sort */}
-               <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-xl border border-gray-100 dark:border-slate-800">
+               <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 p-1 rounded-xl border border-zinc-100 dark:border-zinc-800">
                   <button
                       onClick={() => setSortOrder('NEWEST')}
-                      className={`p-2 rounded-lg transition-all ${sortOrder === 'NEWEST' ? 'bg-gray-100 dark:bg-slate-800 text-black dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`p-2 rounded-lg transition-all ${sortOrder === 'NEWEST' ? 'bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white' : 'text-zinc-400 hover:text-zinc-600'}`}
                       title="Más recientes"
                   ><Calendar className="w-4 h-4 transform rotate-180" /></button>
                   <button
                       onClick={() => setSortOrder('OLDEST')}
-                      className={`p-2 rounded-lg transition-all ${sortOrder === 'OLDEST' ? 'bg-gray-100 dark:bg-slate-800 text-black dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                      className={`p-2 rounded-lg transition-all ${sortOrder === 'OLDEST' ? 'bg-zinc-100 dark:bg-zinc-800 text-black dark:text-white' : 'text-zinc-400 hover:text-zinc-600'}`}
                       title="Más antiguos"
                   ><Calendar className="w-4 h-4" /></button>
                </div>
@@ -453,7 +453,7 @@ export default function ContentIdeasPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : filteredIdeas.length === 0 ? (
-            <div className="text-center py-20 text-gray-400">
+            <div className="text-center py-20 text-zinc-400">
               <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No hay ideas en esta carpeta.</p>
               {selectedFolderId && selectedFolderId !== '__none__' && (
@@ -474,7 +474,7 @@ export default function ContentIdeasPage() {
                     key={idea.id} 
                     onClick={() => navigate(`/content-ideas/${idea.id}`)}
                     onContextMenu={(e) => handleContextMenu(e, idea.id)}
-                    className="group bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl p-5 hover:shadow-xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1 relative cursor-pointer"
+                    className="group bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-5 hover:shadow-xl transition-all duration-300 flex flex-col h-full transform hover:-translate-y-1 relative cursor-pointer"
                   >
                     {/* Folder indicator strip */}
                     {folder && (
@@ -487,7 +487,7 @@ export default function ContentIdeasPage() {
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-4" style={folder ? { marginTop: '4px' } : {}}>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="p-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                        <span className="p-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
                           {getPlatformIcon(idea.platform)}
                         </span>
                         {idea.contentType === 'AD' && (
@@ -501,23 +501,23 @@ export default function ContentIdeasPage() {
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                         <button 
                           onClick={(e) => { e.stopPropagation(); navigate(`/content-ideas/${idea.id}`); }}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-blue-500 transition-colors"
+                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-blue-500 transition-colors"
                         ><Edit2 className="w-3.5 h-3.5" /></button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDelete(idea.id); }}
-                          className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full text-gray-400 hover:text-red-500 transition-colors"
+                          className="p-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-red-500 transition-colors"
                         ><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
 
                     {/* Card Content */}
                     <div className="flex-1 space-y-3">
-                      <h3 className="font-bold text-lg text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                      <h3 className="font-bold text-lg text-zinc-900 dark:text-white line-clamp-2 leading-tight">
                         {idea.title}
                       </h3>
                       
                       {idea.concept && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-3 bg-gray-50 dark:bg-slate-800/50 p-3 rounded-xl italic">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-3 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl italic">
                           "{idea.concept}"
                         </p>
                       )}
@@ -525,12 +525,12 @@ export default function ContentIdeasPage() {
                       {(idea.hook || idea.script) && (
                         <div className="flex gap-4 pt-2">
                           {idea.hook && (
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
                               <Sparkles className="w-3 h-3 text-yellow-500" /> Hook
                             </div>
                           )}
                           {idea.script && (
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+                            <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-medium">
                               <FileText className="w-3 h-3 text-blue-500" /> Guion
                             </div>
                           )}
@@ -539,7 +539,7 @@ export default function ContentIdeasPage() {
                     </div>
 
                     {/* Card Footer */}
-                    <div className="mt-5 pt-4 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between">
+                    <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                       {/* Folder badge */}
                       {folder ? (
                         <span
@@ -549,11 +549,11 @@ export default function ContentIdeasPage() {
                           {folder.icon} {folder.name}
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-300 dark:text-gray-600 flex items-center gap-1">
+                        <span className="text-xs text-zinc-300 dark:text-zinc-600 flex items-center gap-1">
                           <Folder className="w-3 h-3" /> Sin carpeta
                         </span>
                       )}
-                      <span className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="flex items-center gap-1.5 text-xs text-zinc-400">
                         <Calendar className="w-3 h-3" />
                         {new Date(idea.createdAt).toLocaleDateString()}
                       </span>
@@ -567,15 +567,15 @@ export default function ContentIdeasPage() {
           {/* Context Menu */}
           {contextMenu && (
             <div
-              className="fixed z-50 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-xl py-2 w-56"
+              className="fixed z-50 bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl shadow-xl py-2 w-56"
               style={{ top: contextMenu.y, left: contextMenu.x }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700 mb-1">
+              <div className="px-4 py-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-100 dark:border-zinc-700 mb-1">
                 Cambiar Estado
               </div>
               {[
-                { v: 'IDEA', label: '💡 En Idea', color: 'bg-gray-400' },
+                { v: 'IDEA', label: '💡 En Idea', color: 'bg-zinc-400' },
                 { v: 'SCRIPTED', label: '📝 Guionizado', color: 'bg-blue-400' },
                 { v: 'FILMED', label: '🎥 Grabado', color: 'bg-purple-400' },
                 { v: 'EDITED', label: '🎬 Editado', color: 'bg-orange-400' },
@@ -584,7 +584,7 @@ export default function ContentIdeasPage() {
                 <button
                   key={v}
                   onClick={() => handleFastStatusUpdate(contextMenu.id, v)}
-                  className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2"
+                  className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center gap-2"
                 >
                   <span className={`w-2 h-2 rounded-full ${color}`}></span>
                   {label}
@@ -592,22 +592,22 @@ export default function ContentIdeasPage() {
               ))}
 
               {/* Move to folder */}
-              <div className="border-t border-gray-100 dark:border-slate-700 mt-1 pt-1">
+              <div className="border-t border-zinc-100 dark:border-zinc-700 mt-1 pt-1">
                 <div
-                  className="px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center justify-between cursor-pointer"
+                  className="px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 flex items-center justify-between cursor-pointer"
                   onClick={() => setMoveFolderId(moveFolderId ? null : contextMenu.id)}
                 >
                   <span className="flex items-center gap-2">
                     <Folder className="w-3.5 h-3.5 text-indigo-400" />
                     Mover a carpeta
                   </span>
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                  <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
                 </div>
                 {moveFolderId === contextMenu.id && (
-                  <div className="mx-2 my-1 bg-gray-50 dark:bg-slate-900 rounded-lg overflow-hidden border border-gray-100 dark:border-slate-700">
+                  <div className="mx-2 my-1 bg-zinc-50 dark:bg-zinc-900 rounded-lg overflow-hidden border border-zinc-100 dark:border-zinc-700">
                     <button
                       onClick={() => handleMoveToFolder(contextMenu.id, null)}
-                      className="w-full text-left px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                      className="w-full text-left px-3 py-1.5 text-xs text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2"
                     >
                       <Folder className="w-3 h-3 opacity-40" /> Sin carpeta
                     </button>
@@ -615,7 +615,7 @@ export default function ContentIdeasPage() {
                       <button
                         key={f.id}
                         onClick={() => handleMoveToFolder(contextMenu.id, f.id)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-2"
+                        className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2"
                       >
                         <span>{f.icon}</span>
                         <span className="font-medium" style={{ color: f.color }}>{f.name}</span>

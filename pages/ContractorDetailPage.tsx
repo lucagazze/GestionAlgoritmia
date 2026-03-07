@@ -74,11 +74,11 @@ export default function ContractorDetailPage() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen"><div className="animate-pulse text-gray-400">Cargando...</div></div>;
+    return <div className="flex items-center justify-center h-screen"><div className="animate-pulse text-zinc-400">Cargando...</div></div>;
   }
 
   if (!contractor) {
-    return <div className="p-8 text-center text-gray-400">Socio no encontrado</div>;
+    return <div className="p-8 text-center text-zinc-400">Socio no encontrado</div>;
   }
 
   const activeProjects = projects.filter(p => p.status === ProjectStatus.ACTIVE);
@@ -95,8 +95,8 @@ export default function ContractorDetailPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{contractor.name}</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">{contractor.role}</p>
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white">{contractor.name}</h1>
+            <p className="text-zinc-500 dark:text-zinc-400 mt-1">{contractor.role}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -130,8 +130,8 @@ export default function ContractorDetailPage() {
               <Briefcase className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase">Proyectos Activos</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{activeProjects.length}</h3>
+              <p className="text-xs font-bold text-zinc-400 uppercase">Proyectos Activos</p>
+              <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{activeProjects.length}</h3>
             </div>
           </div>
         </Card>
@@ -142,8 +142,8 @@ export default function ContractorDetailPage() {
               <Clock className="w-6 h-6 text-yellow-600" />
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase">Tareas Pendientes</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{activeTasks.length}</h3>
+              <p className="text-xs font-bold text-zinc-400 uppercase">Tareas Pendientes</p>
+              <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">{activeTasks.length}</h3>
             </div>
           </div>
         </Card>
@@ -154,8 +154,8 @@ export default function ContractorDetailPage() {
               <DollarSign className="w-6 h-6 text-green-600" />
             </div>
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase">Pago Mensual</p>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">${monthlyPayout.toLocaleString()}</h3>
+              <p className="text-xs font-bold text-zinc-400 uppercase">Pago Mensual</p>
+              <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">${monthlyPayout.toLocaleString()}</h3>
             </div>
           </div>
         </Card>
@@ -163,7 +163,7 @@ export default function ContractorDetailPage() {
 
       {/* Information Card */}
       <Card className="p-6">
-        <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">Información del Socio</h2>
+        <h2 className="text-xl font-bold mb-6 text-zinc-900 dark:text-white">Información del Socio</h2>
         
         {isEditing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -192,7 +192,7 @@ export default function ContractorDetailPage() {
             <div>
               <Label>Estado</Label>
               <select 
-                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                className="w-full px-3 py-2 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                 value={formData.status}
                 onChange={e => setFormData({...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE'})}
               >
@@ -219,30 +219,30 @@ export default function ContractorDetailPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-gray-400" />
+              <Mail className="w-5 h-5 text-zinc-400" />
               <div>
-                <p className="text-xs text-gray-400">Email</p>
-                <p className="font-medium text-gray-900 dark:text-white">{contractor.email || '-'}</p>
+                <p className="text-xs text-zinc-400">Email</p>
+                <p className="font-medium text-zinc-900 dark:text-white">{contractor.email || '-'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Phone className="w-5 h-5 text-gray-400" />
+              <Phone className="w-5 h-5 text-zinc-400" />
               <div>
-                <p className="text-xs text-gray-400">Teléfono</p>
-                <p className="font-medium text-gray-900 dark:text-white">{contractor.phone || '-'}</p>
+                <p className="text-xs text-zinc-400">Teléfono</p>
+                <p className="font-medium text-zinc-900 dark:text-white">{contractor.phone || '-'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <DollarSign className="w-5 h-5 text-gray-400" />
+              <DollarSign className="w-5 h-5 text-zinc-400" />
               <div>
-                <p className="text-xs text-gray-400">Tarifa Mensual</p>
-                <p className="font-medium text-gray-900 dark:text-white">${contractor.hourlyRate.toLocaleString()}/mes</p>
+                <p className="text-xs text-zinc-400">Tarifa Mensual</p>
+                <p className="font-medium text-zinc-900 dark:text-white">${contractor.hourlyRate.toLocaleString()}/mes</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-gray-400" />
+              <CheckCircle2 className="w-5 h-5 text-zinc-400" />
               <div>
-                <p className="text-xs text-gray-400">Estado</p>
+                <p className="text-xs text-zinc-400">Estado</p>
                 <Badge variant={contractor.status === 'ACTIVE' ? 'green' : 'outline'}>{contractor.status}</Badge>
               </div>
             </div>
@@ -252,23 +252,23 @@ export default function ContractorDetailPage() {
 
       {/* Projects Section */}
       <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Proyectos Asignados ({activeProjects.length})</h2>
+        <h2 className="text-xl font-bold mb-4 text-zinc-900 dark:text-white">Proyectos Asignados ({activeProjects.length})</h2>
         {activeProjects.length === 0 ? (
-          <p className="text-gray-400 text-sm">No hay proyectos asignados actualmente.</p>
+          <p className="text-zinc-400 text-sm">No hay proyectos asignados actualmente.</p>
         ) : (
           <div className="space-y-3">
             {activeProjects.map(p => (
               <div 
                 key={p.id} 
                 onClick={() => navigate(`/projects/${p.id}`)}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors"
               >
                 <div>
-                  <h3 className="font-bold text-gray-900 dark:text-white">{p.name}</h3>
-                  <p className="text-xs text-gray-500">{p.industry}</p>
+                  <h3 className="font-bold text-zinc-900 dark:text-white">{p.name}</h3>
+                  <p className="text-xs text-zinc-500">{p.industry}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-mono font-bold text-gray-900 dark:text-white">${(p.outsourcingCost || 0).toLocaleString()}/mes</p>
+                  <p className="font-mono font-bold text-zinc-900 dark:text-white">${(p.outsourcingCost || 0).toLocaleString()}/mes</p>
                   <Badge variant="blue" className="mt-1">{p.status}</Badge>
                 </div>
               </div>
@@ -279,19 +279,19 @@ export default function ContractorDetailPage() {
 
       {/* Tasks Section */}
       <Card className="p-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Tareas Activas ({activeTasks.length})</h2>
+        <h2 className="text-xl font-bold mb-4 text-zinc-900 dark:text-white">Tareas Activas ({activeTasks.length})</h2>
         {activeTasks.length === 0 ? (
-          <p className="text-gray-400 text-sm">No hay tareas pendientes.</p>
+          <p className="text-zinc-400 text-sm">No hay tareas pendientes.</p>
         ) : (
           <div className="space-y-2">
             {activeTasks.slice(0, 5).map(t => (
-              <div key={t.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-800 rounded-lg">
+              <div key={t.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className={`w-2 h-2 rounded-full ${t.priority === 'HIGH' ? 'bg-red-500' : t.priority === 'MEDIUM' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
-                  <span className="font-medium text-gray-900 dark:text-white">{t.title}</span>
+                  <span className="font-medium text-zinc-900 dark:text-white">{t.title}</span>
                 </div>
                 {t.dueDate && (
-                  <span className="text-xs text-gray-500">{new Date(t.dueDate).toLocaleDateString()}</span>
+                  <span className="text-xs text-zinc-500">{new Date(t.dueDate).toLocaleDateString()}</span>
                 )}
               </div>
             ))}
@@ -301,18 +301,18 @@ export default function ContractorDetailPage() {
 
       {/* Work Order / Assigned Items Section */}
       <div className="mt-8">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Carga de Trabajo Activa</h3>
+          <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-4">Carga de Trabajo Activa</h3>
           <div className="grid grid-cols-1 gap-3">
-              {assignedItems.length === 0 && <p className="text-gray-500">Sin asignaciones activas.</p>}
+              {assignedItems.length === 0 && <p className="text-zinc-500">Sin asignaciones activas.</p>}
               {assignedItems.map((item: any) => (
-                  <div key={item.id} className="p-4 border rounded-xl bg-white dark:bg-slate-800 flex justify-between items-center">
+                  <div key={item.id} className="p-4 border rounded-xl bg-white dark:bg-zinc-800 flex justify-between items-center">
                       <div>
                           <p className="font-bold">{item.serviceSnapshotName}</p>
-                          <p className="text-sm text-gray-500">Cliente: {item.proposal?.client?.name}</p>
+                          <p className="text-sm text-zinc-500">Cliente: {item.proposal?.client?.name}</p>
                       </div>
                       <div className="text-right">
                           <p className="text-emerald-600 font-bold">${item.outsourcingCost?.toLocaleString()}</p>
-                          <p className="text-xs text-gray-400">Mensual</p>
+                          <p className="text-xs text-zinc-400">Mensual</p>
                       </div>
                   </div>
               ))}

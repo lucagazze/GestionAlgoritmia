@@ -89,40 +89,40 @@ export default function PlaybooksPage() {
         <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 flex items-center gap-3">
+                    <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
                         <Book className="w-8 h-8 text-black" /> Playbooks & SOPs
                     </h1>
-                    <p className="text-gray-500 mt-2">La base de conocimiento de tu agencia. Estandariza para escalar.</p>
+                    <p className="text-zinc-500 mt-2">La base de conocimiento de tu agencia. Estandariza para escalar.</p>
                 </div>
                 <Button onClick={() => openModal()} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Nuevo Proceso</Button>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
                 <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                    <Input placeholder="Buscar procesos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-gray-50 border-transparent focus:bg-white" />
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
+                    <Input placeholder="Buscar procesos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 bg-zinc-50 border-transparent focus:bg-white" />
                 </div>
                 <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-                    <button onClick={() => setFilterCat('ALL')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterCat === 'ALL' ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>Todos</button>
+                    <button onClick={() => setFilterCat('ALL')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterCat === 'ALL' ? 'bg-black text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>Todos</button>
                     {CATEGORIES.map(c => (
-                        <button key={c} onClick={() => setFilterCat(c)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterCat === c ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{c}</button>
+                        <button key={c} onClick={() => setFilterCat(c)} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${filterCat === c ? 'bg-black text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>{c}</button>
                     ))}
                 </div>
             </div>
 
-            {loading ? <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-gray-300"/></div> : (
+            {loading ? <div className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-zinc-300"/></div> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filtered.map(sop => (
-                        <div key={sop.id} onClick={() => openModal(sop)} className="group bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-lg hover:border-black/20 transition-all cursor-pointer flex flex-col h-64">
+                        <div key={sop.id} onClick={() => openModal(sop)} className="group bg-white rounded-2xl border border-zinc-200 p-6 hover:shadow-lg hover:border-black/20 transition-all cursor-pointer flex flex-col h-64">
                             <div className="flex justify-between items-start mb-4">
-                                <Badge variant="outline" className="bg-gray-50">{sop.category}</Badge>
+                                <Badge variant="outline" className="bg-zinc-50">{sop.category}</Badge>
                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                                    <button onClick={(e) => {e.stopPropagation(); handleDelete(sop.id)}} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                                    <button onClick={(e) => {e.stopPropagation(); handleDelete(sop.id)}} className="text-zinc-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
                                 </div>
                             </div>
-                            <h3 className="font-bold text-lg text-gray-900 mb-2 line-clamp-2">{sop.title}</h3>
+                            <h3 className="font-bold text-lg text-zinc-900 mb-2 line-clamp-2">{sop.title}</h3>
                             <div className="flex-1 overflow-hidden relative">
-                                <p className="text-sm text-gray-500 line-clamp-4 whitespace-pre-wrap">{sop.content}</p>
+                                <p className="text-sm text-zinc-500 line-clamp-4 whitespace-pre-wrap">{sop.content}</p>
                                 <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent"></div>
                             </div>
                             <div className="pt-4 mt-auto flex items-center text-xs font-bold text-blue-600">
@@ -131,7 +131,7 @@ export default function PlaybooksPage() {
                         </div>
                     ))}
                     {filtered.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
+                        <div className="col-span-full py-12 text-center text-zinc-400 border-2 border-dashed border-zinc-200 rounded-2xl">
                             No se encontraron playbooks.
                         </div>
                     )}
@@ -144,7 +144,7 @@ export default function PlaybooksPage() {
                     
                     <div className="flex justify-between items-center">
                         <select 
-                            className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:border-black"
+                            className="bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:border-black"
                             value={formData.category} 
                             onChange={e => setFormData({...formData, category: e.target.value})}
                         >

@@ -5,7 +5,7 @@ import { db } from '../../services/db';
 import { useToast } from '../Toast';
 import { MarketingProposalData } from '../../services/pdfGenerator'; // Re-using this type for now as the AI prompt returns it
 
-const inputCls = "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white";
+const inputCls = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-zinc-900 dark:text-white";
 const textareaCls = inputCls + " resize-none";
 
 export const AIFillModal: React.FC<{
@@ -121,7 +121,7 @@ export const AIFillModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-slate-800">
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
         <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-white">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -146,7 +146,7 @@ export const AIFillModal: React.FC<{
               disabled={processing}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${isRecording
                 ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-lg shadow-red-500/30'
-                : 'bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200'
+                : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200'
               }`}
             >
               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -176,19 +176,19 @@ export const AIFillModal: React.FC<{
               onChange={e => setText(e.target.value)}
             />
             {text && (
-              <button onClick={() => setText('')} className="absolute top-3 right-3 w-6 h-6 bg-gray-200 dark:bg-slate-700 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors">
+              <button onClick={() => setText('')} className="absolute top-3 right-3 w-6 h-6 bg-zinc-200 dark:bg-zinc-700 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors">
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-zinc-400">
             💡 Podés mezclar voz y texto. Cuanto más info des, más campos se completan mágicamente.
             {clientId && <span className="ml-1 text-indigo-500 font-semibold">Al completar, la información se guardará en el perfil del cliente.</span>}
           </p>
 
           <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-sm">
+            <button onClick={onClose} className="flex-1 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 font-bold py-3 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-sm">
               Cancelar
             </button>
             <button

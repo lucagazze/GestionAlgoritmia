@@ -223,10 +223,10 @@ export default function QuotationsPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+                <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
                     <FileText className="w-8 h-8 text-indigo-600" /> Historial de Presupuestos
                 </h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Gestión financiera y estados.</p>
+                <p className="text-zinc-500 dark:text-zinc-400 mt-1">Gestión financiera y estados.</p>
             </div>
             <Button onClick={() => navigate('/calculator')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg">
                 <Plus className="w-4 h-4 mr-2" /> Generar Nuevo
@@ -234,8 +234,8 @@ export default function QuotationsPage() {
         </div>
 
         {/* Filtros */}
-        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-2">
-             <div className="flex bg-gray-100 dark:bg-slate-800/50 p-1 rounded-xl flex-1 overflow-x-auto">
+        <div className="bg-white dark:bg-zinc-900 p-1.5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row gap-2">
+             <div className="flex bg-zinc-100 dark:bg-zinc-800/50 p-1 rounded-xl flex-1 overflow-x-auto">
                 {[
                     { id: 'ALL', label: 'Todos' },
                     { id: 'APPROVED', label: 'Aprobados' },
@@ -248,8 +248,8 @@ export default function QuotationsPage() {
                         onClick={() => setActiveTab(tab.id as any)}
                         className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
                             activeTab === tab.id 
-                            ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                            ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm' 
+                            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                         }`}
                     >
                         {tab.label}
@@ -259,7 +259,7 @@ export default function QuotationsPage() {
              <div className="flex gap-2 w-full md:w-auto">
                  <div className="relative flex-1 md:w-64">
                      <select
-                        className="w-full bg-gray-50 dark:bg-slate-800/50 border-transparent rounded-lg h-full px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500"
+                        className="w-full bg-zinc-50 dark:bg-zinc-800/50 border-transparent rounded-lg h-full px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500"
                         value={selectedClientId}
                         onChange={e => setSelectedClientId(e.target.value)}
                      >
@@ -274,20 +274,20 @@ export default function QuotationsPage() {
                         type="month" 
                         value={filterMonth}
                         onChange={e => setFilterMonth(e.target.value)}
-                        className="bg-gray-50 dark:bg-slate-800/50 border-transparent h-full"
+                        className="bg-zinc-50 dark:bg-zinc-800/50 border-transparent h-full"
                     />
                  </div>
              </div>
         </div>
 
         {/* Lista en Tabla */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
             {loading && <div className="text-center py-10"><Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600"/></div>}
             
             {!loading && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-bold text-xs">
+                        <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 uppercase font-bold text-xs">
                             <tr>
                                 <th className="px-6 py-4">Fecha</th>
                                 <th className="px-6 py-4">Cliente</th>
@@ -298,25 +298,25 @@ export default function QuotationsPage() {
                                 <th className="px-6 py-4 text-center">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                             {filteredProposals.map((proposal) => {
                                 const finance = calculateFinancials(proposal);
                                 return (
                                     <tr 
                                         key={proposal.id}
-                                        className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group cursor-pointer"
                                         onContextMenu={(e) => {
                                             e.preventDefault();
                                             setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
                                         }}
                                         onDoubleClick={() => handleOpenDetail(proposal)}
                                     >
-                                        <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                                        <td className="px-6 py-4 whitespace-nowrap text-zinc-500">
                                             {new Date(proposal.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="font-bold text-gray-900 dark:text-white">{proposal.client?.name || 'Cliente Potencial'}</div>
-                                            {proposal.client?.industry && <div className="text-xs text-gray-400">{proposal.client.industry}</div>}
+                                            <div className="font-bold text-zinc-900 dark:text-white">{proposal.client?.name || 'Cliente Potencial'}</div>
+                                            {proposal.client?.industry && <div className="text-xs text-zinc-400">{proposal.client.industry}</div>}
                                         </td>
                                         <td className="px-6 py-4">
                                             {getStatusBadge(proposal.status)}
@@ -324,19 +324,19 @@ export default function QuotationsPage() {
                                         <td className="px-6 py-4 hidden md:table-cell">
                                             <div className="flex -space-x-2">
                                                 {(proposal.items || []).slice(0, 3).map((item, idx) => (
-                                                    <div key={idx} className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 border-2 border-white dark:border-slate-800 flex items-center justify-center text-[10px] font-bold text-indigo-600" title={item.serviceSnapshotName}>
+                                                    <div key={idx} className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900 border-2 border-white dark:border-zinc-800 flex items-center justify-center text-[10px] font-bold text-indigo-600" title={item.serviceSnapshotName}>
                                                         {item.serviceSnapshotName.charAt(0)}
                                                     </div>
                                                 ))}
                                                 {(proposal.items || []).length > 3 && (
-                                                    <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-slate-800 border-2 border-white dark:border-slate-800 flex items-center justify-center text-[8px] font-bold text-gray-500">
+                                                    <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 border-2 border-white dark:border-zinc-800 flex items-center justify-center text-[8px] font-bold text-zinc-500">
                                                         +{proposal.items.length - 3}
                                                     </div>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="font-black text-gray-900 dark:text-white text-base">
+                                            <div className="font-black text-zinc-900 dark:text-white text-base">
                                                 {formatMoney(finance.totalContractRevenue, proposal.currency)}
                                             </div>
                                             <div className="text-xs text-indigo-500 font-medium">
@@ -358,7 +358,7 @@ export default function QuotationsPage() {
                                                     handleOpenDetail(proposal);
                                                 }}
                                             >
-                                                <Eye className="w-4 h-4 text-gray-400 hover:text-indigo-600" />
+                                                <Eye className="w-4 h-4 text-zinc-400 hover:text-indigo-600" />
                                             </Button>
                                             <Button 
                                                 size="sm" 
@@ -369,7 +369,7 @@ export default function QuotationsPage() {
                                                     handleViewInCopilot(proposal);
                                                 }}
                                             >
-                                                <Edit className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+                                                <Edit className="w-4 h-4 text-zinc-400 hover:text-blue-600" />
                                             </Button>
                                             <Button 
                                                 size="sm" 
@@ -380,12 +380,12 @@ export default function QuotationsPage() {
                                                     setContextMenu({ visible: true, x: e.pageX, y: e.pageY, proposal });
                                                 }}
                                             >
-                                                <MoreVertical className="w-4 h-4 text-gray-400" />
+                                                <MoreVertical className="w-4 h-4 text-zinc-400" />
                                             </Button>
                                             <Button 
                                                 size="sm" 
                                                 variant="ghost" 
-                                                className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                                className="h-8 w-8 p-0 text-zinc-400 hover:text-red-600 hover:bg-red-50"
                                                 onClick={(e) => handleDeleteProposal(proposal.id, e)}
                                                 title="Eliminar"
                                             >
@@ -403,9 +403,9 @@ export default function QuotationsPage() {
 
         {/* ... (Menú Contextual y Modales se mantienen igual) ... */}
         {contextMenu.visible && (
-            <div className="fixed bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}>
-                <div className="px-4 py-2 border-b border-gray-100 dark:border-slate-700 bg-gray-50/50 dark:bg-slate-900/50">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acciones</p>
+            <div className="fixed bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-zinc-100 dark:border-zinc-700 py-1 z-50 w-60 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={{ top: contextMenu.y, left: contextMenu.x }}>
+                <div className="px-4 py-2 border-b border-zinc-100 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/50">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Acciones</p>
                 </div>
                 <div className="p-1 space-y-0.5">
                     <button onClick={handleApprovePartial} className="w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-2">
@@ -417,8 +417,8 @@ export default function QuotationsPage() {
                     <button onClick={handleReject} className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
                         <XCircle className="w-4 h-4"/> Rechazar
                     </button>
-                    <div className="my-1 border-t border-gray-100 dark:border-slate-700"></div>
-                    <button onClick={() => contextMenu.proposal && handleDeleteProposal(contextMenu.proposal.id)} className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                    <div className="my-1 border-t border-zinc-100 dark:border-zinc-700"></div>
+                    <button onClick={() => contextMenu.proposal && handleDeleteProposal(contextMenu.proposal.id)} className="w-full text-left px-3 py-2 text-sm text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
                         <Trash2 className="w-4 h-4"/> Eliminar Definitivamente
                     </button>
                 </div>
@@ -433,12 +433,12 @@ export default function QuotationsPage() {
                     <div className="space-y-6">
                         <div className="flex justify-between items-start">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedDetailProposal.client?.name}</h2>
+                                <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">{selectedDetailProposal.client?.name}</h2>
                                 <div className="flex items-center gap-2 mt-1">
                                     {getStatusBadge(selectedDetailProposal.status)}
-                                    <span className="text-sm text-gray-500">Duración: <b>{fin.duration} meses</b></span>
+                                    <span className="text-sm text-zinc-500">Duración: <b>{fin.duration} meses</b></span>
                                     {selectedDetailProposal.client?.contractStartDate && (
-                                        <div className="flex items-center gap-1 text-sm text-gray-500 ml-2 border-l pl-2 border-gray-300">
+                                        <div className="flex items-center gap-1 text-sm text-zinc-500 ml-2 border-l pl-2 border-zinc-300">
                                             <Calendar className="w-3 h-3" />
                                             <span>Inicio: <b>{new Date(selectedDetailProposal.client.contractStartDate).toLocaleDateString()}</b></span>
                                         </div>
@@ -447,7 +447,7 @@ export default function QuotationsPage() {
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">
                                 <div>
-                                    <p className="text-xs text-gray-500 uppercase font-bold">Valor Total Contrato</p>
+                                    <p className="text-xs text-zinc-500 uppercase font-bold">Valor Total Contrato</p>
                                     <p className="text-3xl font-black text-indigo-600 dark:text-indigo-400">{formatMoney(fin.totalContractRevenue, selectedDetailProposal.currency)}</p>
                                 </div>
                                 <div className="flex gap-2 mt-2">
@@ -465,7 +465,7 @@ export default function QuotationsPage() {
                                              return acc;
                                          }, {} as Record<string, { contractor: any, items: any[] }>)
                                      ).map(({ contractor, items }) => (
-                                         <Button key={contractor.id} size="sm" variant="outline" className="border-gray-200 text-gray-600" onClick={() => generatePartnerPDF(selectedDetailProposal, contractor, items)}>
+                                         <Button key={contractor.id} size="sm" variant="outline" className="border-zinc-200 text-zinc-600" onClick={() => generatePartnerPDF(selectedDetailProposal, contractor, items)}>
                                              <FileText className="w-4 h-4 mr-2" /> PDF {contractor.name.split(' ')[0]}
                                          </Button>
                                      ))}
@@ -482,34 +482,34 @@ export default function QuotationsPage() {
                                 <p className="text-sm font-bold text-red-700">Gastos de Equipo</p>
                                 <p className="text-2xl font-bold text-red-800 dark:text-red-200">{formatMoney(fin.totalContractCost, selectedDetailProposal.currency)}</p>
                             </div>
-                            <div className="bg-gray-50 dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
-                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">Mensualidad</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatMoney(fin.revenueRecurring, selectedDetailProposal.currency)}</p>
+                            <div className="bg-zinc-50 dark:bg-zinc-800 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                                <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">Mensualidad</p>
+                                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatMoney(fin.revenueRecurring, selectedDetailProposal.currency)}</p>
                             </div>
                         </div>
 
                         {/* Servicios Incluidos */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden">
-                            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
-                                <h3 className="font-bold text-gray-900 dark:text-white text-sm">Servicios Incluidos</h3>
+                        <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+                            <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                                <h3 className="font-bold text-zinc-900 dark:text-white text-sm">Servicios Incluidos</h3>
                             </div>
-                            <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                            <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                                 {selectedDetailProposal.items?.map((item: any) => (
-                                    <div key={item.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <div key={item.id} className="p-4 flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
                                                 <Briefcase className="w-4 h-4" />
                                             </div>
                                             <div>
-                                                <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
-                                                {item.serviceSnapshotDescription && <p className="text-xs text-gray-500">{item.serviceSnapshotDescription}</p>}
-                                                <p className="text-xs text-gray-400 mt-0.5">
+                                                <p className="font-bold text-zinc-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
+                                                {item.serviceSnapshotDescription && <p className="text-xs text-zinc-500">{item.serviceSnapshotDescription}</p>}
+                                                <p className="text-xs text-zinc-400 mt-0.5">
                                                     {item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Pago Único'}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="font-bold text-gray-900 dark:text-white">{formatMoney(item.serviceSnapshotCost, selectedDetailProposal.currency)}</p>
+                                            <p className="font-bold text-zinc-900 dark:text-white">{formatMoney(item.serviceSnapshotCost, selectedDetailProposal.currency)}</p>
                                             {item.outsourcingCost > 0 && (
                                                 <p className="text-xs text-red-500 font-medium">Outsourcing: {formatMoney(item.outsourcingCost, selectedDetailProposal.currency)}</p>
                                             )}
@@ -550,24 +550,24 @@ export default function QuotationsPage() {
                                 <p>Modifica la duración o selecciona solo los servicios que el cliente aceptó.</p>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
+                        <div className="bg-white dark:bg-zinc-800 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700">
                             <Label className="mb-2 block font-bold">Duración del Contrato (Meses)</Label>
                             <div className="flex items-center gap-4">
                                 <Input type="number" min={1} max={60} value={approvedDuration} onChange={(e) => setApprovedDuration(Number(e.target.value))} className="w-24 text-center font-bold text-lg" />
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-zinc-500">
                                     <p>Nuevo Total Estimado:</p>
                                     <p className="font-bold text-indigo-600 text-lg">{formatMoney(previewFin.totalContractRevenue, selectedProposal.currency)}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-gray-200 dark:border-slate-700">
+                        <div className="bg-white dark:bg-zinc-800 p-4 rounded-xl border border-zinc-200 dark:border-zinc-700">
                              <Label className="mb-2 block font-bold">Fecha de Inicio (Cobro)</Label>
                              <div className="flex items-center gap-2">
-                                <Calendar className="w-5 h-5 text-gray-500"/>
+                                <Calendar className="w-5 h-5 text-zinc-500"/>
                                 <Input type="date" value={approvedStartDate} onChange={e => setApprovedStartDate(e.target.value)} />
                              </div>
-                             <p className="text-xs text-gray-400 mt-2">Esta fecha determinará el día de cobro mensual.</p>
+                             <p className="text-xs text-zinc-400 mt-2">Esta fecha determinará el día de cobro mensual.</p>
                         </div>
 
                         <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -575,15 +575,15 @@ export default function QuotationsPage() {
                             {selectedProposal.items?.map(item => {
                                 const isSelected = selectedItemIds.includes(item.id);
                                 return (
-                                    <div key={item.id} className={`border rounded-xl p-3 transition-all ${isSelected ? 'bg-white dark:bg-slate-800 border-indigo-200 shadow-sm' : 'bg-gray-50 dark:bg-slate-900 opacity-60'}`}>
+                                    <div key={item.id} className={`border rounded-xl p-3 transition-all ${isSelected ? 'bg-white dark:bg-zinc-800 border-indigo-200 shadow-sm' : 'bg-zinc-50 dark:bg-zinc-900 opacity-60'}`}>
                                         <div className="flex justify-between items-center cursor-pointer" onClick={() => { if (isSelected) setSelectedItemIds(selectedItemIds.filter(id => id !== item.id)); else setSelectedItemIds([...selectedItemIds, item.id]); }}>
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                                                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-300'}`}>
                                                     {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                                                 </div>
                                                 <div>
-                                                    <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
-                                                    <p className="text-xs text-gray-500">{formatMoney(item.serviceSnapshotCost, selectedProposal.currency)}</p>
+                                                    <p className="font-bold text-zinc-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
+                                                    <p className="text-xs text-zinc-500">{formatMoney(item.serviceSnapshotCost, selectedProposal.currency)}</p>
                                                 </div>
                                             </div>
                                             <Badge variant={item.serviceSnapshotType === 'RECURRING' ? 'blue' : 'yellow'}>{item.serviceSnapshotType === 'RECURRING' ? 'Mensual' : 'Único'}</Badge>
@@ -592,7 +592,7 @@ export default function QuotationsPage() {
                                 );
                             })}
                         </div>
-                        <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-slate-700">
+                        <div className="flex gap-3 pt-2 border-t border-zinc-100 dark:border-zinc-700">
                             <Button variant="secondary" onClick={() => setIsApproveModalOpen(false)} className="flex-1">Cancelar</Button>
                             <Button onClick={confirmApprovalModal} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white" disabled={selectedItemIds.length === 0}>Confirmar y Activar Contrato</Button>
                         </div>

@@ -402,13 +402,13 @@ export default function ContentIdeaDetailPage() {
   }
 
   const Toolbar = () => (
-      <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-800 bg-white/90 dark:bg-black/90 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800 bg-white/90 dark:bg-black/90 backdrop-blur-sm sticky top-0 z-10">
           <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={() => isFullScreen ? setIsFullScreen(false) : navigate('/content-ideas')}>
                   <ArrowLeft className="w-6 h-6" /> <span className="ml-2 font-bold">Volver</span>
               </Button>
-              <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 mx-2"></div>
-              <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-900 rounded-full p-1">
+              <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 mx-2"></div>
+              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 rounded-full p-1">
                   <Button variant="ghost" size="sm" onClick={() => setFontSize(prev => Math.max(12, prev - 2))} className="rounded-full w-8 h-8 p-0">
                       <ZoomOut className="w-4 h-4" />
                   </Button>
@@ -419,16 +419,16 @@ export default function ContentIdeaDetailPage() {
               </div>
           </div>
           
-          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <div className="flex bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
               <button
                   onClick={() => setViewMode('EDIT')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'EDIT' ? 'bg-white dark:bg-slate-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'EDIT' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900'}`}
               >
                   <Edit3 className="w-4 h-4" /> Editar
               </button>
               <button
                   onClick={() => setViewMode('READ')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'READ' ? 'bg-white dark:bg-slate-700 shadow-sm text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900'}`}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'READ' ? 'bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900'}`}
               >
                   <Eye className="w-4 h-4" /> Leer
               </button>
@@ -438,7 +438,7 @@ export default function ContentIdeaDetailPage() {
                <Button 
                     onClick={handleManualBold}
                     variant="ghost"
-                    className="h-8 w-8 p-0 text-gray-600 hover:bg-gray-200 rounded-full"
+                    className="h-8 w-8 p-0 text-zinc-600 hover:bg-zinc-200 rounded-full"
                     title="Resaltar texto seleccionado"
                >
                    <Bold className="w-4 h-4" />
@@ -460,11 +460,11 @@ export default function ContentIdeaDetailPage() {
       {isFullScreen && (
         <div className="fixed inset-0 z-50 bg-white dark:bg-black flex flex-col">
            <Toolbar />
-           <div className="flex-1 overflow-auto bg-gray-50 dark:bg-black relative">
+           <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-black relative">
                <div className="w-full min-h-full bg-white dark:bg-black shadow-none p-8 md:p-12">
                   {viewMode === 'READ' ? (
                       <div 
-                        className="w-full h-full font-serif leading-relaxed text-gray-900 dark:text-gray-100 whitespace-pre-wrap outline-none"
+                        className="w-full h-full font-serif leading-relaxed text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap outline-none"
                         style={{ fontSize: `${fontSize}px`, minHeight: '80vh' }}
                       >
                           {renderScriptContent()}
@@ -476,7 +476,7 @@ export default function ContentIdeaDetailPage() {
                           onChange={handleScriptChangeWithHistory}
                           onKeyDown={handleKeyDown}
                           placeholder="Escribe tu guion aquí..."
-                          className="w-full h-full bg-transparent border-none resize-none focus:ring-0 p-0 font-serif leading-relaxed text-gray-900 dark:text-gray-100"
+                          className="w-full h-full bg-transparent border-none resize-none focus:ring-0 p-0 font-serif leading-relaxed text-zinc-900 dark:text-zinc-100"
                           style={{ fontSize: `${fontSize}px`, minHeight: '80vh', outline: 'none' }}
                       />
                   )}
@@ -486,23 +486,23 @@ export default function ContentIdeaDetailPage() {
       )}
 
       {!isFullScreen && (
-        <div className="min-h-screen bg-gray-50/50 dark:bg-slate-950/50 p-6 md:p-10">
+        <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950/50 p-6 md:p-10">
           <div className="max-w-7xl mx-auto">
             
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between sticky top-0 z-10 bg-gray-50/90 dark:bg-slate-950/90 backdrop-blur-md py-4 mb-8 border-b border-gray-200/50 dark:border-slate-800/50">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between sticky top-0 z-10 bg-zinc-50/90 dark:bg-zinc-950/90 backdrop-blur-md py-4 mb-8 border-b border-zinc-200/50 dark:border-zinc-800/50">
                <div className="flex items-center gap-4 w-full md:w-auto flex-1">
                    <button 
                       onClick={() => navigate('/content-ideas')}
-                      className="p-2 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full transition-colors flex-shrink-0"
+                      className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors flex-shrink-0"
                     >
-                       <ArrowLeft className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+                       <ArrowLeft className="w-6 h-6 text-zinc-600 dark:text-zinc-300" />
                    </button>
                    <input
                       type="text"
                       value={formData.title}
                       onChange={e => setFormData({ ...formData, title: e.target.value })}
                       placeholder="Título de la Propuesta / Idea"
-                      className="text-2xl md:text-3xl font-bold bg-transparent border-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-300 w-full"
+                      className="text-2xl md:text-3xl font-bold bg-transparent border-none focus:ring-0 text-zinc-900 dark:text-white placeholder-gray-300 w-full"
                    />
                </div>
 
@@ -520,7 +520,7 @@ export default function ContentIdeaDetailPage() {
                    <Select
                         value={formData.status}
                         onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                        className="w-full md:w-48 font-semibold border-none shadow-sm bg-white dark:bg-slate-900"
+                        className="w-full md:w-48 font-semibold border-none shadow-sm bg-white dark:bg-zinc-900"
                     >
                         <option value="IDEA">💡 En Idea</option>
                         <option value="SCRIPTED">📝 Guionizado</option>
@@ -545,13 +545,13 @@ export default function ContentIdeaDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 h-full">
                 
                 <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
-                         <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-4">
+                         <h3 className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                            <Video className="w-4 h-4 text-blue-500" /> Plataforma & Tipo
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-400 uppercase">Plataforma</label>
+                                <label className="text-xs font-bold text-zinc-400 uppercase">Plataforma</label>
                                 <Select
                                     value={formData.platform}
                                     onChange={e => setFormData({ ...formData, platform: e.target.value as any })}
@@ -563,7 +563,7 @@ export default function ContentIdeaDetailPage() {
                                 </Select>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-gray-400 uppercase">Tipo</label>
+                                <label className="text-xs font-bold text-zinc-400 uppercase">Tipo</label>
                                 <Select
                                     value={formData.contentType || 'POST'}
                                     onChange={e => setFormData({ ...formData, contentType: e.target.value as any })}
@@ -576,8 +576,8 @@ export default function ContentIdeaDetailPage() {
                         </div>
 
                         {/* Carpeta */}
-                        <div className="space-y-1 pt-2 border-t border-gray-100 dark:border-slate-800">
-                            <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+                        <div className="space-y-1 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                            <label className="text-xs font-bold text-zinc-400 uppercase flex items-center gap-1">
                                 <Folder className="w-3 h-3" /> Carpeta
                             </label>
                             <Select
@@ -592,9 +592,9 @@ export default function ContentIdeaDetailPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-6">
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-6">
                         <div className="space-y-2">
-                             <label className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-sm">
+                             <label className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 text-sm">
                                 <Sparkles className="w-4 h-4 text-yellow-500" /> Concepto
                             </label>
                             <Input 
@@ -613,7 +613,7 @@ export default function ContentIdeaDetailPage() {
                              </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2 text-sm">
+                            <label className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 text-sm">
                                 🎯 Hook (3-5 seg)
                             </label>
                             <Textarea 
@@ -625,8 +625,8 @@ export default function ContentIdeaDetailPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-sm space-y-4">
-                        <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm space-y-4">
+                        <h3 className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                            <Video className="w-4 h-4 text-green-500" /> Visuals / Escenas
                         </h3>
                         <Textarea 
@@ -639,16 +639,16 @@ export default function ContentIdeaDetailPage() {
                 </div>
 
                 <div className="lg:col-span-8 flex flex-col h-full">
-                    <div className="flex-1 bg-white dark:bg-slate-900 p-8 rounded-3xl border border-gray-100 dark:border-slate-800 shadow-md flex flex-col gap-4 min-h-[600px] lg:min-h-[calc(100vh-200px)]">
+                    <div className="flex-1 bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-md flex flex-col gap-4 min-h-[600px] lg:min-h-[calc(100vh-200px)]">
                         <div className="flex items-center justify-between">
-                             <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-2">
+                             <h3 className="font-bold text-xl text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-2">
                                 <FileText className="w-6 h-6 text-blue-600" /> Guion (Script)
                             </h3>
                              <div className="flex items-center gap-2">
                                  <Button 
                                     onClick={() => setIsFullScreen(true)}
                                     variant="ghost"
-                                    className="h-8 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                    className="h-8 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
                                     title="Modo Pantalla Completa / Teleprompter"
                                  >
                                      <Maximize2 className="w-4 h-4 mr-1" /> Ampliar
@@ -662,20 +662,20 @@ export default function ContentIdeaDetailPage() {
                                      <Sparkles className="w-3 h-3 mr-1" />
                                      {generating ? 'Analizando...' : 'Completar Datos'}
                                  </Button>
-                                 <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">Documento Principal</span>
+                                 <span className="text-xs text-zinc-400 uppercase tracking-wider font-bold">Documento Principal</span>
                              </div>
                         </div>
                        
-                        <div className="flex items-center gap-2 mb-2 bg-gray-50 dark:bg-slate-800 rounded-lg p-1 self-start">
+                        <div className="flex items-center gap-2 mb-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg p-1 self-start">
                               <button
                                   onClick={() => setViewMode('EDIT')}
-                                  className={`px-3 py-1 rounded text-xs font-semibold ${viewMode === 'EDIT' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}
+                                  className={`px-3 py-1 rounded text-xs font-semibold ${viewMode === 'EDIT' ? 'bg-white shadow text-indigo-600' : 'text-zinc-500'}`}
                               >
                                   Editar
                               </button>
                               <button
                                   onClick={() => setViewMode('READ')}
-                                  className={`px-3 py-1 rounded text-xs font-semibold ${viewMode === 'READ' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}
+                                  className={`px-3 py-1 rounded text-xs font-semibold ${viewMode === 'READ' ? 'bg-white shadow text-indigo-600' : 'text-zinc-500'}`}
                               >
                                   Leer
                               </button>
@@ -683,7 +683,7 @@ export default function ContentIdeaDetailPage() {
 
                         {viewMode === 'READ' ? (
                             <div 
-                              className="w-full h-full font-serif leading-relaxed text-gray-900 dark:text-gray-100 whitespace-pre-wrap outline-none bg-gray-50/30 p-4 rounded-xl"
+                              className="w-full h-full font-serif leading-relaxed text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap outline-none bg-zinc-50/30 p-4 rounded-xl"
                               style={{ fontSize: `${fontSize}px`, minHeight: '60vh' }}
                             >
                                 {renderScriptContent()}
@@ -695,7 +695,7 @@ export default function ContentIdeaDetailPage() {
                                 onChange={handleScriptChangeWithHistory}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Escribe tu guion aquí..."
-                                className="flex-1 w-full p-6 bg-gray-50 dark:bg-slate-800/50 border-0 rounded-xl focus:ring-0 resize-none text-lg leading-relaxed dark:text-white font-serif placeholder-gray-400"
+                                className="flex-1 w-full p-6 bg-zinc-50 dark:bg-zinc-800/50 border-0 rounded-xl focus:ring-0 resize-none text-lg leading-relaxed dark:text-white font-serif placeholder-gray-400"
                                 style={{ outline: "none", minHeight: '60vh' }}
                             />
                         )}

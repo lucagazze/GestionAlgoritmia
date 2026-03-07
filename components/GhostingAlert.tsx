@@ -104,7 +104,7 @@ export const GhostingAlert = () => {
 
     return (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className="bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-xl shadow-2xl p-4 w-80 relative overflow-hidden">
+            <div className="bg-white dark:bg-zinc-800 border-2 border-indigo-500 rounded-xl shadow-2xl p-4 w-80 relative overflow-hidden">
                 {/* Decorative background element */}
                 <div className="absolute -top-10 -right-10 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl"></div>
 
@@ -114,22 +114,22 @@ export const GhostingAlert = () => {
                     </div>
                     <div className="flex-1">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wide">
+                            <h3 className="font-bold text-zinc-900 dark:text-white text-sm uppercase tracking-wide">
                                 Ghosting Alert 👻
                             </h3>
                             <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">
                                 {currentIndex + 1} / {ghostedQueue.length}
                             </span>
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1">
                             Hace <b>{daysSince} días</b> que no hablas con <br/>
                             <span className="font-semibold text-indigo-600 dark:text-indigo-400">{currentClient.name}</span>.
                         </p>
-                        <p className="text-xs text-gray-500 mt-1 italic">
+                        <p className="text-xs text-zinc-500 mt-1 italic">
                             ¿Le escribiste hoy?
                         </p>
                     </div>
-                    <button onClick={handleCloseAll} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="Posponer todos">
+                    <button onClick={handleCloseAll} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200" title="Posponer todos">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -153,7 +153,7 @@ export const GhostingAlert = () => {
                     </Button>
                 </div>
                 {remainingCount > 0 && (
-                    <div className="text-center mt-2 text-[10px] text-gray-400">
+                    <div className="text-center mt-2 text-[10px] text-zinc-400">
                         +{remainingCount} más en cola
                     </div>
                 )}

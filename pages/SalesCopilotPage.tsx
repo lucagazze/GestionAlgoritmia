@@ -236,11 +236,11 @@ export default function SalesCopilotPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
             <Wand2 className="w-8 h-8 text-indigo-600" /> 
             {proposalIdFromUrl ? (isReadOnly ? "Visualizar Propuesta Aprobada" : "Editar Propuesta") : "Generador de Propuestas"}
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">
               {isReadOnly ? "Modo de solo lectura. Esta propuesta ya ha sido procesada." : "Arma presupuestos inteligentes y rentables."}
           </p>
         </div>
@@ -269,7 +269,7 @@ export default function SalesCopilotPage() {
         <div className="lg:col-span-2 space-y-6">
           
           {/* 1. Datos del Cliente y Objetivo */}
-          <Card className={`p-6 ${isReadOnly ? 'opacity-80 pointer-events-none bg-gray-50 dark:bg-slate-900/50' : ''}`}>
+          <Card className={`p-6 ${isReadOnly ? 'opacity-80 pointer-events-none bg-zinc-50 dark:bg-zinc-900/50' : ''}`}>
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <User className="w-5 h-5 text-indigo-500"/> Información del Cliente
             </h3>
@@ -335,12 +335,12 @@ export default function SalesCopilotPage() {
                     className="w-32"
                     disabled={isReadOnly}
                  />
-                 <p className="text-xs text-gray-500 mt-1">Afecta el cálculo del valor total.</p>
+                 <p className="text-xs text-zinc-500 mt-1">Afecta el cálculo del valor total.</p>
               </div>
             </div>
 
             {/* Botón IA deshabilitado si es readOnly */}
-            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
+            <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <Button 
                     variant="secondary" 
                     className="w-full" 
@@ -366,7 +366,7 @@ export default function SalesCopilotPage() {
                 <Label className="mb-2 block">Agregar Servicio al Presupuesto</Label>
                 <div className="flex gap-2">
                     <select 
-                        className="flex-1 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2"
+                        className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2"
                         onChange={(e) => {
                             if (e.target.value) {
                                 handleAddService(e.target.value);
@@ -392,28 +392,28 @@ export default function SalesCopilotPage() {
             {/* Lista de Servicios Seleccionados (Editables) */}
             <div className="space-y-4">
               {selectedServices.length === 0 && (
-                <div className="text-center py-8 border-2 border-dashed border-gray-200 dark:border-slate-800 rounded-xl text-gray-400">
+                <div className="text-center py-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-zinc-400">
                   No hay servicios seleccionados. Agrega uno arriba.
                 </div>
               )}
               
               {selectedServices.map((item, index) => (
-                <div key={item.instanceId} className={`border border-gray-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-800 relative group animate-in fade-in slide-in-from-bottom-2 duration-300 ${isReadOnly ? 'pointer-events-none' : ''}`}>
+                <div key={item.instanceId} className={`border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 bg-white dark:bg-zinc-800 relative group animate-in fade-in slide-in-from-bottom-2 duration-300 ${isReadOnly ? 'pointer-events-none' : ''}`}>
                   {/* Header del Item */}
                   <div className="flex justify-between items-start mb-3">
                       <div>
-                          <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                          <h4 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                               {item.name}
                               <Badge variant={item.type === 'RECURRING' ? 'blue' : 'yellow'} className="text-[10px]">
                                   {item.type === 'RECURRING' ? 'Mensual' : 'Único'}
                               </Badge>
                           </h4>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{item.description}</p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 line-clamp-1">{item.description}</p>
                       </div>
                       {!isReadOnly && (
                         <button 
                             onClick={() => handleRemoveService(item.instanceId)}
-                            className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            className="text-zinc-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                             <Trash2 className="w-4 h-4"/>
                         </button>
@@ -436,7 +436,7 @@ export default function SalesCopilotPage() {
                       <div>
                           <Label className="text-xs">Asignar a (Opcional)</Label>
                           <select 
-                              className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2 h-[38px]"
+                              className="w-full text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg p-2 h-[38px]"
                               value={item.assignedContractorId || ''}
                               onChange={e => handleUpdateServiceItem(item.instanceId, { assignedContractorId: e.target.value })}
                               disabled={isReadOnly}
@@ -474,17 +474,17 @@ export default function SalesCopilotPage() {
         {/* COLUMNA DER: Resumen Financiero y Acciones */}
         <div className="lg:col-span-1 space-y-6 sticky top-6 h-fit">
             {/* ... (Card de Resumen Financiero igual que antes) ... */}
-            <Card className="p-6 bg-indigo-50 dark:bg-slate-800/50 border-indigo-100 dark:border-slate-700 sticky top-6">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+            <Card className="p-6 bg-indigo-50 dark:bg-zinc-800/50 border-indigo-100 dark:border-zinc-700 sticky top-6">
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-zinc-900 dark:text-white">
               <DollarSign className="w-5 h-5 text-emerald-500"/> Resumen Financiero
             </h3>
 
             <div className="mb-4">
-              <Label className="text-xs text-gray-500">Moneda de la Propuesta</Label>
+              <Label className="text-xs text-zinc-500">Moneda de la Propuesta</Label>
               <select
                 value={formData.currency}
                 onChange={e => setFormData({...formData, currency: e.target.value as 'ARS' | 'USD'})}
-                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400 mt-1"
+                className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400 mt-1"
                 disabled={isReadOnly}
               >
                 <option value="ARS">Pesos Argentinos (ARS)</option>
@@ -494,8 +494,8 @@ export default function SalesCopilotPage() {
 
             <div className="space-y-3 mb-6">
                 {/* Ingresos */}
-                <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-gray-100 dark:border-slate-700">
-                    <p className="text-xs text-gray-500 mb-1">Ingresos Brutos (Cliente)</p>
+                <div className="bg-white dark:bg-zinc-800 p-3 rounded-lg border border-zinc-100 dark:border-zinc-700">
+                    <p className="text-xs text-zinc-500 mb-1">Ingresos Brutos (Cliente)</p>
                     <div className="flex justify-between text-sm mb-1">
                         <span>Recurrente ({formData.durationMonths} meses):</span>
                         <span className="font-medium">{formatMoney(totals.recurringRevenue * formData.durationMonths, formData.currency)}</span>
@@ -504,7 +504,7 @@ export default function SalesCopilotPage() {
                         <span>Pago Único:</span>
                         <span className="font-medium">{formatMoney(totals.oneTimeRevenue, formData.currency)}</span>
                     </div>
-                    <div className="border-t border-gray-100 dark:border-slate-700 my-2"></div>
+                    <div className="border-t border-zinc-100 dark:border-zinc-700 my-2"></div>
                     <div className="flex justify-between font-bold text-indigo-600 dark:text-indigo-400">
                         <span>Total Contrato:</span>
                         <span>{formatMoney(totalContractRevenue, formData.currency)}</span>
@@ -595,9 +595,9 @@ export default function SalesCopilotPage() {
       {/* PDF Preview Modal (Se mantiene igual) */}
        {showPdfPreview && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 md:p-8 overflow-y-auto">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
+            <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden relative animate-in zoom-in-95">
                 {/* Header del Modal */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
+                <div className="flex justify-between items-center p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
                     <h3 className="text-lg font-bold flex items-center gap-2">
                         <FileText className="w-5 h-5 text-indigo-600"/> Vista Previa del Presupuesto
                     </h3>
@@ -610,8 +610,8 @@ export default function SalesCopilotPage() {
                 </div>
                 
                 {/* Contenido del PDF (Referencia) */}
-                <div className="p-8 bg-gray-100 dark:bg-slate-950 overflow-y-auto max-h-[80vh]">
-                    <div ref={pdfRef} className="bg-white text-gray-900 p-10 shadow-xl rounded-xl mx-auto max-w-3xl">
+                <div className="p-8 bg-zinc-100 dark:bg-zinc-950 overflow-y-auto max-h-[80vh]">
+                    <div ref={pdfRef} className="bg-white text-zinc-900 p-10 shadow-xl rounded-xl mx-auto max-w-3xl">
                         {/* ... (Diseño del PDF igual que antes) ... */}
                          <div className="flex justify-between items-start mb-10">
                             {/* Logo de la Agencia */}
@@ -620,28 +620,28 @@ export default function SalesCopilotPage() {
                                     <Wand2 className="h-8 w-8 text-white" />
                                 </div>
                                 <h1 className="text-xl font-bold">Algoritmia Agency</h1>
-                                <p className="text-sm text-gray-500">Soluciones Digitales Inteligentes</p>
+                                <p className="text-sm text-zinc-500">Soluciones Digitales Inteligentes</p>
                             </div>
                             {/* Datos del Cliente y Fecha */}
                             <div className="text-right">
-                                <h2 className="text-3xl font-bold text-gray-900 mb-2">Propuesta Comercial</h2>
-                                <p className="text-gray-500">Fecha: {new Date().toLocaleDateString()}</p>
-                                <div className="mt-4 p-3 bg-gray-50 rounded-lg inline-block text-left border border-gray-100">
-                                    <p className="text-xs text-gray-400 uppercase font-bold">Preparado para:</p>
+                                <h2 className="text-3xl font-bold text-zinc-900 mb-2">Propuesta Comercial</h2>
+                                <p className="text-zinc-500">Fecha: {new Date().toLocaleDateString()}</p>
+                                <div className="mt-4 p-3 bg-zinc-50 rounded-lg inline-block text-left border border-zinc-100">
+                                    <p className="text-xs text-zinc-400 uppercase font-bold">Preparado para:</p>
                                     <p className="font-bold text-lg">{formData.clientName}</p>
-                                    {formData.industry && <p className="text-sm text-gray-600">{formData.industry}</p>}
+                                    {formData.industry && <p className="text-sm text-zinc-600">{formData.industry}</p>}
                                 </div>
                             </div>
                         </div>
 
-                        <hr className="my-8 border-gray-200"/>
+                        <hr className="my-8 border-zinc-200"/>
 
                         {/* Resumen Ejecutivo */}
                         <div className="mb-10">
                             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-600">
                                 <ArrowRight className="w-5 h-5"/> Resumen Ejecutivo & Objetivos
                             </h3>
-                            <p className="text-gray-700 leading-relaxed mb-4">{formData.objective}</p>
+                            <p className="text-zinc-700 leading-relaxed mb-4">{formData.objective}</p>
                             
                             <div className="grid grid-cols-2 gap-4 mt-6">
                                 <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
@@ -660,28 +660,28 @@ export default function SalesCopilotPage() {
                             <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-600">
                                 <Briefcase className="w-5 h-5"/> Plan de Inversión Propuesto
                             </h3>
-                            <div className="border border-gray-200 rounded-xl overflow-hidden">
+                            <div className="border border-zinc-200 rounded-xl overflow-hidden">
                                 <table className="w-full text-left">
-                                    <thead className="bg-gray-50 text-gray-600 font-bold text-sm">
+                                    <thead className="bg-zinc-50 text-zinc-600 font-bold text-sm">
                                         <tr>
                                             <th className="p-4">Servicio / Solución</th>
                                             <th className="p-4 text-center">Tipo</th>
                                             <th className="p-4 text-right">Inversión</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-zinc-100">
                                         {selectedServices.map((item) => (
-                                            <tr key={item.instanceId} className="hover:bg-gray-50 transition-colors">
+                                            <tr key={item.instanceId} className="hover:bg-zinc-50 transition-colors">
                                                 <td className="p-4">
-                                                    <p className="font-bold text-gray-900">{item.name}</p>
-                                                    <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                                                    <p className="font-bold text-zinc-900">{item.name}</p>
+                                                    <p className="text-sm text-zinc-500 mt-1">{item.description}</p>
                                                 </td>
                                                 <td className="p-4 text-center">
                                                     <Badge variant={item.type === 'RECURRING' ? 'blue' : 'yellow'} className="bg-opacity-20 text-xs">
                                                         {item.type === 'RECURRING' ? 'Mensual' : 'Único'}
                                                     </Badge>
                                                 </td>
-                                                <td className="p-4 text-right font-bold text-gray-900">
+                                                <td className="p-4 text-right font-bold text-zinc-900">
                                                     {formatMoney(item.customPrice || 0, formData.currency)}
                                                 </td>
                                             </tr>
@@ -693,7 +693,7 @@ export default function SalesCopilotPage() {
 
                         {/* Totales y Cierre */}
                         <div className="flex justify-end mb-10">
-                            <div className="w-1/2 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                            <div className="w-1/2 bg-zinc-50 p-6 rounded-xl border border-zinc-200">
                                 <h4 className="font-bold text-lg mb-4">Resumen de Inversión</h4>
                                 <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
@@ -704,11 +704,11 @@ export default function SalesCopilotPage() {
                                         <span>Inversión Inicial (Único):</span>
                                         <span className="font-medium">{formatMoney(totals.oneTimeRevenue, formData.currency)}</span>
                                     </div>
-                                    <div className="flex justify-between text-gray-500">
+                                    <div className="flex justify-between text-zinc-500">
                                         <span>Duración del contrato:</span>
                                         <span>{formData.durationMonths} meses</span>
                                     </div>
-                                    <hr className="my-2 border-gray-300"/>
+                                    <hr className="my-2 border-zinc-300"/>
                                     <div className="flex justify-between text-xl font-black text-indigo-600">
                                         <span>Valor Total del Contrato:</span>
                                         <span>{formatMoney(totalContractRevenue, formData.currency)}</span>

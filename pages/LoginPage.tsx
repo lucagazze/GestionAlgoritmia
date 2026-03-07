@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Button, Input } from '../components/UIComponents';
 import { useToast } from '../components/Toast';
 
 export default function LoginPage() {
@@ -14,92 +13,86 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-
-      showToast("Bienvenido de vuelta 👋", "success");
+      showToast('Bienvenido de vuelta', 'success');
       navigate('/');
     } catch (error: any) {
-      showToast(error.message || "Error al iniciar sesión", "error");
+      showToast(error.message || 'Error al iniciar sesión', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center">
-            <div className="h-12 w-12 bg-black dark:bg-white rounded-xl flex items-center justify-center text-white dark:text-black font-bold text-2xl">
-                A
-            </div>
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-          Algoritmia OS
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          Inicia sesión para gestionar tu negocio
-        </p>
-      </div>
+    <div className="min-h-screen bg-[#f5f5f7] dark:bg-[#0a0a0a] flex items-center justify-center p-4">
+      <div className="w-full max-w-[360px]">
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white dark:bg-slate-900 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100 dark:border-slate-800">
-          <form className="space-y-6" onSubmit={handleLogin}>
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-[18px] bg-zinc-900 dark:bg-white flex items-center justify-center shadow-[0_4px_20px_rgba(0,0,0,0.15)] mb-5">
+            <span className="text-white dark:text-zinc-900 text-[20px] font-bold tracking-tight">A</span>
+          </div>
+          <h1 className="text-[22px] font-semibold text-zinc-900 dark:text-white tracking-[-0.03em]">
+            Algoritmia OS
+          </h1>
+          <p className="text-[13px] text-zinc-500 dark:text-zinc-500 mt-1">
+            Ingresá para gestionar tu agencia
+          </p>
+        </div>
+
+        {/* Form card */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-black/[0.05] dark:border-white/[0.06] shadow-[0_4px_24px_rgba(0,0,0,0.08)] p-6">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500 dark:text-zinc-500 mb-1.5 block">
                 Email
               </label>
-              <div className="mt-1">
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full"
-                  placeholder="luca@algoritmia.com"
-                />
-              </div>
+              <input
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="luca@algoritmia.com"
+                className="w-full h-10 rounded-[10px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-3.5 text-[13px] text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-black/[0.08] dark:focus:ring-white/[0.08] focus:border-zinc-400 dark:focus:border-zinc-600 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+              />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500 dark:text-zinc-500 mb-1.5 block">
                 Contraseña
               </label>
-              <div className="mt-1">
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full"
-                  placeholder="••••••••"
-                />
-              </div>
+              <input
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full h-10 rounded-[10px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 px-3.5 text-[13px] text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-black/[0.08] dark:focus:ring-white/[0.08] focus:border-zinc-400 dark:focus:border-zinc-600 focus:bg-white dark:focus:bg-zinc-800 transition-all"
+              />
             </div>
 
-            <div>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {loading ? 'Iniciando sesión...' : 'Ingresar'}
-              </Button>
-            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-10 mt-2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold tracking-[-0.01em] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.15)] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 dark:border-zinc-900/30 border-t-white dark:border-t-zinc-900 rounded-full animate-spin" />
+                  Iniciando sesión...
+                </span>
+              ) : 'Ingresar'}
+            </button>
           </form>
         </div>
+
+        <p className="text-center text-[11px] text-zinc-400 dark:text-zinc-600 mt-6">
+          Algoritmia · 2026
+        </p>
       </div>
     </div>
   );

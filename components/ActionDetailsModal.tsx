@@ -74,22 +74,22 @@ export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
                     {items.map((item, idx) => (
                         <div
                             key={item.id || idx}
-                            className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 hover:shadow-md transition-all"
+                            className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-all"
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                                    <h4 className="font-semibold text-zinc-900 dark:text-white truncate">
                                         {item.title}
                                     </h4>
                                     {item.subtitle && (
-                                        <p className="text-xs text-gray-500 mt-1">{item.subtitle}</p>
+                                        <p className="text-xs text-zinc-500 mt-1">{item.subtitle}</p>
                                     )}
                                     {item.metadata && (
                                         <div className="flex gap-2 mt-2 flex-wrap">
                                             {Object.entries(item.metadata).map(([key, value]) => (
                                                 <span
                                                     key={key}
-                                                    className="text-[10px] px-2 py-0.5 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-full text-gray-600 dark:text-gray-300"
+                                                    className="text-[10px] px-2 py-0.5 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded-full text-zinc-600 dark:text-zinc-300"
                                                 >
                                                     {key}: {String(value)}
                                                 </span>
@@ -104,7 +104,7 @@ export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
                                     {onUndoItem && (
                                         <button 
                                             onClick={() => onUndoItem(item.id)}
-                                            className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-md transition-colors text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                                            className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                                             title="Deshacer esta acción individualmente"
                                         >
                                             <RotateCcw className="w-4 h-4" />
@@ -117,10 +117,10 @@ export const ActionDetailsModal: React.FC<ActionDetailsModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                <div className="flex justify-end gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg font-semibold transition-colors"
+                        className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 dark:hover:bg-zinc-600 rounded-lg font-semibold transition-colors"
                     >
                         Cerrar
                     </button>

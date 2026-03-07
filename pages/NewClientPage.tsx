@@ -50,33 +50,33 @@ const REQUIRED_FIELDS: (keyof NewClientData)[] = ['clientName'];
 const Section: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; hasErrors?: boolean }> = ({ title, icon, children, defaultOpen = true, hasErrors }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden transition-all ${hasErrors ? 'border-red-300 dark:border-red-700' : 'border-gray-100 dark:border-slate-800'}`}>
-      <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => setOpen(!open)}>
-        <div className="flex items-center gap-3 font-bold text-gray-900 dark:text-white text-sm">
+    <div className={`bg-white dark:bg-zinc-900 rounded-2xl border overflow-hidden transition-all ${hasErrors ? 'border-red-300 dark:border-red-700' : 'border-zinc-100 dark:border-zinc-800'}`}>
+      <button type="button" className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors" onClick={() => setOpen(!open)}>
+        <div className="flex items-center gap-3 font-bold text-zinc-900 dark:text-white text-sm">
           <span className="text-indigo-600 dark:text-indigo-400">{icon}</span>
           {title}
           {hasErrors && <span className="flex items-center gap-1 text-red-500 text-xs font-semibold"><AlertCircle className="w-3.5 h-3.5" />Campos requeridos</span>}
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        {open ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
       </button>
-      {open && <div className="px-5 pb-5 space-y-3 border-t border-gray-50 dark:border-slate-800 pt-4">{children}</div>}
+      {open && <div className="px-5 pb-5 space-y-3 border-t border-zinc-50 dark:border-zinc-800 pt-4">{children}</div>}
     </div>
   );
 };
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; hint?: string; required?: boolean; missing?: boolean }> = ({ label, children, hint, required, missing }) => (
   <div className="space-y-1">
-    <label className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${missing ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+    <label className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${missing ? 'text-red-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
       {label}
       {required && <span className="text-red-400">*</span>}
       {missing && <span className="text-red-400 text-[10px] normal-case font-medium">(requerido)</span>}
     </label>
     <div className={missing ? 'ring-2 ring-red-400 ring-offset-1 rounded-xl' : ''}>{children}</div>
-    {hint && <p className="text-[11px] text-gray-400">{hint}</p>}
+    {hint && <p className="text-[11px] text-zinc-400">{hint}</p>}
   </div>
 );
 
-const inputCls = "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white";
+const inputCls = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-zinc-900 dark:text-white";
 const textareaCls = inputCls + " resize-none";
 
 // ---- Main Page ----
@@ -191,10 +191,10 @@ export default function NewClientPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
             <User className="w-8 h-8 text-indigo-600" /> Nuevo Cliente
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Ingresá toda la información comercial y estratégica del cliente en un solo lugar.</p>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Ingresá toda la información comercial y estratégica del cliente en un solo lugar.</p>
         </div>
         <div className="flex items-center gap-3">
           <button

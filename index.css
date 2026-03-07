@@ -53,7 +53,48 @@
   * {
     @apply border-border;
   }
+  html {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+      'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Scrollbar — macOS style ──────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* ── Selection ────────────────────────────────────────────── */
+::selection {
+  background: rgba(0, 113, 227, 0.2);
+  color: inherit;
+}
+
+/* ── Focus rings ──────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid rgba(0, 113, 227, 0.6);
+  outline-offset: 2px;
 }

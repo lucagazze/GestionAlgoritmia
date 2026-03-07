@@ -94,7 +94,7 @@ export function EditProjectModal({ isOpen, onClose, project, onSave }: Props) {
                             <Input 
                                 value={formData.name || ''} 
                                 onChange={e => setFormData({...formData, name: e.target.value})}
-                                className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 font-semibold"
+                                className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 font-semibold"
                             />
                         </div>
                         <div>
@@ -103,7 +103,7 @@ export function EditProjectModal({ isOpen, onClose, project, onSave }: Props) {
                                 value={formData.industry || ''} 
                                 onChange={e => setFormData({...formData, industry: e.target.value})}
                                 placeholder="Ej: Odontología, E-commerce..."
-                                className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+                                className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
                             />
                         </div>
                     </div>
@@ -115,38 +115,38 @@ export function EditProjectModal({ isOpen, onClose, project, onSave }: Props) {
                             value={businessDescription}
                             onChange={e => setBusinessDescription(e.target.value)}
                             placeholder="Pega aquí toda la info bruta: qué venden, quiénes son, pitch de ventas... La IA usará esto para completar el contexto."
-                            className="bg-white dark:bg-slate-800 border-indigo-200 focus:border-indigo-500 min-h-[80px]"
+                            className="bg-white dark:bg-zinc-800 border-indigo-200 focus:border-indigo-500 min-h-[80px]"
                         />
                          <div className="flex justify-end mt-2">
-                            <p className="text-[10px] text-gray-400 mr-auto">Cuanta más info pegues aquí, mejor será el autocompletado.</p>
+                            <p className="text-[10px] text-zinc-400 mr-auto">Cuanta más info pegues aquí, mejor será el autocompletado.</p>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t border-indigo-100 dark:border-indigo-900/30 pt-4">
                             <div>
-                            <Label className="text-xs mb-1.5 block text-gray-500">Fee Mensual ($)</Label>
+                            <Label className="text-xs mb-1.5 block text-zinc-500">Fee Mensual ($)</Label>
                             <Input 
                                 type="number"
                                 value={formData.monthlyRevenue || 0} 
                                 onChange={e => setFormData({...formData, monthlyRevenue: parseFloat(e.target.value)})}
-                                className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+                                className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
                             />
                         </div>
                             <div>
-                            <Label className="text-xs mb-1.5 block text-gray-500">Día de Cobro</Label>
+                            <Label className="text-xs mb-1.5 block text-zinc-500">Día de Cobro</Label>
                             <Input 
                                 type="number"
                                 value={formData.billingDay || 1} 
                                 onChange={e => setFormData({...formData, billingDay: parseInt(e.target.value)})}
-                                className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
+                                className="bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
                             />
                         </div>
                         <div className="col-span-2">
-                            <Label className="text-xs mb-1.5 block text-gray-500">Estado</Label>
+                            <Label className="text-xs mb-1.5 block text-zinc-500">Estado</Label>
                             <select 
                                 value={formData.status || ProjectStatus.ACTIVE}
                                 onChange={e => setFormData({...formData, status: e.target.value as ProjectStatus})}
-                                className="w-full h-10 px-3 rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full h-10 px-3 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                             >
                                 {Object.values(ProjectStatus).map(s => (
                                     <option key={s} value={s}>{s}</option>
@@ -158,45 +158,45 @@ export function EditProjectModal({ isOpen, onClose, project, onSave }: Props) {
 
                 {/* SECTION 2: STRATEGIC CONTEXT (AI FILLABLE) */}
                 <div className="space-y-4">
-                        <Label className="uppercase text-xs font-bold text-gray-400 tracking-wider flex items-center gap-2">
+                        <Label className="uppercase text-xs font-bold text-zinc-400 tracking-wider flex items-center gap-2">
                         Contexto Estratégico {formData.name && formData.industry && !formData.targetAudience && <span className="text-[10px] font-normal text-indigo-500 lowercase">(usa el botón de IA arriba 👆)</span>}
                         </Label>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label className="text-xs text-gray-500">Público Objetivo</Label>
+                            <Label className="text-xs text-zinc-500">Público Objetivo</Label>
                             <Textarea 
                                 value={formData.targetAudience || ''}
                                 onChange={e => setFormData({...formData, targetAudience: e.target.value})}
                                 placeholder="¿A quién le vendemos?"
-                                className="h-24 resize-none bg-gray-50 dark:bg-slate-800 border-none"
+                                className="h-24 resize-none bg-zinc-50 dark:bg-zinc-800 border-none"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs text-gray-500">Situación Actual / Dolores</Label>
+                            <Label className="text-xs text-zinc-500">Situación Actual / Dolores</Label>
                             <Textarea 
                                 value={formData.contextProblem || ''}
                                 onChange={e => setFormData({...formData, contextProblem: e.target.value})}
                                 placeholder="¿Qué problemas tienen hoy?"
-                                className="h-24 resize-none bg-gray-50 dark:bg-slate-800 border-none"
+                                className="h-24 resize-none bg-zinc-50 dark:bg-zinc-800 border-none"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs text-gray-500">Objetivos Principales (Punto B)</Label>
+                            <Label className="text-xs text-zinc-500">Objetivos Principales (Punto B)</Label>
                             <Textarea 
                                 value={formData.contextObjectives || ''}
                                 onChange={e => setFormData({...formData, contextObjectives: e.target.value})}
                                 placeholder="¿Qué quieren lograr?"
-                                className="h-24 resize-none bg-gray-50 dark:bg-slate-800 border-none"
+                                className="h-24 resize-none bg-zinc-50 dark:bg-zinc-800 border-none"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs text-gray-500">Estrategia Macro</Label>
+                            <Label className="text-xs text-zinc-500">Estrategia Macro</Label>
                             <Textarea 
                                 value={formData.growthStrategy || ''}
                                 onChange={e => setFormData({...formData, growthStrategy: e.target.value})}
                                 placeholder="Enfoque general..."
-                                className="h-24 resize-none bg-gray-50 dark:bg-slate-800 border-none"
+                                className="h-24 resize-none bg-zinc-50 dark:bg-zinc-800 border-none"
                             />
                         </div>
                     </div>

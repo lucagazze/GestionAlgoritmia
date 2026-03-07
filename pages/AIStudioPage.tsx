@@ -26,11 +26,11 @@ const formatText = (text: string) => {
   return text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^### (.*$)/gm, '<h3 class="text-base font-bold text-gray-900 dark:text-white mt-4 mb-2">$1</h3>')
-    .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold text-gray-900 dark:text-white mt-5 mb-2">$1</h2>')
-    .replace(/^# (.*$)/gm, '<h1 class="text-xl font-bold text-gray-900 dark:text-white mt-5 mb-3">$1</h1>')
-    .replace(/^- (.*$)/gm, '<li class="ml-4 list-disc text-gray-700 dark:text-gray-300">$1</li>')
-    .replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal text-gray-700 dark:text-gray-300">$1</li>')
+    .replace(/^### (.*$)/gm, '<h3 class="text-[14px] font-bold text-zinc-900 dark:text-white mt-4 mb-2 tracking-tight">$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2 class="text-[16px] font-bold text-zinc-900 dark:text-white mt-5 mb-2 tracking-tight">$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1 class="text-[18px] font-bold text-zinc-900 dark:text-white mt-5 mb-3 tracking-tight">$1</h1>')
+    .replace(/^- (.*$)/gm, '<li class="ml-4 list-disc text-zinc-700 dark:text-zinc-300">$1</li>')
+    .replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal text-zinc-700 dark:text-zinc-300">$1</li>')
     .replace(/\n\n/g, '<br/><br/>')
     .replace(/\n/g, '<br/>');
 };
@@ -42,12 +42,12 @@ const MessageBubble = ({ msg, onCopy }: { msg: UIMessage; onCopy: (text: string)
 
   if (isUser) {
     return (
-      <div className="flex justify-end mb-4 animate-in slide-in-from-right-4 duration-300">
-        <div className="max-w-[75%]">
-          <div className="bg-gray-900 dark:bg-white text-white dark:text-black px-5 py-3.5 rounded-3xl rounded-br-lg shadow-sm">
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+      <div className="flex justify-end mb-3">
+        <div className="max-w-[78%]">
+          <div className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-4 py-3 rounded-2xl rounded-br-sm shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+            <p className="text-[13px] leading-relaxed whitespace-pre-wrap tracking-[-0.01em]">{msg.content}</p>
           </div>
-          <p className="text-right text-[10px] text-gray-400 mt-1 mr-2">
+          <p className="text-right text-[10px] text-zinc-400 mt-1 mr-1">
             {msg.timestamp.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
@@ -56,37 +56,34 @@ const MessageBubble = ({ msg, onCopy }: { msg: UIMessage; onCopy: (text: string)
   }
 
   return (
-    <div className="flex gap-3 mb-6 animate-in slide-in-from-left-4 duration-300">
-      <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md">
-        <Bot className="w-4 h-4 text-white" />
+    <div className="flex gap-2.5 mb-5">
+      <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+        <Bot className="w-3.5 h-3.5 text-white" />
       </div>
-      <div className="flex-1 max-w-[85%]">
-        <div className="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-3xl rounded-tl-lg px-5 py-4 shadow-sm">
+      <div className="flex-1 max-w-[88%]">
+        <div className="bg-white dark:bg-zinc-900 border border-black/[0.05] dark:border-white/[0.07] rounded-2xl rounded-tl-sm px-4 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
           {isLoading ? (
-            <div className="flex items-center gap-2 h-6">
+            <div className="flex items-center gap-2 h-5">
               <div className="flex gap-1">
-                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                {[0, 150, 300].map(d => (
+                  <span key={d} className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                ))}
               </div>
-              <span className="text-xs text-gray-400">Pensando...</span>
+              <span className="text-[12px] text-zinc-400">Pensando...</span>
             </div>
           ) : (
             <div
-              className="text-sm leading-relaxed text-gray-700 dark:text-gray-200 prose-sm max-w-none"
+              className="text-[13px] leading-relaxed text-zinc-700 dark:text-zinc-200 tracking-[-0.01em]"
               dangerouslySetInnerHTML={{ __html: formatText(msg.content) }}
             />
           )}
         </div>
         {!isLoading && (
-          <div className="flex items-center gap-2 mt-1.5 ml-2">
-            <p className="text-[10px] text-gray-400">
+          <div className="flex items-center gap-2 mt-1 ml-1">
+            <p className="text-[10px] text-zinc-400">
               {msg.timestamp.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
             </p>
-            <button
-              onClick={() => onCopy(msg.content)}
-              className="flex items-center gap-1 text-[10px] text-gray-400 hover:text-indigo-500 transition-colors"
-            >
+            <button onClick={() => onCopy(msg.content)} className="flex items-center gap-1 text-[10px] text-zinc-400 hover:text-indigo-500 transition-colors">
               <Copy className="w-3 h-3" /> Copiar
             </button>
           </div>
@@ -100,15 +97,13 @@ const MessageBubble = ({ msg, onCopy }: { msg: UIMessage; onCopy: (text: string)
 const QuickCard = ({ action, onClick }: { action: typeof QUICK_PROMPTS[0]; onClick: () => void }) => (
   <button
     onClick={onClick}
-    className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-2xl hover:border-indigo-200 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 text-left group w-full"
+    className="flex items-center gap-3 p-3.5 bg-white dark:bg-zinc-900 border border-black/[0.04] dark:border-white/[0.06] rounded-[14px] hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 text-left group w-full shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
   >
-    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center flex-shrink-0 text-lg shadow-sm group-hover:scale-110 transition-transform`}>
+    <div className={`w-9 h-9 rounded-[10px] bg-gradient-to-br ${action.color} flex items-center justify-center flex-shrink-0 text-base shadow-sm`}>
       {action.icon}
     </div>
-    <div className="min-w-0">
-      <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{action.label}</p>
-    </div>
-    <ArrowRight className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-indigo-500 ml-auto flex-shrink-0 transition-colors" />
+    <p className="text-[13px] font-semibold text-zinc-900 dark:text-white tracking-[-0.01em] flex-1 min-w-0 truncate">{action.label}</p>
+    <ArrowRight className="w-3.5 h-3.5 text-zinc-300 dark:text-zinc-600 group-hover:text-indigo-500 flex-shrink-0 transition-colors" />
   </button>
 );
 
@@ -248,27 +243,19 @@ export default function AIStudioPage() {
   if (hasApiKey === false) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="max-w-md text-center space-y-6 p-8">
-          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 mx-auto flex items-center justify-center shadow-2xl shadow-indigo-500/30">
-            <Bot className="w-10 h-10 text-white" />
+        <div className="max-w-sm text-center space-y-5 p-6">
+          <div className="w-16 h-16 rounded-[20px] bg-gradient-to-br from-indigo-500 to-violet-600 mx-auto flex items-center justify-center shadow-[0_8px_32px_rgba(99,102,241,0.4)]">
+            <Bot className="w-8 h-8 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Conectá la IA</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">
-              Para usar el AI Studio necesitás una API Key de Anthropic (Claude). Es gratis para empezar y vale la pena.
+            <h1 className="text-[20px] font-bold tracking-[-0.02em] text-zinc-900 dark:text-white">Conectá la IA</h1>
+            <p className="text-[13px] text-zinc-500 dark:text-zinc-400 mt-1.5 leading-relaxed">
+              Para usar el AI Studio necesitás una API Key de Anthropic. Entrá a console.anthropic.com y pegala en Ajustes.
             </p>
-          </div>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900 rounded-2xl p-4 text-left">
-            <p className="text-sm font-bold text-amber-800 dark:text-amber-200 mb-1">¿Cómo conseguirla?</p>
-            <ol className="text-sm text-amber-700 dark:text-amber-300 space-y-1 list-decimal list-inside">
-              <li>Entrá a console.anthropic.com</li>
-              <li>Creá una cuenta y generá una API Key</li>
-              <li>Pegala en Ajustes → Claude API Key</li>
-            </ol>
           </div>
           <button
             onClick={() => navigate('/settings')}
-            className="w-full py-3.5 bg-gray-900 dark:bg-white text-white dark:text-black rounded-2xl font-bold text-sm hover:bg-black dark:hover:bg-gray-100 transition-colors shadow-lg flex items-center justify-center gap-2"
+            className="w-full h-11 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-[12px] font-semibold text-[13px] tracking-[-0.01em] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.97] transition-all shadow-[0_1px_3px_rgba(0,0,0,0.15)] flex items-center justify-center gap-2"
           >
             <Settings className="w-4 h-4" /> Ir a Ajustes
           </button>
@@ -277,124 +264,105 @@ export default function AIStudioPage() {
     );
   }
 
-  // ── Loading context ──────────────────────────────────────────────────
   if (isLoadingContext) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 mx-auto flex items-center justify-center animate-pulse">
-            <Sparkles className="w-6 h-6 text-white" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-[12px] bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <p className="text-gray-500 text-sm">Cargando contexto de la agencia...</p>
+          <div className="w-4 h-4 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] max-h-[900px] animate-in fade-in duration-300">
+    <div className="flex flex-col h-[calc(100vh-8rem)] max-h-[900px]">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg">
-            <Bot className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-[0_2px_8px_rgba(99,102,241,0.35)]">
+            <Bot className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white leading-none">AI Studio</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-              Claude Sonnet · Con contexto de agencia
+            <h1 className="text-[17px] font-bold tracking-[-0.02em] text-zinc-900 dark:text-white leading-none">AI Studio</h1>
+            <p className="text-[11px] text-zinc-400 mt-0.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              Claude Sonnet · Contexto de agencia cargado
             </p>
           </div>
         </div>
         <div className="flex gap-2">
           {messages.length > 0 && (
-            <button
-              onClick={handleClear}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Nueva conversación
+            <button onClick={handleClear} className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-white bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all">
+              <RotateCcw className="w-3.5 h-3.5" /> Nueva
             </button>
           )}
-          <button
-            onClick={() => navigate('/settings')}
-            className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700 transition-all"
-          >
+          <button onClick={() => navigate('/settings')} className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all">
             <Settings className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Quick Actions — shown when chat is empty */}
+      {/* Quick Actions */}
       {showQuickActions && messages.length <= 1 && (
         <div className="flex-shrink-0 mb-4">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Acciones rápidas</p>
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.08em] mb-2.5">Acciones rápidas</p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {QUICK_PROMPTS.map((action) => (
-              <QuickCard
-                key={action.label}
-                action={action}
-                onClick={() => handleQuickAction(action)}
-              />
-            ))}
+            {QUICK_PROMPTS.map(a => <QuickCard key={a.label} action={a} onClick={() => handleQuickAction(a)} />)}
           </div>
         </div>
       )}
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar rounded-2xl bg-gray-50/50 dark:bg-slate-900/30 p-4 mb-4 min-h-0">
+      <div className="flex-1 overflow-y-auto rounded-2xl bg-zinc-50/60 dark:bg-zinc-800/20 p-4 mb-3 min-h-0 border border-black/[0.03] dark:border-white/[0.04]">
         {messages.length === 0 && !showQuickActions && (
-          <div className="flex flex-col items-center justify-center h-full text-center space-y-3 opacity-50">
-            <Bot className="w-10 h-10 text-gray-300" />
-            <p className="text-sm text-gray-400">Empezá una conversación</p>
+          <div className="flex flex-col items-center justify-center h-full gap-2 opacity-40">
+            <Bot className="w-8 h-8 text-zinc-400" />
+            <p className="text-[13px] text-zinc-400">Empezá una conversación</p>
           </div>
         )}
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} msg={msg} onCopy={handleCopy} />
-        ))}
+        {messages.map(msg => <MessageBubble key={msg.id} msg={msg} onCopy={handleCopy} />)}
         <div ref={chatEndRef} />
       </div>
 
       {/* Input Area */}
       <div className="flex-shrink-0">
-        {/* Suggestion chips while typing */}
         {input.length === 0 && messages.length > 0 && !isLoading && (
-          <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1">
             {QUICK_PROMPTS.slice(0, 4).map(a => (
-              <button
-                key={a.label}
-                onClick={() => handleQuickAction(a)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full whitespace-nowrap hover:border-indigo-300 hover:text-indigo-600 transition-all"
-              >
-                <span>{a.icon}</span> {a.label}
+              <button key={a.label} onClick={() => handleQuickAction(a)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-full whitespace-nowrap hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all">
+                <span>{a.icon}</span>{a.label}
               </button>
             ))}
           </div>
         )}
 
-        <div className="flex gap-3 items-end bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-3 shadow-sm focus-within:border-indigo-300 dark:focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900/30 transition-all">
+        <div className="flex gap-2.5 items-end bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl p-3 shadow-[0_1px_4px_rgba(0,0,0,0.06)] focus-within:border-indigo-300 dark:focus-within:border-indigo-500/50 focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.1)] transition-all">
           <textarea
             ref={inputRef}
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Preguntame algo... o seleccioná una acción rápida arriba"
+            placeholder="Preguntame algo..."
             rows={1}
             disabled={isLoading}
-            className="flex-1 resize-none bg-transparent border-none outline-none text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 leading-relaxed min-h-[24px] max-h-40 disabled:opacity-50"
-            style={{ height: '24px' }}
+            className="flex-1 resize-none bg-transparent border-none outline-none text-[13px] text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-600 leading-relaxed tracking-[-0.01em] min-h-[22px] max-h-40 disabled:opacity-50"
+            style={{ height: '22px' }}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isLoading}
-            className="w-9 h-9 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-black flex items-center justify-center flex-shrink-0 hover:bg-indigo-600 dark:hover:bg-indigo-500 hover:text-white transition-all disabled:opacity-30 disabled:pointer-events-none shadow-sm active:scale-95"
+            className="w-8 h-8 rounded-[9px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center flex-shrink-0 hover:bg-indigo-600 hover:text-white transition-all disabled:opacity-30 disabled:pointer-events-none active:scale-[0.95]"
           >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
           </button>
         </div>
-        <p className="text-center text-[10px] text-gray-400 mt-2">
-          Enter para enviar · Shift+Enter para nueva línea · Powered by Claude Sonnet
+        <p className="text-center text-[10px] text-zinc-400 mt-1.5">
+          Enter para enviar · Shift+Enter para nueva línea
         </p>
       </div>
     </div>

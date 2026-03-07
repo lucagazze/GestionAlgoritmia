@@ -34,19 +34,19 @@ export default function PublicContentIdeaPage() {
     };
 
     if (loading) return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
     );
 
     if (error || !idea) return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
             <div className="text-center max-w-md">
                 <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
                     <Video className="h-6 w-6 text-red-600" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900">Error</h3>
-                <p className="mt-2 text-sm text-gray-500">{error || "Idea no encontrada"}</p>
+                <h3 className="text-lg font-medium text-zinc-900">Error</h3>
+                <p className="mt-2 text-sm text-zinc-500">{error || "Idea no encontrada"}</p>
             </div>
         </div>
     );
@@ -54,7 +54,7 @@ export default function PublicContentIdeaPage() {
     // Simple parser for bolding **text** if it exists in the script (since we'll be adding that feature next)
     // Also handles simple "LO QUE DECIS:" blocks if we want to validte that structure later.
     const renderScript = (text: string) => {
-        if (!text) return <p className="text-gray-400 italic">Sin guion...</p>;
+        if (!text) return <p className="text-zinc-400 italic">Sin guion...</p>;
         
         // Split by newlines to preserve paragraphs
         return text.split('\n').map((line, i) => {
@@ -66,7 +66,7 @@ export default function PublicContentIdeaPage() {
              const parts = line.split(/(\*\*.*?\*\*)/g);
              
              return (
-                 <div key={i} className={`min-h-[1.5em] mb-2 ${isHeader ? 'text-gray-500 font-bold text-xs uppercase tracking-wider mt-4' : 'text-gray-800'}`}>
+                 <div key={i} className={`min-h-[1.5em] mb-2 ${isHeader ? 'text-zinc-500 font-bold text-xs uppercase tracking-wider mt-4' : 'text-zinc-800'}`}>
                      {parts.map((part, j) => {
                          if (part.startsWith('**') && part.endsWith('**')) {
                              return <strong key={j} className="text-indigo-700 bg-indigo-50 px-1 rounded">{part.slice(2, -2)}</strong>;
@@ -79,35 +79,35 @@ export default function PublicContentIdeaPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
+        <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Brand Header */}
                 <div className="text-center">
                     <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-black text-white font-bold text-2xl mb-6 shadow-lg shadow-gray-200">
                         A
                     </div>
-                    <h2 className="text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-tight">
+                    <h2 className="text-4xl md:text-5xl font-extrabold text-zinc-900 tracking-tight leading-tight">
                         {idea.title}
                     </h2>
                     {idea.concept && (
-                        <p className="mt-4 max-w-2xl mx-auto text-xl md:text-2xl text-gray-500 font-light leading-relaxed">
+                        <p className="mt-4 max-w-2xl mx-auto text-xl md:text-2xl text-zinc-500 font-light leading-relaxed">
                             {idea.concept}
                         </p>
                     )}
                 </div>
 
-                <div className="bg-white overflow-hidden shadow-2xl shadow-gray-200/50 rounded-3xl border border-gray-100">
+                <div className="bg-white overflow-hidden shadow-2xl shadow-gray-200/50 rounded-3xl border border-zinc-100">
                     {/* Metadata Bar */}
-                    <div className="bg-gray-50/50 backdrop-blur-sm px-8 py-6 border-b border-gray-100 flex flex-wrap gap-6 items-center justify-between">
+                    <div className="bg-zinc-50/50 backdrop-blur-sm px-8 py-6 border-b border-zinc-100 flex flex-wrap gap-6 items-center justify-between">
                          <div className="flex items-center gap-4">
                             <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold tracking-wide shadow-sm ${idea.platform === 'Instagram' ? 'bg-pink-100 text-pink-700' : idea.platform === 'TikTok' ? 'bg-black text-white' : 'bg-blue-100 text-blue-800'}`}>
                                 {idea.platform}
                             </span>
-                            <span className="text-gray-300 transform scale-150">|</span>
-                            <span className="text-base font-medium text-gray-600 uppercase tracking-wide">{idea.contentType}</span>
+                            <span className="text-zinc-300 transform scale-150">|</span>
+                            <span className="text-base font-medium text-zinc-600 uppercase tracking-wide">{idea.contentType}</span>
                          </div>
                          {idea.scheduledDate && (
-                             <div className="text-gray-500 font-medium text-sm flex items-center gap-2">
+                             <div className="text-zinc-500 font-medium text-sm flex items-center gap-2">
                                  📅 {new Date(idea.scheduledDate).toLocaleDateString()}
                              </div>
                          )}
@@ -131,10 +131,10 @@ export default function PublicContentIdeaPage() {
 
                         {/* Script Section */}
                         <div className="space-y-6">
-                            <h3 className="text-gray-900 font-bold text-xl flex items-center gap-3 pb-4 border-b border-gray-100">
+                            <h3 className="text-zinc-900 font-bold text-xl flex items-center gap-3 pb-4 border-b border-zinc-100">
                                 <FileText className="w-6 h-6 text-indigo-600" /> Guion
                             </h3>
-                            <div className="prose prose-xl prose-slate max-w-none font-serif leading-loose text-gray-700">
+                            <div className="prose prose-xl prose-slate max-w-none font-serif leading-loose text-zinc-700">
                                 {renderScript(idea.script || '')}
                             </div>
                         </div>
@@ -154,8 +154,8 @@ export default function PublicContentIdeaPage() {
                 </div>
                 
                 <div className="text-center pb-8">
-                    <p className="text-sm text-gray-400 font-medium">
-                        Gestión de Contenido por <span className="text-gray-600 font-bold">Algoritmia OS</span>
+                    <p className="text-sm text-zinc-400 font-medium">
+                        Gestión de Contenido por <span className="text-zinc-600 font-bold">Algoritmia OS</span>
                     </p>
                 </div>
             </div>

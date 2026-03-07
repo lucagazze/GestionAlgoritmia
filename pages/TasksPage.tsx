@@ -450,33 +450,33 @@ export default function TasksPage() {
       });
 
       return (
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-6">
-              <div className="max-w-4xl mx-auto space-y-4">
+          <div className="flex-1 overflow-y-auto bg-zinc-50/50 dark:bg-zinc-900/50 p-6 rounded-2xl">
+              <div className="max-w-4xl mx-auto space-y-2">
                   {sorted.map(task => (
-                      <div key={task.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl hover:shadow-md transition-all">
-                          <div className="flex-shrink-0 w-16 text-center">
-                              <div className="text-xs font-bold text-gray-400 uppercase">
+                      <div key={task.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all">
+                          <div className="flex-shrink-0 w-14 text-center">
+                              <div className="text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.06em]">
                                   {task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES', { month: 'short' }) : '-'}
                               </div>
-                              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                              <div className="text-[22px] font-bold text-zinc-900 dark:text-white tracking-[-0.03em]">
                                   {task.dueDate ? new Date(task.dueDate).getDate() : '-'}
                               </div>
                           </div>
-                          
-                          <div className={`w-1 h-12 rounded-full ${
-                              task.status === TaskStatus.DONE ? 'bg-green-500' :
-                              task.priority === 'HIGH' ? 'bg-red-500' : 
-                              'bg-blue-500'
+
+                          <div className={`w-1 h-10 rounded-full flex-shrink-0 ${
+                              task.status === TaskStatus.DONE ? 'bg-emerald-400' :
+                              task.priority === 'HIGH' ? 'bg-red-400' :
+                              'bg-zinc-300 dark:bg-zinc-600'
                           }`}></div>
 
                           <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                  <h3 className={`font-semibold text-lg truncate ${task.status === TaskStatus.DONE ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                              <div className="flex items-center gap-2 mb-0.5">
+                                  <h3 className={`font-semibold text-[14px] truncate ${task.status === TaskStatus.DONE ? 'line-through text-zinc-400' : 'text-zinc-900 dark:text-white'}`}>
                                       {task.title}
                                   </h3>
-                                  {task.googleEventId && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-50" />}
+                                  {task.googleEventId && <img src="https://www.google.com/favicon.ico" className="w-3 h-3 opacity-40" />}
                               </div>
-                              <div className="flex items-center gap-4 text-sm text-gray-500">
+                              <div className="flex items-center gap-3 text-[12px] text-zinc-400">
                                   <span className="flex items-center gap-1">
                                       <Clock className="w-3 h-3"/>
                                       {task.dueDate ? new Date(task.dueDate).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Sin hora'}
@@ -489,29 +489,19 @@ export default function TasksPage() {
                               </div>
                           </div>
 
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleEdit(task)}
-                                className="h-8 w-8 p-0 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
-                              >
-                                  <Edit2 className="w-4 h-4 text-gray-500"/>
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleDelete(task)}
-                                className="h-8 w-8 p-0 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                  <Trash2 className="w-4 h-4 text-red-500"/>
-                              </Button>
+                          <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => handleEdit(task)} className="h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                                  <Edit2 className="w-3.5 h-3.5 text-zinc-500"/>
+                              </button>
+                              <button onClick={() => handleDelete(task)} className="h-8 w-8 flex items-center justify-center rounded-[8px] hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5 text-red-400"/>
+                              </button>
                           </div>
                       </div>
                   ))}
                   {sorted.length === 0 && (
-                      <div className="text-center py-20 text-gray-400">
-                          <p>No hay tareas pendientes.</p>
+                      <div className="text-center py-20 text-zinc-400">
+                          <p className="text-[13px]">No hay tareas pendientes.</p>
                       </div>
                   )}
               </div>
@@ -540,17 +530,17 @@ export default function TasksPage() {
       }
 
       return (
-          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
               {/* Header con Días */}
-              <div className="flex border-b border-gray-200 dark:border-slate-800 ml-14">
+              <div className="flex border-b border-zinc-100 dark:border-zinc-800 ml-14">
                   {daysToShow.map((date, i) => {
                        const isToday = new Date().toDateString() === date.toDateString();
                        return (
-                           <div key={i} className={`flex-1 text-center py-3 border-l border-gray-100 dark:border-slate-800 ${isToday ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
-                               <div className={`text-xs uppercase font-semibold ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>
+                           <div key={i} className={`flex-1 text-center py-3 border-l border-zinc-100 dark:border-zinc-800 ${isToday ? 'bg-zinc-50 dark:bg-zinc-800/40' : ''}`}>
+                               <div className={`text-[10px] uppercase font-semibold tracking-[0.06em] ${isToday ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`}>
                                    {date.toLocaleDateString('es-ES', { weekday: 'short' })}
                                </div>
-                               <div className={`text-xl font-bold mt-1 inline-flex w-8 h-8 items-center justify-center rounded-full ${isToday ? 'bg-blue-600 text-white shadow-md' : 'text-gray-900 dark:text-white'}`}>
+                               <div className={`text-[18px] font-bold mt-1 inline-flex w-8 h-8 items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'text-zinc-700 dark:text-zinc-300'}`}>
                                    {date.getDate()}
                                </div>
                            </div>
@@ -559,21 +549,21 @@ export default function TasksPage() {
               </div>
 
               {/* Cuerpo del Calendario */}
-              <div className="flex flex-1 overflow-y-auto relative custom-scrollbar bg-white dark:bg-slate-900">
+              <div className="flex flex-1 overflow-y-auto relative bg-white dark:bg-zinc-900">
                   {/* Columna de Horas (Eje Y) */}
-                  <div className="w-16 flex-shrink-0 relative bg-white dark:bg-slate-900 border-r border-gray-100 dark:border-slate-800" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
+                  <div className="w-16 flex-shrink-0 relative bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
                       {hours.map((h, index) => (
-                          <span key={h} className="absolute right-3 text-xs font-medium text-gray-400 dark:text-gray-500 font-mono -translate-y-1/2" style={{ top: `${index * ROW_HEIGHT}px` }}>
+                          <span key={h} className="absolute right-3 text-[10px] font-medium text-zinc-400 font-mono -translate-y-1/2" style={{ top: `${index * ROW_HEIGHT}px` }}>
                                 {h}:00
                           </span>
                       ))}
                   </div>
 
                   {/* Columnas de Días */}
-                  <div className="flex-1 flex relative min-w-[600px]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}> 
+                  <div className="flex-1 flex relative min-w-[600px]" style={{ height: `${(TOTAL_HOURS + 1) * ROW_HEIGHT}px` }}>
                       <div className="absolute inset-0 z-0 pointer-events-none">
                           {hours.map((h, index) => (
-                              <div key={h} className="absolute left-0 right-0 border-b border-gray-100 dark:border-slate-800 dashed" style={{ top: `${index * ROW_HEIGHT}px` }} />
+                              <div key={h} className="absolute left-0 right-0 border-b border-zinc-100 dark:border-zinc-800" style={{ top: `${index * ROW_HEIGHT}px` }} />
                           ))}
                       </div>
 
@@ -599,9 +589,9 @@ export default function TasksPage() {
                           };
 
                           return (
-                              <div 
-                                key={i} 
-                                className={`flex-1 relative border-l border-transparent hover:bg-gray-50/30 dark:hover:bg-slate-800/30 transition-colors group ${isToday ? 'bg-blue-50/10' : ''}`}
+                              <div
+                                key={i}
+                                className={`flex-1 relative border-l border-transparent hover:bg-zinc-50/30 dark:hover:bg-zinc-800/20 transition-colors group ${isToday ? 'bg-zinc-50/50 dark:bg-zinc-800/20' : ''}`}
                                 onDragOver={(e) => { 
                                     e.preventDefault(); 
                                     setDragOverSlot(date.toISOString());
@@ -632,7 +622,7 @@ export default function TasksPage() {
                                 onDrop={(e) => handleDrop(e, date)} // ✅ Usa el nuevo handleDrop
                                 onClick={handleColumnClick} // ✅ Usa el nuevo click handler
                               >
-                                   <div className="absolute inset-y-0 -left-px w-px bg-gray-100 dark:bg-slate-800"></div>
+                                   <div className="absolute inset-y-0 -left-px w-px bg-zinc-100 dark:bg-zinc-800"></div>
 
                                    {/* Drag Preview Ghost */}
                                    {dragPreview && dragPreview.date === date.toISOString() && (
@@ -677,12 +667,12 @@ export default function TasksPage() {
                                                    }
                                                }}
                                               className={`
-                                                  absolute left-1 right-2 rounded-lg px-2 text-[10px] font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all z-10 flex flex-col justify-center leading-tight
-                                                  ${isGoogle 
-                                                      ? 'bg-white border-blue-200 text-blue-700' 
-                                                      : item.status === 'DONE' 
-                                                          ? 'bg-green-100 text-green-700 border-green-200 opacity-80' 
-                                                          : 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                                                  absolute left-1 right-2 rounded-[8px] px-2 text-[10px] font-semibold shadow-sm border overflow-hidden cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all z-10 flex flex-col justify-center leading-tight
+                                                  ${isGoogle
+                                                      ? 'bg-white border-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'
+                                                      : item.status === 'DONE'
+                                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-100 opacity-80 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30'
+                                                          : 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-zinc-200 text-white dark:text-zinc-900'
                                                   }
                                               `}
                                               style={{ top: `${top}px`, height: `${ROW_HEIGHT}px` }}
@@ -737,23 +727,23 @@ export default function TasksPage() {
       const weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
       return (
-          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
               {/* Header Semanal */}
-              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-900 z-10">
+              <div className="grid grid-cols-7 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900 z-10">
                   {weekDays.map(d => (
-                      <div key={d} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <div key={d} className="py-3 text-center text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.06em]">
                           {d}
                       </div>
                   ))}
               </div>
 
               {/* Grid Scrollable */}
-              <div className="overflow-y-auto flex-1 custom-scrollbar">
+              <div className="overflow-y-auto flex-1">
                   <div className="grid grid-cols-7 auto-rows-fr">
-                      
+
                       {/* Espacios vacíos mes anterior */}
                       {blanks.map((_, i) => (
-                          <div key={`blank-${i}`} className="bg-gray-50/30 dark:bg-slate-800/20 border-b border-r border-gray-100 dark:border-slate-800 min-h-[160px]" />
+                          <div key={`blank-${i}`} className="bg-zinc-50/30 dark:bg-zinc-800/10 border-b border-r border-zinc-100 dark:border-zinc-800 min-h-[160px]" />
                       ))}
 
                       {/* Días del mes */}
@@ -779,23 +769,23 @@ export default function TasksPage() {
                                       setIsModalOpen(true);
                                   }}
                                   className={`
-                                      relative border-b border-r border-gray-100 dark:border-slate-800 p-2 transition-colors cursor-pointer group min-h-[160px]
-                                      ${isToday 
-                                          ? 'bg-blue-50/60 dark:bg-blue-900/20 shadow-[inset_0_0_0_2px_rgba(59,130,246,0.3)]' // Color especial para HOY
-                                          : 'hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                                      relative border-b border-r border-zinc-100 dark:border-zinc-800 p-2 transition-colors cursor-pointer group min-h-[160px]
+                                      ${isToday
+                                          ? 'bg-zinc-50 dark:bg-zinc-800/30 shadow-[inset_0_0_0_1.5px_rgba(0,0,0,0.08)]'
+                                          : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/20'
                                       }
                                   `}
                               >
                                   {/* Número del día */}
                                   <div className="flex justify-between items-start mb-2">
                                       <span className={`
-                                          text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full
-                                          ${isToday ? 'bg-blue-600 text-white shadow-md scale-110' : 'text-gray-700 dark:text-gray-300'}
+                                          text-[13px] font-bold w-7 h-7 flex items-center justify-center rounded-full
+                                          ${isToday ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'text-zinc-600 dark:text-zinc-400'}
                                       `}>
                                           {d}
                                       </span>
                                       {/* Indicador sutil de agregar tarea (+) visible al hover */}
-                                      <span className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-600">
+                                      <span className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600">
                                           <i className="fa-solid fa-plus text-xs"></i>
                                       </span>
                                   </div>
@@ -817,11 +807,11 @@ export default function TasksPage() {
                                             className={`
                                                 cursor-grab active:cursor-grabbing
                                                 text-[11px] px-2 py-1 rounded border truncate font-medium
-                                                ${task.summary 
-                                                    ? 'bg-white border-blue-200 text-blue-700 dark:bg-slate-800 dark:border-blue-900 dark:text-blue-300' 
+                                                ${task.summary
+                                                    ? 'bg-zinc-50 border-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400'
                                                     : task.status === 'DONE'
-                                                        ? 'bg-green-50 text-green-700 border-green-200 line-through opacity-70'
-                                                        : 'bg-indigo-50 text-indigo-700 border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-200'
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 line-through opacity-70 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-900/30'
+                                                        : 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-zinc-200'
                                                 }
                                             `}
                                             title={task.title || task.summary}
@@ -843,47 +833,44 @@ export default function TasksPage() {
     <div className="space-y-6 animate-in fade-in duration-500 h-[calc(100vh-100px)] flex flex-col pb-6">
       
       {/* Header */}
-      {/* Header */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 flex-shrink-0 bg-white dark:bg-slate-900 p-3 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm">
-        
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 flex-shrink-0">
+
         {/* Left: Title & Date Nav */}
-        <div className="flex flex-col gap-1">
-            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-600"/> Agenda
+        <div className="flex flex-col gap-1.5">
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
+                <CalendarIcon className="w-5 h-5 text-zinc-400"/> Agenda
             </h1>
-            
-            <div className="flex items-center gap-2 mt-1">
-                <div className="flex items-center bg-gray-100 dark:bg-slate-800 rounded-lg p-0.5">
-                    <button onClick={() => changeDate(-1)} className="p-1 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronLeft className="w-4 h-4"/></button>
-                    <button onClick={() => setReferenceDate(new Date())} className="px-2 py-0.5 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:text-black">Hoy</button>
-                    <button onClick={() => changeDate(1)} className="p-1.5 hover:bg-white dark:hover:bg-slate-700 rounded-md text-gray-500 transition-all"><ChevronRight className="w-5 h-5"/></button>
+
+            <div className="flex items-center gap-2">
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-[10px] p-0.5">
+                    <button onClick={() => changeDate(-1)} className="p-1.5 hover:bg-white dark:hover:bg-zinc-700 rounded-[8px] text-zinc-500 transition-all shadow-none hover:shadow-[0_1px_3px_rgba(0,0,0,0.08)]"><ChevronLeft className="w-3.5 h-3.5"/></button>
+                    <button onClick={() => setReferenceDate(new Date())} className="px-2.5 py-0.5 text-[12px] font-semibold text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white">Hoy</button>
+                    <button onClick={() => changeDate(1)} className="p-1.5 hover:bg-white dark:hover:bg-zinc-700 rounded-[8px] text-zinc-500 transition-all shadow-none hover:shadow-[0_1px_3px_rgba(0,0,0,0.08)]"><ChevronRight className="w-3.5 h-3.5"/></button>
                 </div>
-                <h2 className="text-xl font-medium capitalize text-gray-900 dark:text-white min-w-[200px]">
-                    {viewMode === 'TODAY' 
-                        ? referenceDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) 
+                <h2 className="text-[15px] font-medium capitalize text-zinc-600 dark:text-zinc-400 min-w-[200px]">
+                    {viewMode === 'TODAY'
+                        ? referenceDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
                         : viewMode === 'WEEK'
                             ? `Semana del ${getWeekRange(referenceDate)}`
                             : referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
                     }
                 </h2>
-
-
             </div>
         </div>
-        
+
         {/* Right: Controls */}
-        <div className="flex flex-col md:flex-row gap-3 w-full xl:w-auto items-center">
-             {/* View Switcher */}
-            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex w-full md:w-auto">
+        <div className="flex flex-col md:flex-row gap-2 w-full xl:w-auto items-center">
+            {/* View Switcher */}
+            <div className="bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] flex w-full md:w-auto">
                 {([['TODAY', 'Día'], ['WEEK', 'Semana'], ['CALENDAR', 'Mes'], ['LIST', 'Lista']] as const).map(([mode, label]) => (
-                     <button 
+                     <button
                         key={mode}
-                        onClick={() => setViewMode(mode as ViewMode)} 
+                        onClick={() => setViewMode(mode as ViewMode)}
                         className={`
-                            flex-1 md:flex-none px-4 py-1.5 rounded-md text-sm font-medium transition-all
-                            ${viewMode === mode 
-                                ? 'bg-white dark:bg-slate-700 text-black dark:text-white shadow-sm' 
-                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}
+                            flex-1 md:flex-none px-3.5 py-1.5 rounded-[8px] text-[13px] font-medium transition-all
+                            ${viewMode === mode
+                                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
+                                : 'text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300'}
                         `}
                      >
                          {label}
@@ -891,16 +878,16 @@ export default function TasksPage() {
                  ))}
              </div>
 
-             <div className="h-6 w-px bg-gray-300 dark:bg-slate-700 hidden md:block mx-2"></div>
+             <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-700 hidden md:block mx-1"></div>
 
              <div className="relative flex-1 md:min-w-[200px] w-full">
-                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                 <Input placeholder="Buscar..." className="pl-9 h-10 w-full bg-gray-50 dark:bg-slate-800/50 border-transparent focus:bg-white transition-all" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+                 <Input placeholder="Buscar..." className="pl-9 h-10 w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
              </div>
-             
-             <Button onClick={() => { setIsModalOpen(true); resetForm(); }} className="w-full md:w-auto shadow-lg bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-                 <Plus className="w-4 h-4 mr-2" /> Crear
-             </Button>
+
+             <button onClick={() => { setIsModalOpen(true); resetForm(); }} className="flex items-center gap-2 h-10 px-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.15)] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.97] transition-all w-full md:w-auto justify-center">
+                 <Plus className="w-4 h-4" /> Crear
+             </button>
         </div>
       </div>
 
@@ -925,7 +912,7 @@ export default function TasksPage() {
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <Label>Prioridad</Label>
-                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}>
+                      <select className="flex h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value as any})}>
                           <option value="HIGH">Alta</option>
                           <option value="MEDIUM">Media</option>
                           <option value="LOW">Baja</option>
@@ -933,7 +920,7 @@ export default function TasksPage() {
                   </div>
                   <div>
                       <Label>Estado</Label>
-                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
+                      <select className="flex h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
                           <option value={TaskStatus.TODO}>Pendiente</option>
                           <option value={TaskStatus.DONE}>Completada</option>
                       </select>
@@ -943,7 +930,7 @@ export default function TasksPage() {
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <Label>Asignar a</Label>
-                      <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}>
+                      <select className="flex h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.assigneeId} onChange={e => setFormData({...formData, assigneeId: e.target.value})}>
                           <option value="">(Sin asignar)</option>
                           {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
@@ -957,7 +944,7 @@ export default function TasksPage() {
 
               <div>
                   <Label>Vincular SOP (Procedimiento)</Label>
-                  <select className="flex h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.sopId} onChange={e => setFormData({...formData, sopId: e.target.value})}>
+                  <select className="flex h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50/50 px-3 py-2 text-sm outline-none focus:border-black" value={formData.sopId} onChange={e => setFormData({...formData, sopId: e.target.value})}>
                       <option value="">(Ninguno)</option>
                       {sops.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
                   </select>
@@ -984,7 +971,7 @@ export default function TasksPage() {
       <Modal isOpen={sopModalOpen} onClose={() => setSopModalOpen(false)} title={`SOP: ${selectedSop?.title}`}>
           <div className="space-y-4">
               <Badge>{selectedSop?.category}</Badge>
-              <div className="bg-gray-50 p-4 rounded-xl text-sm whitespace-pre-wrap font-mono">
+              <div className="bg-zinc-50 p-4 rounded-xl text-sm whitespace-pre-wrap font-mono">
                   {selectedSop?.content}
               </div>
               <div className="flex justify-end">

@@ -76,10 +76,10 @@ export default function AutomationsPage() {
         <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+                    <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
                         <Workflow className="w-8 h-8 text-purple-600" /> Motor de Automatización
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Crea recetas "Si pasa esto, entonces haz aquello" para escalar operaciones.</p>
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-2">Crea recetas "Si pasa esto, entonces haz aquello" para escalar operaciones.</p>
                 </div>
                 <Button onClick={() => setIsModalOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/20"><Plus className="w-4 h-4 mr-2" /> Nueva Receta</Button>
             </div>
@@ -87,7 +87,7 @@ export default function AutomationsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Intro Card */}
                 <div className="col-span-full bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 p-6 rounded-2xl border border-purple-100 dark:border-purple-800 flex items-center gap-6">
-                    <div className="hidden md:flex bg-white dark:bg-slate-900 p-4 rounded-full shadow-sm">
+                    <div className="hidden md:flex bg-white dark:bg-zinc-900 p-4 rounded-full shadow-sm">
                         <Zap className="w-8 h-8 text-yellow-500 fill-yellow-500" />
                     </div>
                     <div>
@@ -99,19 +99,19 @@ export default function AutomationsPage() {
                     </div>
                 </div>
 
-                {loading ? <div className="col-span-full text-center py-20 text-gray-400">Cargando recetas...</div> : recipes.map(recipe => (
+                {loading ? <div className="col-span-full text-center py-20 text-zinc-400">Cargando recetas...</div> : recipes.map(recipe => (
                     <Card key={recipe.id} className="relative overflow-hidden hover:shadow-lg transition-all border-l-4 border-l-purple-500">
                         <div className="p-6 space-y-4">
                             <div className="flex justify-between items-start">
-                                <h3 className="font-bold text-gray-900 dark:text-white pr-6">{recipe.name}</h3>
-                                <button onClick={() => handleDelete(recipe.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                                <h3 className="font-bold text-zinc-900 dark:text-white pr-6">{recipe.name}</h3>
+                                <button onClick={() => handleDelete(recipe.id)} className="text-zinc-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
                             </div>
 
                             <div className="space-y-3">
                                 {/* Trigger Visual */}
-                                <div className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-slate-800 p-2 rounded-lg">
+                                <div className="flex items-center gap-3 text-xs bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg">
                                     <Play className="w-3 h-3 text-green-500" />
-                                    <span className="font-bold text-gray-500 uppercase tracking-wider">Cuando:</span>
+                                    <span className="font-bold text-zinc-500 uppercase tracking-wider">Cuando:</span>
                                     <Badge variant="outline" className="bg-white">
                                         {recipe.triggerType === 'NEW_PROJECT' ? 'Nuevo Cliente' : `Estado: ${recipe.triggerValue}`}
                                     </Badge>
@@ -119,10 +119,10 @@ export default function AutomationsPage() {
 
                                 {/* Condition Visual */}
                                 {recipe.conditions && recipe.conditions.length > 0 && (
-                                    <div className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-slate-800 p-2 rounded-lg">
+                                    <div className="flex items-center gap-3 text-xs bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg">
                                         <Filter className="w-3 h-3 text-blue-500" />
-                                        <span className="font-bold text-gray-500 uppercase tracking-wider">Si:</span>
-                                        <span className="text-gray-700 dark:text-gray-300">
+                                        <span className="font-bold text-zinc-500 uppercase tracking-wider">Si:</span>
+                                        <span className="text-zinc-700 dark:text-zinc-300">
                                             {recipe.conditions[0].field} tiene "{recipe.conditions[0].value}"
                                         </span>
                                     </div>
@@ -130,7 +130,7 @@ export default function AutomationsPage() {
 
                                 {/* Arrow */}
                                 <div className="flex justify-center">
-                                    <ArrowRight className="w-4 h-4 text-gray-300 rotate-90 md:rotate-0" />
+                                    <ArrowRight className="w-4 h-4 text-zinc-300 rotate-90 md:rotate-0" />
                                 </div>
 
                                 {/* Action Visual */}
@@ -147,8 +147,8 @@ export default function AutomationsPage() {
                 ))}
 
                 {recipes.length === 0 && !loading && (
-                    <div className="col-span-full py-12 text-center border-2 border-dashed border-gray-200 rounded-2xl">
-                        <p className="text-gray-400">No hay recetas configuradas.</p>
+                    <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-200 rounded-2xl">
+                        <p className="text-zinc-400">No hay recetas configuradas.</p>
                         <Button variant="ghost" onClick={() => setIsModalOpen(true)} className="mt-2 text-purple-600">Crear mi primera automatización</Button>
                     </div>
                 )}
@@ -161,7 +161,7 @@ export default function AutomationsPage() {
                         <Input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Onboarding SaaS" autoFocus />
                     </div>
 
-                    <div className="space-y-4 border rounded-xl p-4 bg-gray-50 dark:bg-slate-800/50">
+                    <div className="space-y-4 border rounded-xl p-4 bg-zinc-50 dark:bg-zinc-800/50">
                         <div className="flex items-center gap-2 text-sm font-bold text-green-600 uppercase tracking-wider">
                             <Play className="w-4 h-4"/> 1. Disparador (Trigger)
                         </div>
@@ -186,7 +186,7 @@ export default function AutomationsPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-4 border rounded-xl p-4 bg-gray-50 dark:bg-slate-800/50">
+                    <div className="space-y-4 border rounded-xl p-4 bg-zinc-50 dark:bg-zinc-800/50">
                         <div className="flex items-center gap-2 text-sm font-bold text-blue-600 uppercase tracking-wider">
                             <Filter className="w-4 h-4"/> 2. Condición (Opcional)
                         </div>
@@ -196,7 +196,7 @@ export default function AutomationsPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-4 border rounded-xl p-4 bg-gray-50 dark:bg-slate-800/50">
+                    <div className="space-y-4 border rounded-xl p-4 bg-zinc-50 dark:bg-zinc-800/50">
                         <div className="flex items-center gap-2 text-sm font-bold text-purple-600 uppercase tracking-wider">
                             <CheckCircle2 className="w-4 h-4"/> 3. Acción
                         </div>

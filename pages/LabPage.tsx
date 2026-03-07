@@ -76,10 +76,10 @@ export default function LabPage() {
         <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+                    <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
                         <Rocket className="w-8 h-8 text-purple-600" /> El Laboratorio
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-2">Simulador de Crecimiento & Ingeniería Inversa de Metas.</p>
+                    <p className="text-zinc-500 dark:text-zinc-400 mt-2">Simulador de Crecimiento & Ingeniería Inversa de Metas.</p>
                 </div>
             </div>
 
@@ -87,14 +87,14 @@ export default function LabPage() {
                 
                 {/* Control Panel */}
                 <div className="lg:col-span-5 space-y-6">
-                    <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-purple-100 dark:border-purple-900/50 shadow-xl shadow-purple-500/5">
+                    <Card className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm border-purple-100 dark:border-purple-900/50 shadow-xl shadow-purple-500/5">
                         <div className="p-6 space-y-6">
-                            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-purple-600"/> Variables del Experimento</h3>
+                            <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Target className="w-5 h-5 text-purple-600"/> Variables del Experimento</h3>
                             
                             <div>
                                 <Label>Tu "Freedom Number" (Meta MRR)</Label>
                                 <div className="relative">
-                                    <span className="absolute left-4 top-3 text-gray-400 font-bold">$</span>
+                                    <span className="absolute left-4 top-3 text-zinc-400 font-bold">$</span>
                                     <Input 
                                         type="number" 
                                         value={targetMRR} 
@@ -108,7 +108,7 @@ export default function LabPage() {
                                 <div>
                                     <div className="flex justify-between mb-2">
                                         <Label className="mb-0">Ticket Promedio ($)</Label>
-                                        <span className="text-xs font-bold bg-gray-100 dark:bg-slate-800 px-2 rounded">${avgTicket}</span>
+                                        <span className="text-xs font-bold bg-zinc-100 dark:bg-zinc-800 px-2 rounded">${avgTicket}</span>
                                     </div>
                                     <Slider min={100} max={5000} step={50} value={avgTicket} onChange={e => setAvgTicket(parseInt(e.target.value))} />
                                 </div>
@@ -135,7 +135,7 @@ export default function LabPage() {
                     {/* Scenario Simulator Widget */}
                     <Card className="border-orange-100 dark:border-orange-900/30">
                         <div className="p-6 space-y-4">
-                            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2"><Calculator className="w-5 h-5 text-orange-500"/> Simulador de Contratación</h3>
+                            <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Calculator className="w-5 h-5 text-orange-500"/> Simulador de Contratación</h3>
                             
                             <div className="flex items-center gap-4">
                                 <div className="flex-1">
@@ -145,9 +145,9 @@ export default function LabPage() {
                                 <div className="flex flex-col items-center">
                                     <Label>Cantidad</Label>
                                     <div className="flex items-center gap-2">
-                                        <button onClick={() => setNewHires(Math.max(0, newHires - 1))} className="p-1 bg-gray-100 dark:bg-slate-800 rounded hover:bg-gray-200"><MinusCircle className="w-5 h-5"/></button>
+                                        <button onClick={() => setNewHires(Math.max(0, newHires - 1))} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded hover:bg-zinc-200"><MinusCircle className="w-5 h-5"/></button>
                                         <span className="font-bold w-4 text-center">{newHires}</span>
-                                        <button onClick={() => setNewHires(newHires + 1)} className="p-1 bg-gray-100 dark:bg-slate-800 rounded hover:bg-gray-200"><UserPlus className="w-5 h-5"/></button>
+                                        <button onClick={() => setNewHires(newHires + 1)} className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded hover:bg-zinc-200"><UserPlus className="w-5 h-5"/></button>
                                     </div>
                                 </div>
                             </div>
@@ -168,10 +168,10 @@ export default function LabPage() {
                     <Card className="border-indigo-100 dark:border-indigo-900/30">
                         <div className="p-6 flex items-center justify-between">
                             <div>
-                                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                <h3 className="font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                                     <Mail className="w-5 h-5 text-indigo-500"/> Test de Conexión
                                 </h3>
-                                <p className="text-xs text-gray-500 mt-1">Prueba envío con Hostinger</p>
+                                <p className="text-xs text-zinc-500 mt-1">Prueba envío con Hostinger</p>
                             </div>
                             <Button 
                                 onClick={handleTestEmail} 
@@ -190,65 +190,65 @@ export default function LabPage() {
                 {/* Results Visualization */}
                 <div className="lg:col-span-7 space-y-6">
                     <Card className="h-full border-0 shadow-2xl flex flex-col">
-                        <div className="p-8 flex-1 bg-white dark:bg-slate-900">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2"><TrendingUp className="w-5 h-5"/> Hoja de Ruta Generada</h3>
+                        <div className="p-8 flex-1 bg-white dark:bg-zinc-900">
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-2"><TrendingUp className="w-5 h-5"/> Hoja de Ruta Generada</h3>
                             
                             <div className="flex flex-col gap-0 relative">
                                 {/* Step 1: Gap */}
-                                <div className="flex items-center gap-4 pb-8 border-l-2 border-dashed border-gray-200 dark:border-slate-700 pl-8 relative">
-                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                                <div className="flex items-center gap-4 pb-8 border-l-2 border-dashed border-zinc-200 dark:border-zinc-700 pl-8 relative">
+                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-zinc-200 dark:bg-zinc-700"></div>
                                     <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-600 font-bold shrink-0">
                                         <TrendingUp className="w-8 h-8" />
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Falta para la meta</p>
-                                        <p className="text-3xl font-bold text-gray-900 dark:text-white">${gap.toLocaleString()}</p>
-                                        <p className="text-xs text-gray-400">Mensuales recurrentes</p>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider">Falta para la meta</p>
+                                        <p className="text-3xl font-bold text-zinc-900 dark:text-white">${gap.toLocaleString()}</p>
+                                        <p className="text-xs text-zinc-400">Mensuales recurrentes</p>
                                     </div>
                                 </div>
 
                                 {/* Step 2: Clients */}
-                                <div className="flex items-center gap-4 pb-8 border-l-2 border-purple-100 dark:border-slate-700 pl-8 relative">
-                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-500 ring-4 ring-white dark:ring-slate-900"></div>
+                                <div className="flex items-center gap-4 pb-8 border-l-2 border-purple-100 dark:border-zinc-700 pl-8 relative">
+                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-purple-500 ring-4 ring-white dark:ring-zinc-900"></div>
                                     <div className="w-16 h-16 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 font-bold shrink-0 shadow-sm">
                                         {newClientsNeeded}
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-gray-900 dark:text-white">Nuevos Clientes</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Necesarios a ${avgTicket}/mes</p>
+                                        <p className="text-lg font-bold text-zinc-900 dark:text-white">Nuevos Clientes</p>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400">Necesarios a ${avgTicket}/mes</p>
                                     </div>
-                                    <ArrowRight className="ml-auto text-gray-300 w-6 h-6"/>
+                                    <ArrowRight className="ml-auto text-zinc-300 w-6 h-6"/>
                                 </div>
 
                                 {/* Step 3: Calls */}
-                                <div className="flex items-center gap-4 pb-8 border-l-2 border-blue-100 dark:border-slate-700 pl-8 relative">
-                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 ring-4 ring-white dark:ring-slate-900"></div>
+                                <div className="flex items-center gap-4 pb-8 border-l-2 border-blue-100 dark:border-zinc-700 pl-8 relative">
+                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 ring-4 ring-white dark:ring-zinc-900"></div>
                                     <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 font-bold shrink-0 shadow-sm">
                                         {callsNeeded}
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-gray-900 dark:text-white">Reuniones de Venta</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Asumiendo cierre del {closeRate}%</p>
+                                        <p className="text-lg font-bold text-zinc-900 dark:text-white">Reuniones de Venta</p>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400">Asumiendo cierre del {closeRate}%</p>
                                     </div>
-                                    <ArrowRight className="ml-auto text-gray-300 w-6 h-6"/>
+                                    <ArrowRight className="ml-auto text-zinc-300 w-6 h-6"/>
                                 </div>
 
                                 {/* Step 4: Leads */}
                                 <div className="flex items-center gap-4 pl-8 relative">
-                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-black dark:bg-white ring-4 ring-white dark:ring-slate-900"></div>
+                                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-black dark:bg-white ring-4 ring-white dark:ring-zinc-900"></div>
                                     <div className="w-16 h-16 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-bold shrink-0 shadow-xl">
                                         {leadsNeeded}
                                     </div>
                                     <div>
-                                        <p className="text-lg font-bold text-gray-900 dark:text-white">Leads / Prospectos</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Volumen necesario en el Top of Funnel</p>
+                                        <p className="text-lg font-bold text-zinc-900 dark:text-white">Leads / Prospectos</p>
+                                        <p className="text-sm text-zinc-500 dark:text-zinc-400">Volumen necesario en el Top of Funnel</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-gray-50 dark:bg-slate-800 p-6 border-t border-gray-100 dark:border-slate-700 text-center">
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Para facturar <span className="font-bold text-gray-900 dark:text-white">${targetMRR.toLocaleString()}</span>, tu foco hoy es conseguir <span className="font-bold underline">{leadsNeeded} leads</span> este mes.
+                        <div className="bg-zinc-50 dark:bg-zinc-800 p-6 border-t border-zinc-100 dark:border-zinc-700 text-center">
+                            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                                Para facturar <span className="font-bold text-zinc-900 dark:text-white">${targetMRR.toLocaleString()}</span>, tu foco hoy es conseguir <span className="font-bold underline">{leadsNeeded} leads</span> este mes.
                             </p>
                         </div>
                     </Card>

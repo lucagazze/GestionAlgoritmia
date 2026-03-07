@@ -811,36 +811,36 @@ export const AIActionCenter = () => {
 
     return (
         <div ref={containerRef} className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 w-[95%] md:w-[800px] bottom-6`}>
-            <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-gray-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[75vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
+            <div className={`absolute bottom-full mb-3 w-full bg-white/95 backdrop-blur-2xl border border-zinc-200/50 shadow-2xl rounded-3xl overflow-hidden transition-all duration-300 origin-bottom flex flex-col ${isOpen ? 'opacity-100 scale-100 h-[75vh] md:h-[550px]' : 'opacity-0 scale-95 h-0 pointer-events-none'}`}>
                  
                  {/* Wake Word Indicator */}
                  {wakeWordEnabled && !isRecording && !isOpen && (
-                     <div className="absolute -top-10 right-0 text-[10px] text-gray-400 flex items-center gap-1 animate-pulse bg-white/80 px-2 py-1 rounded-full border border-gray-100 shadow-sm backdrop-blur-sm">
+                     <div className="absolute -top-10 right-0 text-[10px] text-zinc-400 flex items-center gap-1 animate-pulse bg-white/80 px-2 py-1 rounded-full border border-zinc-100 shadow-sm backdrop-blur-sm">
                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                          Jarvis
                      </div>
                  )}
 
-                 <div className="flex justify-between items-center p-3 border-b border-gray-100 bg-gray-50/80 flex-shrink-0">
+                 <div className="flex justify-between items-center p-3 border-b border-zinc-100 bg-zinc-50/80 flex-shrink-0">
                     <div className="flex items-center gap-2">
-                        {viewMode === 'CHAT' && <button onClick={() => setViewMode('HISTORY')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><History className="w-4 h-4" /></button>}
-                        {viewMode === 'HISTORY' && <button onClick={() => setViewMode('CHAT')} className="p-1.5 hover:bg-gray-200 rounded-lg text-gray-500"><CornerDownLeft className="w-4 h-4" /></button>}
-                        <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">{viewMode === 'HISTORY' ? 'Historial' : sessions.find(s => s.id === currentSessionId)?.title || 'Nueva Conversación'}</span>
+                        {viewMode === 'CHAT' && <button onClick={() => setViewMode('HISTORY')} className="p-1.5 hover:bg-zinc-200 rounded-lg text-zinc-500"><History className="w-4 h-4" /></button>}
+                        {viewMode === 'HISTORY' && <button onClick={() => setViewMode('CHAT')} className="p-1.5 hover:bg-zinc-200 rounded-lg text-zinc-500"><CornerDownLeft className="w-4 h-4" /></button>}
+                        <span className="text-xs font-bold text-zinc-600 uppercase tracking-widest">{viewMode === 'HISTORY' ? 'Historial' : sessions.find(s => s.id === currentSessionId)?.title || 'Nueva Conversación'}</span>
                     </div>
                     {activeContextData && (
                         <div className="hidden md:flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold border border-blue-100">
                             <Lightbulb className="w-3 h-3" /> {activeContextData.data.name}
                         </div>
                     )}
-                    <button onClick={startNewChat} className="text-[10px] bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-gray-800"><Plus className="w-3 h-3"/> Nuevo</button>
+                    <button onClick={startNewChat} className="text-[10px] bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-zinc-800"><Plus className="w-3 h-3"/> Nuevo</button>
                  </div>
                  
                  {viewMode === 'HISTORY' && (
-                     <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar bg-gray-50/30">
+                     <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar bg-zinc-50/30">
                          {sessions.map(s => (
-                             <div key={s.id} onClick={() => selectSession(s.id)} className={`group p-3 rounded-xl border cursor-pointer hover:shadow-md transition-all flex justify-between items-center ${currentSessionId === s.id ? 'bg-white border-black ring-1 ring-black' : 'bg-white border-gray-100'}`}>
-                                 <div><p className="font-bold text-sm text-gray-800 line-clamp-1">{s.title}</p><p className="text-[10px] text-gray-400">{new Date(s.updated_at || s.created_at).toLocaleDateString()}</p></div>
-                                 <button onClick={(e) => deleteSession(e, s.id)} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                             <div key={s.id} onClick={() => selectSession(s.id)} className={`group p-3 rounded-xl border cursor-pointer hover:shadow-md transition-all flex justify-between items-center ${currentSessionId === s.id ? 'bg-white border-black ring-1 ring-black' : 'bg-white border-zinc-100'}`}>
+                                 <div><p className="font-bold text-sm text-zinc-800 line-clamp-1">{s.title}</p><p className="text-[10px] text-zinc-400">{new Date(s.updated_at || s.created_at).toLocaleDateString()}</p></div>
+                                 <button onClick={(e) => deleteSession(e, s.id)} className="opacity-0 group-hover:opacity-100 p-2 hover:bg-red-50 text-zinc-300 hover:text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                              </div>
                          ))}
                      </div>
@@ -849,7 +849,7 @@ export const AIActionCenter = () => {
                  {viewMode === 'CHAT' && (
                      <div ref={chatContainerRef} className="p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1 pb-20">
                         {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-300 gap-2 opacity-50">
+                            <div className="flex flex-col items-center justify-center h-full text-zinc-300 gap-2 opacity-50">
                                 <Sparkles className="w-10 h-10" />
                                 <p className="text-xs">Soy tu Segundo Cerebro. {activeContextData ? `Hablemos de ${activeContextData.data.name}.` : "¿Qué ordenamos hoy?"}</p>
                             </div>
@@ -872,7 +872,7 @@ export const AIActionCenter = () => {
                              
                              return (
                                 <div key={msg.id || idx} className={`flex flex-col max-w-[95%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
-                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm break-words overflow-visible ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'}`}>
+                                 <div className={`p-3.5 rounded-2xl text-sm shadow-sm break-words overflow-visible ${msg.role === 'user' ? 'bg-black text-white rounded-br-sm' : 'bg-white text-zinc-800 border border-zinc-100 rounded-bl-sm'}`}>
                                      <MessageRenderer 
                                          content={msg.content} 
                                          role={msg.role} 
@@ -895,9 +895,9 @@ export const AIActionCenter = () => {
                                      />
                                  </div>
                                 <div className="flex items-center gap-2 mt-1 px-1">
-                                    <span className="text-[10px] text-gray-300">{formatTime(msg.created_at)}</span>
+                                    <span className="text-[10px] text-zinc-300">{formatTime(msg.created_at)}</span>
                                     {msg.role === 'assistant' && msg.action_payload && !msg.is_undone && (
-                                        <button onClick={() => handleUndoMessage(msg)} className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 px-2 py-0.5 rounded-full border border-gray-100"><RotateCcw className="w-2.5 h-2.5" /> Deshacer</button>
+                                        <button onClick={() => handleUndoMessage(msg)} className="flex items-center gap-1 text-[9px] font-bold text-zinc-400 hover:text-indigo-600 bg-zinc-50 hover:bg-indigo-50 px-2 py-0.5 rounded-full border border-zinc-100"><RotateCcw className="w-2.5 h-2.5" /> Deshacer</button>
                                     )}
                                  </div>
                              </div>
@@ -905,16 +905,16 @@ export const AIActionCenter = () => {
                          })}
                         {decisionOptions && (
                             <div className="self-start w-[95%] md:w-[85%] grid gap-2 animate-in slide-in-from-left-4">
-                                <p className="text-xs text-gray-400 font-bold ml-1 uppercase">Opciones:</p>
+                                <p className="text-xs text-zinc-400 font-bold ml-1 uppercase">Opciones:</p>
                                 {decisionOptions.map((opt, idx) => (
                                     <button key={idx} onClick={() => handleDecisionClick(opt)} className="text-left bg-white border-2 border-indigo-100 hover:border-indigo-500 hover:bg-indigo-50 p-3 rounded-xl transition-all shadow-sm flex items-center gap-3 group">
                                         <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors"><MousePointerClick className="w-4 h-4" /></div>
-                                        <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-900">{opt.label}</span>
+                                        <span className="text-sm font-medium text-zinc-700 group-hover:text-indigo-900">{opt.label}</span>
                                     </button>
                                 ))}
                             </div>
                         )}
-                        {isThinking && <div className="self-start bg-white border border-gray-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-gray-500">Ejecutando...</span></div>}
+                        {isThinking && <div className="self-start bg-white border border-zinc-100 p-3 rounded-2xl rounded-bl-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-500" /><span className="text-xs text-zinc-500">Ejecutando...</span></div>}
                         
                         {/* 📊 Execution Progress UI */}
                         {executionProgress && (
@@ -954,7 +954,7 @@ export const AIActionCenter = () => {
             {isOpen && !isThinking && !isRecording && !isTranscribing && !input && viewMode === 'CHAT' && messages.length === 0 && (
                 <div className="absolute bottom-full mb-4 left-0 w-full flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar animate-in slide-in-from-bottom-2">
                     {quickChips.map((chip, idx) => (
-                        <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-gray-200 px-4 py-2 rounded-full text-xs font-bold text-gray-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
+                        <button key={idx} onClick={() => handleSend(chip.prompt)} className="flex items-center gap-2 bg-white/90 backdrop-blur border border-zinc-200 px-4 py-2 rounded-full text-xs font-bold text-zinc-700 hover:bg-black hover:text-white transition-all shadow-lg shadow-black/5 whitespace-nowrap">
                             <Sparkles className="w-3 h-3 text-yellow-500" /> {chip.label}
                         </button>
                     ))}
@@ -965,15 +965,15 @@ export const AIActionCenter = () => {
                 {/* Main Dynamic Button */}
                 <div 
                     onClick={(e) => { e.stopPropagation(); if (isRecording) stopRecording(); else startRecording(); }}
-                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer flex-shrink-0 ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-gray-800'}`}
+                    className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-white shadow-lg transition-all duration-500 cursor-pointer flex-shrink-0 ${isThinking || isTranscribing ? 'bg-indigo-600 rotate-180' : isRecording ? 'bg-red-500 scale-110 shadow-red-500/50' : 'bg-black hover:bg-zinc-800'}`}
                 >
                     {isThinking || isTranscribing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <AudioWaveform className="w-5 h-5 animate-pulse" /> : <Mic className="w-5 h-5" />}
                 </div>
                 
-                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-sm md:text-base text-gray-800 placeholder:text-gray-500 font-medium px-2 md:px-4 h-full min-w-0" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
+                <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !isThinking && !isTranscribing && handleSend()} placeholder={isRecording ? "Escuchando..." : isTranscribing ? "Transcribiendo..." : placeholder} className="flex-1 bg-transparent border-none outline-none text-sm md:text-base text-zinc-800 placeholder:text-zinc-500 font-medium px-2 md:px-4 h-full min-w-0" autoComplete="off" disabled={!!pendingAction || !!decisionOptions || isRecording || isTranscribing} />
                 
                 <div className="flex items-center gap-2 pr-2 flex-shrink-0">
-                     {isThinking || isTranscribing ? <div className="text-xs text-gray-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gray-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-gray-300 hover:text-gray-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
+                     {isThinking || isTranscribing ? <div className="text-xs text-zinc-400 animate-pulse">AI</div> : input.length > 0 ? <button onClick={(e) => { e.stopPropagation(); handleSend(); }} className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-zinc-100 hover:bg-black hover:text-white flex items-center justify-center transition-colors"><CornerDownLeft className="w-4 h-4 md:w-5 md:h-5" /></button> : <button onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="hidden md:flex text-zinc-300 hover:text-zinc-500"><ChevronUp className={`w-5 h-5 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} /></button>}
                 </div>
             </div>
             

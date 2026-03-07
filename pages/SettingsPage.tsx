@@ -3,13 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Card, CardContent, CardHeader, CardTitle, Input, Button, Label } from '../components/UIComponents';
-import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow, CalendarCheck } from 'lucide-react';
+import { ShieldCheck, Key, Loader2, Save, CheckCircle, AlertTriangle, Database, Copy, Sparkles, Workflow, CalendarCheck, Megaphone } from 'lucide-react';
 
 export default function SettingsPage() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
     const [claudeApiKey, setClaudeApiKey] = useState('');
     const [oauthClientId, setOauthClientId] = useState('');
+    const [metaAdsToken, setMetaAdsToken] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -29,6 +30,9 @@ export default function SettingsPage() {
 
             const clientId = await db.settings.getApiKey('google_oauth_client_id');
             if (clientId) setOauthClientId(clientId);
+
+            const metaToken = await db.settings.getApiKey('meta_ads_token');
+            if (metaToken) setMetaAdsToken(metaToken.slice(0, 12) + '••••••••••••••••••••••••');
         } catch (e) {
             console.error("Error loading settings", e);
         } finally {
@@ -42,7 +46,11 @@ export default function SettingsPage() {
             if (apiKey.trim()) await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
             if (claudeApiKey.trim() && !claudeApiKey.includes('••')) await db.settings.setApiKey(claudeApiKey.trim(), 'claude_api_key');
             if (oauthClientId.trim()) await db.settings.setApiKey(oauthClientId.trim(), 'google_oauth_client_id');
-            
+            if (metaAdsToken.trim() && !metaAdsToken.includes('••')) {
+                await db.settings.setApiKey(metaAdsToken.trim(), 'meta_ads_token');
+                localStorage.setItem('meta_ads_token', metaAdsToken.trim()); // sync cache
+            }
+
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (e) {
@@ -176,77 +184,101 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto pb-20">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Ajustes del Sistema</h1>
-                <p className="text-gray-500 dark:text-gray-400 mt-2">Configura las conexiones externas y la base de datos.</p>
+                <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white">Ajustes</h1>
+                <p className="text-[14px] text-zinc-400 dark:text-zinc-500 mt-0.5 font-medium">Conexiones externas y base de datos.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                {/* Claude API Key */}
-                <Card className="border-violet-100 dark:border-violet-900/50 shadow-lg shadow-violet-500/5 overflow-visible">
-                    <CardHeader className="bg-gradient-to-r from-violet-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-violet-100 dark:border-slate-800">
-                        <CardTitle className="flex items-center gap-2 text-violet-900 dark:text-violet-200">
-                            <Sparkles className="w-5 h-5 text-violet-600" /> Claude AI Studio (Anthropic)
+                {/* Meta Ads Token */}
+                <Card className="overflow-visible md:col-span-2">
+                    <CardHeader className="border-b border-zinc-100 dark:border-zinc-800">
+                        <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-zinc-900 dark:text-white">
+                            <Megaphone className="w-4 h-4 text-blue-500" /> Meta Ads — Access Token
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-6">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Para usar el AI Studio con propuestas, estrategias y análisis inteligente de campañas.</p>
-                        <div className="space-y-3">
-                            <Label>Anthropic (Claude) API Key</Label>
+                    <CardContent className="space-y-3 pt-5">
+                        <p className="text-[12px] text-zinc-400">Token de acceso para leer campañas, métricas e Instagram. Se guarda localmente.</p>
+                        <div className="space-y-2">
+                            <Label>Access Token</Label>
+                            <Input
+                                type="password"
+                                value={metaAdsToken}
+                                onChange={(e) => setMetaAdsToken(e.target.value)}
+                                placeholder="EAAr..."
+                                className="font-mono text-[12px]"
+                            />
+                            <p className="text-[11px] text-zinc-400">
+                                Generalo en <span className="text-zinc-600 dark:text-zinc-300 font-medium">developers.facebook.com/tools/explorer</span> con permisos <span className="font-mono text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">ads_read</span> y <span className="font-mono text-[10px] bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded">business_management</span>. Expira cada 60 días.
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Claude API Key */}
+                <Card className="overflow-visible">
+                    <CardHeader className="border-b border-zinc-100 dark:border-zinc-800">
+                        <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-zinc-900 dark:text-white">
+                            <Sparkles className="w-4 h-4 text-violet-500" /> Claude AI (Anthropic)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-5">
+                        <p className="text-[12px] text-zinc-400">Para AI Studio, propuestas y análisis de campañas.</p>
+                        <div className="space-y-2">
+                            <Label>API Key</Label>
                             <Input
                                 type="password"
                                 value={claudeApiKey}
                                 onChange={(e) => setClaudeApiKey(e.target.value)}
                                 placeholder="sk-ant-..."
-                                className="font-mono text-sm"
+                                className="font-mono text-[12px]"
                             />
-                            <p className="text-xs text-gray-400">Conseguí tu key en <span className="text-violet-500 font-medium">console.anthropic.com</span></p>
+                            <p className="text-[11px] text-zinc-400">Conseguila en <span className="text-zinc-600 dark:text-zinc-300 font-medium">console.anthropic.com</span></p>
                         </div>
                     </CardContent>
                 </Card>
 
-                 {/* Google API Key (GEMINI) */}
-                <Card className="border-indigo-100 dark:border-indigo-900/50 shadow-lg shadow-indigo-500/5 overflow-visible">
-                    <CardHeader className="bg-gradient-to-r from-indigo-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-indigo-100 dark:border-slate-800">
-                        <CardTitle className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
-                            <Key className="w-5 h-5 text-indigo-600" /> Inteligencia Artificial (Gemini)
+                {/* Google API Key (GEMINI) */}
+                <Card className="overflow-visible">
+                    <CardHeader className="border-b border-zinc-100 dark:border-zinc-800">
+                        <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-zinc-900 dark:text-white">
+                            <Key className="w-4 h-4 text-zinc-500" /> Gemini AI (Google)
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        <div className="space-y-3">
-                            <Label>Google Gemini API Key</Label>
+                    <CardContent className="space-y-3 pt-5">
+                        <div className="space-y-2">
+                            <Label>API Key</Label>
                             <Input
                                 type="password"
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
                                 placeholder="AIzaSy..."
-                                className="font-mono text-sm"
+                                className="font-mono text-[12px]"
                             />
-                            <p className="text-xs text-gray-400">Usado para el Copiloto de Ventas y el Asistente.</p>
+                            <p className="text-[11px] text-zinc-400">Usado para el Copiloto de Ventas.</p>
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Google OAuth (CALENDAR) */}
-                <Card className="border-blue-100 dark:border-blue-900/50 shadow-lg shadow-blue-500/5">
-                    <CardHeader className="bg-gradient-to-r from-blue-50 to-white dark:from-slate-800 dark:to-slate-900 border-b border-blue-100 dark:border-slate-800">
-                        <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-200">
-                            <CalendarCheck className="w-5 h-5 text-blue-600" /> Google Calendar API
+                <Card>
+                    <CardHeader className="border-b border-zinc-100 dark:border-zinc-800">
+                        <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-zinc-900 dark:text-white">
+                            <CalendarCheck className="w-4 h-4 text-zinc-500" /> Google Calendar
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                        <div className="space-y-3">
-                            <Label>OAuth Client ID (Web)</Label>
-                            <Input 
-                                type="text" 
-                                value={oauthClientId} 
-                                onChange={(e) => setOauthClientId(e.target.value)} 
-                                placeholder="123...apps.googleusercontent.com" 
-                                className="font-mono text-sm"
+                    <CardContent className="space-y-3 pt-5">
+                        <div className="space-y-2">
+                            <Label>OAuth Client ID</Label>
+                            <Input
+                                type="text"
+                                value={oauthClientId}
+                                onChange={(e) => setOauthClientId(e.target.value)}
+                                placeholder="123...apps.googleusercontent.com"
+                                className="font-mono text-[12px]"
                             />
-                            <p className="text-xs text-gray-400">
-                                Requerido para sincronizar tareas con el calendario. <br/>
-                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" className="underline text-blue-500">Obtener en Google Cloud Console</a>
+                            <p className="text-[11px] text-zinc-400">
+                                Necesario para sincronizar tareas.
                             </p>
                         </div>
                     </CardContent>
@@ -254,38 +286,41 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
             </div>
 
             <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving || loading} className="min-w-[150px] shadow-xl">
-                    {saving ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : success ? <CheckCircle className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                    {success ? "Configuración Guardada" : "Guardar Todo"}
-                </Button>
+                <button
+                    onClick={handleSave}
+                    disabled={saving || loading}
+                    className="flex items-center gap-2 h-10 px-5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.15)] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.97] transition-all disabled:opacity-50"
+                >
+                    {saving ? <Loader2 className="animate-spin w-4 h-4" /> : success ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                    {success ? "Guardado" : "Guardar cambios"}
+                </button>
             </div>
 
-            <Card className="border-red-100 dark:border-red-900/30">
-                 <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/30">
-                    <CardTitle className="flex items-center gap-2 text-red-800 dark:text-red-200">
-                        <Database className="w-5 h-5 text-red-600" /> REPARACIÓN DE BASE DE DATOS
+            <Card className="border-red-100 dark:border-red-900/20">
+                 <CardHeader className="border-b border-red-100 dark:border-red-900/20">
+                    <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-red-700 dark:text-red-400">
+                        <Database className="w-4 h-4" /> Reparación de Base de Datos
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="text-sm text-gray-600 dark:text-gray-300 space-y-4">
+                <CardContent className="pt-5">
+                    <div className="text-[13px] text-zinc-600 dark:text-zinc-300 space-y-4">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0 animate-pulse" />
+                            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
                             <div>
-                                <p className="font-bold text-red-700 dark:text-red-400">¿No puedes crear o borrar tareas?</p>
-                                <p className="mt-1">
-                                    Esto es un problema de <strong>Permisos (RLS)</strong> en Supabase. 
-                                    Copia el siguiente script y ejecútalo en el <strong>SQL Editor</strong> de Supabase para desbloquear todo.
+                                <p className="font-semibold text-zinc-900 dark:text-white">¿No podés crear o borrar tareas?</p>
+                                <p className="mt-1 text-zinc-500">
+                                    Problema de permisos (RLS) en Supabase. Ejecutá este script en el SQL Editor.
                                 </p>
                             </div>
                         </div>
-                        
+
                         <div className="relative group">
                             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button size="sm" variant="secondary" onClick={() => {navigator.clipboard.writeText(sqlScript); alert("Script copiado! Pégalo en Supabase SQL Editor.")}}>
                                     <Copy className="w-3 h-3 mr-2" /> Copiar SQL
                                 </Button>
                             </div>
-                            <div className="bg-gray-900 text-gray-300 p-4 rounded-xl font-mono text-[10px] md:text-xs overflow-x-auto leading-relaxed border border-gray-700 h-64 custom-scrollbar">
+                            <div className="bg-zinc-950 text-zinc-400 p-4 rounded-xl font-mono text-[10px] md:text-[11px] overflow-x-auto leading-relaxed border border-zinc-800 h-64">
                                 <pre>{sqlScript}</pre>
                             </div>
                         </div>

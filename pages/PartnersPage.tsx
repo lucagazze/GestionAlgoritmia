@@ -79,92 +79,95 @@ export default function PartnersPage() {
       {/* Header & Financial Stats */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Equipo & Finanzas</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Gestión de socios y costos fijos mensuales.</p>
+            <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white">Equipo</h1>
+            <p className="text-[14px] text-zinc-400 dark:text-zinc-500 mt-0.5 font-medium">Socios, costos y carga de trabajo.</p>
         </div>
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64"><Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" /><Input placeholder="Buscar socio..." className="pl-9 h-10 bg-white dark:bg-slate-800" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></div>
-            <Button onClick={() => setIsModalOpen(true)} className="shadow-lg"><Plus className="w-4 h-4 mr-2" /> Agregar</Button>
+        <div className="flex gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+                <Input placeholder="Buscar socio..." className="pl-9 h-10" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            </div>
+            <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 h-10 px-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.15)] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.97] transition-all whitespace-nowrap">
+                <Plus className="w-4 h-4" /> Agregar
+            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-slate-800 dark:to-slate-900 text-white border-0 shadow-xl">
-              <div className="p-6">
-                  <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-widest mb-2">
-                      <Wallet className="w-4 h-4" /> Nómina Mensual Activa
-                  </div>
-                  <div className="text-4xl font-bold tracking-tight">${totalPayroll.toLocaleString()}</div>
-                  <div className="mt-4 text-sm text-gray-400">Total a pagar a socios por proyectos activos.</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-zinc-900 dark:bg-white border border-zinc-900 dark:border-zinc-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.12)]">
+              <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-500 text-[10px] font-semibold uppercase tracking-[0.08em] mb-2">
+                  <Wallet className="w-3.5 h-3.5" /> Nómina Mensual
               </div>
-          </Card>
+              <div className="text-[32px] font-bold tracking-[-0.03em] text-white dark:text-zinc-900">${totalPayroll.toLocaleString()}</div>
+              <div className="mt-2 text-[12px] text-zinc-500 dark:text-zinc-500">Total a pagar por proyectos activos.</div>
+          </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col">
-          <div className="overflow-x-auto custom-scrollbar">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <div className="overflow-x-auto">
               <table className="w-full text-sm text-left min-w-[800px]">
-                  <thead className="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-gray-400 font-medium border-b border-gray-100 dark:border-slate-700 uppercase text-xs tracking-wider">
+                  <thead className="bg-zinc-50/80 dark:bg-zinc-800/60 text-zinc-400 font-medium border-b border-zinc-100 dark:border-zinc-800 uppercase text-[10px] tracking-[0.06em]">
                       <tr>
-                          <th className="px-6 py-4">Socio / Freelancer</th>
-                          <th className="px-6 py-4">Carga de Trabajo (Tareas)</th>
-                          <th className="px-6 py-4 text-right">Pago Mensual (Estimado)</th>
-                          <th className="px-6 py-4 text-center">Estado</th>
-                          <th className="px-6 py-4 text-center">Acciones</th>
+                          <th className="px-5 py-3">Socio / Freelancer</th>
+                          <th className="px-5 py-3">Carga de Trabajo</th>
+                          <th className="px-5 py-3 text-right">Pago Mensual</th>
+                          <th className="px-5 py-3 text-center">Estado</th>
+                          <th className="px-5 py-3 text-center">Acciones</th>
                       </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-slate-800">
-                      {filtered.length === 0 ? (<tr><td colSpan={5} className="text-center py-12 text-gray-400">No hay socios registrados.</td></tr>) : 
+                  <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800">
+                      {filtered.length === 0 ? (<tr><td colSpan={5} className="text-center py-12 text-[13px] text-zinc-400">No hay socios registrados.</td></tr>) :
                           filtered.map(c => {
                               const partnerProjects = projects.filter(p => p.assignedPartnerId === c.id && p.status === ProjectStatus.ACTIVE);
                               const monthlyPayout = partnerProjects.reduce((sum, p) => sum + (p.outsourcingCost || 0), 0);
-                              
+
                               // WORKLOAD LOGIC
                               const activeTasks = tasks.filter(t => t.assigneeId === c.id && t.status !== TaskStatus.DONE).length;
-                              const loadPercentage = Math.min(100, (activeTasks / 10) * 100); // Assume 10 tasks is full cap
-                              const loadColor = loadPercentage > 80 ? 'bg-red-500' : loadPercentage > 50 ? 'bg-yellow-500' : 'bg-green-500';
+                              const loadPercentage = Math.min(100, (activeTasks / 10) * 100);
+                              const loadColor = loadPercentage > 80 ? 'bg-red-400' : loadPercentage > 50 ? 'bg-amber-400' : 'bg-emerald-400';
 
                               return (
-                                  <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} onClick={() => navigate(`/partners/${c.id}`)} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 group cursor-pointer">
-                                      <td className="px-6 py-4">
+                                  <tr key={c.id} onContextMenu={(e) => handleContextMenu(e, c)} onClick={() => navigate(`/partners/${c.id}`)} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 group cursor-pointer transition-colors">
+                                      <td className="px-5 py-3">
                                           <div className="flex items-center gap-3">
-                                              <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 flex items-center justify-center font-bold text-sm">{c.name.charAt(0)}</div>
+                                              <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 flex items-center justify-center font-bold text-[13px]">{c.name.charAt(0)}</div>
                                               <div>
-                                                  <div className="font-bold text-gray-900 dark:text-white">{c.name}</div>
-                                                  <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">{c.role} <span className="text-gray-300">|</span> {c.email || '-'}</div>
+                                                  <div className="font-semibold text-[13px] text-zinc-900 dark:text-white">{c.name}</div>
+                                                  <div className="text-[11px] text-zinc-400 flex items-center gap-1">{c.role} {c.email && <><span className="text-zinc-200 dark:text-zinc-700">·</span> {c.email}</>}</div>
                                               </div>
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 w-64">
-                                          <div className="flex justify-between text-xs mb-1 text-gray-600 dark:text-gray-400">
+                                      <td className="px-5 py-3 w-56">
+                                          <div className="flex justify-between text-[11px] mb-1.5 text-zinc-500">
                                               <span>{activeTasks} tareas activas</span>
-                                              <span>{loadPercentage > 80 ? 'Saturado' : 'Disponible'}</span>
+                                              <span className={loadPercentage > 80 ? 'text-red-500 font-semibold' : ''}>{loadPercentage > 80 ? 'Saturado' : 'Disponible'}</span>
                                           </div>
-                                          <div className="h-2 w-full bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                          <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                                               <div className={`h-full rounded-full ${loadColor} transition-all duration-500`} style={{width: `${loadPercentage}%`}}></div>
                                           </div>
                                       </td>
-                                      <td className="px-6 py-4 text-right">
-                                          <span className={`font-mono font-bold ${monthlyPayout > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
+                                      <td className="px-5 py-3 text-right">
+                                          <span className={`font-mono font-bold text-[13px] ${monthlyPayout > 0 ? 'text-zinc-900 dark:text-white' : 'text-zinc-300 dark:text-zinc-600'}`}>
                                               ${monthlyPayout.toLocaleString()}
                                           </span>
-                                          <div className="text-[10px] text-gray-400 mt-0.5">Tarifa ref: ${c.hourlyRate}/mes</div>
+                                          <div className="text-[10px] text-zinc-400 mt-0.5">ref: ${c.hourlyRate}/mes</div>
                                       </td>
-                                      <td className="px-6 py-4 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
-                                      <td className="px-6 py-4 text-center">
-                                          <div className="flex items-center justify-center gap-2">
-                                              <button 
-                                                  onClick={(e) => { e.stopPropagation(); navigate(`/partners/${c.id}`); }} 
-                                                  className="text-blue-600 hover:text-blue-800 transition-colors p-1 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                                      <td className="px-5 py-3 text-center"><Badge variant={c.status === 'ACTIVE' ? 'green' : 'outline'}>{c.status}</Badge></td>
+                                      <td className="px-5 py-3 text-center">
+                                          <div className="flex items-center justify-center gap-1.5">
+                                              <button
+                                                  onClick={(e) => { e.stopPropagation(); navigate(`/partners/${c.id}`); }}
+                                                  className="w-8 h-8 flex items-center justify-center rounded-[8px] text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                                                   title="Ver Perfil"
                                               >
-                                                  <Eye className="w-4 h-4" />
+                                                  <Eye className="w-3.5 h-3.5" />
                                               </button>
-                                              <button 
-                                                  onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }} 
-                                                  className="text-gray-300 hover:text-red-500 transition-colors p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                                              <button
+                                                  onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                                                  className="w-8 h-8 flex items-center justify-center rounded-[8px] text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                                   title="Eliminar"
                                               >
-                                                  <Trash2 className="w-4 h-4" />
+                                                  <Trash2 className="w-3.5 h-3.5" />
                                               </button>
                                           </div>
                                       </td>

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Home, Briefcase, Activity, CalendarDays, Calculator, FileText, CheckSquare,
   Users, Rocket, Book, MessageSquareMore, LayoutGrid, Workflow, Settings,
-  X, Sun, Moon, Globe, Megaphone, Target, Sparkles
+  X, Sun, Moon, Globe, Megaphone, Target, Sparkles, HardDrive,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -13,66 +13,73 @@ interface SidebarProps {
   toggleDarkMode: () => void;
 }
 
+const sections = [
+  {
+    title: 'Principal',
+    items: [
+      { path: '/',                   icon: Home,             label: 'Inicio' },
+      { path: '/projects',           icon: Briefcase,        label: 'Clientes' },
+      { path: '/meta-ads',           icon: Target,           label: 'Meta Ads' },
+      { path: '/payments',           icon: CalendarDays,     label: 'Pagos' },
+      { path: '/tasks',              icon: CheckSquare,      label: 'Tareas' },
+      { path: '/content-ideas',      icon: FileText,         label: 'Contenido' },
+    ],
+  },
+  {
+    title: 'Ventas',
+    items: [
+      { path: '/calculator',         icon: Calculator,       label: 'Cotizar' },
+      { path: '/quotations',         icon: FileText,         label: 'Presupuestos' },
+      { path: '/marketing-proposal', icon: Megaphone,        label: 'Propuesta Ads' },
+      { path: '/audit',              icon: Activity,         label: 'Auditoría' },
+    ],
+  },
+  {
+    title: 'Estrategia',
+    items: [
+      { path: '/ai-studio',          icon: Sparkles,         label: 'AI Studio',  ai: true },
+      { path: '/sales-copilot',      icon: MessageSquareMore,label: 'Copiloto IA' },
+      { path: '/lab',                icon: Rocket,           label: 'The Lab' },
+      { path: '/playbooks',          icon: Book,             label: 'Playbooks' },
+    ],
+  },
+  {
+    title: 'Sistema',
+    items: [
+      { path: '/roles',              icon: Users,            label: 'Roles' },
+      { path: '/partners',           icon: Users,            label: 'Equipo' },
+      { path: '/services',           icon: LayoutGrid,       label: 'Catálogo' },
+      { path: '/automations',        icon: Workflow,         label: 'Automations' },
+      { path: '/settings',           icon: Settings,         label: 'Ajustes' },
+    ],
+  },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, toggleDarkMode }) => {
   const location = useLocation();
-  
-  const sections = [
-      {
-          title: "PRINCIPAL",
-          items: [
-              { path: '/', icon: <Home className="w-5 h-5" />, label: 'Inicio', color: 'text-gray-900 dark:text-white' },
-              { path: '/projects', icon: <Briefcase className="w-5 h-5" />, label: 'Clientes', color: 'text-blue-600 dark:text-blue-400' },
-              { path: '/audit', icon: <Activity className="w-5 h-5" />, label: 'Auditoría', color: 'text-red-600 dark:text-red-400' },
-              { path: '/meta-ads', icon: <Target className="w-5 h-5" />, label: 'Meta Ads', color: 'text-blue-600 dark:text-blue-400' },
-              { path: '/payments', icon: <CalendarDays className="w-5 h-5" />, label: 'Pagos', color: 'text-emerald-600 dark:text-emerald-400' },
-              { path: '/calculator', icon: <Calculator className="w-5 h-5" />, label: 'Cotizar', color: 'text-gray-600 dark:text-gray-300' },
-              { path: '/quotations', icon: <FileText className="w-5 h-5" />, label: 'Presupuestos', color: 'text-pink-600 dark:text-pink-400' },
-              { path: '/marketing-proposal', icon: <Megaphone className="w-5 h-5" />, label: 'Propuesta Publicitaria', color: 'text-violet-600 dark:text-violet-400' },
-              { path: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'Tareas', color: 'text-orange-600 dark:text-orange-400' },
-              { path: '/content-ideas', icon: <FileText className="w-5 h-5" />, label: 'Contenido', color: 'text-pink-600 dark:text-pink-400' }, // ✅ ADDED
-              { path: '/roles', icon: <Users className="w-5 h-5" />, label: 'Roles', color: 'text-teal-600 dark:text-teal-400' },
-              { path: '/partners', icon: <Users className="w-5 h-5" />, label: 'Equipo', color: 'text-purple-600 dark:text-purple-400' },
-          ]
-      },
-      {
-          title: "ESTRATEGIA",
-          items: [
-              { path: '/ai-studio', icon: <Sparkles className="w-5 h-5" />, label: 'AI Studio', color: 'text-violet-600 dark:text-violet-400' },
-              { path: '/lab', icon: <Rocket className="w-5 h-5" />, label: 'The Lab', color: 'text-pink-600 dark:text-pink-400' },
-              { path: '/playbooks', icon: <Book className="w-5 h-5" />, label: 'Playbooks', color: 'text-amber-600 dark:text-amber-400' },
-              { path: '/sales-copilot', icon: <MessageSquareMore className="w-5 h-5" />, label: 'Copiloto IA', color: 'text-indigo-600 dark:text-indigo-400' },
-          ]
-      },
-      {
-          title: "SISTEMA",
-          items: [
-              { path: '/services', icon: <LayoutGrid className="w-5 h-5" />, label: 'Catálogo', color: 'text-gray-600 dark:text-gray-400' },
-              { path: '/automations', icon: <Workflow className="w-5 h-5" />, label: 'Automations', color: 'text-purple-600 dark:text-purple-400' },
-              { path: '/settings', icon: <Settings className="w-5 h-5" />, label: 'Ajustes', color: 'text-gray-600 dark:text-gray-400' },
-          ]
-      }
-  ];
 
-  const NavItem: React.FC<{ path: string, icon: React.ReactNode, label: string, color: string }> = ({ path, icon, label, color }) => {
-    const isActive = location.pathname === path || (path === '/projects' && location.pathname.includes('/projects/'));
-    const isAI = path === '/ai-studio';
+  const NavItem = ({ path, icon: Icon, label, ai }: {
+    path: string; icon: any; label: string; ai?: boolean;
+  }) => {
+    const isActive = location.pathname === path
+      || (path === '/projects' && location.pathname.startsWith('/projects/'));
 
-    if (isAI) {
+    if (ai) {
       return (
         <Link
           to={path}
           onClick={() => window.innerWidth < 768 && setIsOpen(false)}
-          className={`flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all duration-200 relative overflow-hidden ${
+          className={`group flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
             isActive
-              ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30'
-              : 'bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-900/20 dark:to-indigo-900/20 text-violet-700 dark:text-violet-300 hover:from-violet-100 hover:to-indigo-100 border border-violet-100 dark:border-violet-800/50'
+              ? 'bg-gradient-to-r from-violet-500 to-indigo-500 text-white shadow-[0_2px_8px_rgba(124,58,237,0.35)]'
+              : 'text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10'
           }`}
         >
-          <span>{icon}</span>
-          {label}
-          <span className={`ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-300'}`}>
-            CLAUDE
-          </span>
+          <Icon className="w-[15px] h-[15px] flex-shrink-0" />
+          <span className="flex-1 tracking-[-0.01em]">{label}</span>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-wide ${
+            isActive ? 'bg-white/20 text-white' : 'bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400'
+          }`}>AI</span>
         </Link>
       );
     }
@@ -81,87 +88,122 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, darkMode, t
       <Link
         to={path}
         onClick={() => window.innerWidth < 768 && setIsOpen(false)}
-        className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group relative ${
+        className={`group flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
           isActive
-          ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/20 dark:shadow-white/10'
-          : 'text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
+            ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+            : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
         }`}
       >
-        <span className={isActive ? 'text-white dark:text-black' : color}>{icon}</span>
-        {label}
-        {isActive && <div className="absolute right-3 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>}
+        <Icon className={`w-[15px] h-[15px] flex-shrink-0 transition-none ${
+          isActive ? 'text-white dark:text-zinc-900' : 'text-zinc-400 dark:text-zinc-500 group-hover:text-zinc-600 dark:group-hover:text-zinc-300'
+        }`} />
+        <span className="tracking-[-0.01em]">{label}</span>
       </Link>
     );
   };
 
   return (
     <>
+      {/* Mobile backdrop */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden" 
+        <div
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsOpen(false)}
         />
       )}
-      
+
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-gray-50/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-gray-200 dark:border-slate-800 transform transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none
-        md:translate-x-0 md:static md:h-screen flex flex-col
+        fixed inset-y-0 left-0 z-50 w-[220px]
+        bg-white/90 dark:bg-[#161618]/95
+        backdrop-blur-2xl
+        border-r border-black/[0.06] dark:border-white/[0.05]
+        flex flex-col
+        transform transition-transform duration-300 ease-in-out
+        md:translate-x-0 md:static md:h-screen
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="h-20 flex items-center px-8 border-b border-gray-100 dark:border-slate-800">
-          <img src="/logo.png" alt="Algoritmia Logo" className="w-8 h-8 mr-3 object-contain" />
-          <div>
-            <span className="font-bold text-lg tracking-tight block leading-none text-gray-900 dark:text-white">Algoritmia</span>
-            <span className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">2026</span>
+
+        {/* Logo */}
+        <div className="h-[60px] flex items-center px-5 border-b border-black/[0.05] dark:border-white/[0.04] flex-shrink-0">
+          <div className="w-7 h-7 rounded-[8px] bg-zinc-900 dark:bg-white flex items-center justify-center flex-shrink-0 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
+            <span className="text-white dark:text-zinc-900 text-[11px] font-bold tracking-tight">A</span>
           </div>
-          <button className="ml-auto md:hidden text-gray-500 dark:text-gray-400 p-1 hover:bg-gray-200 rounded-md" onClick={() => setIsOpen(false)}>
-            <X className="w-5 h-5" />
+          <div className="ml-3 flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-zinc-900 dark:text-white tracking-[-0.02em] leading-none">Algoritmia</p>
+            <p className="text-[10px] text-zinc-400 dark:text-zinc-600 font-medium mt-0.5 tracking-wider">OS · 2026</p>
+          </div>
+          <button
+            className="md:hidden p-1.5 rounded-[6px] text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+            onClick={() => setIsOpen(false)}
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <nav className="p-6 space-y-8 flex-1 overflow-y-auto custom-scrollbar">
-          {sections.map((section, idx) => (
-              <div key={idx}>
-                  <p className="px-4 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-2">{section.title}</p>
-                  <div className="space-y-1">
-                      {section.items.map(link => <NavItem key={link.path} {...link} />)}
-                  </div>
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5">
+          {sections.map((section) => (
+            <div key={section.title}>
+              <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.08em] px-3 mb-1">
+                {section.title}
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map(item => (
+                  <NavItem key={item.path} {...item} />
+                ))}
               </div>
+            </div>
           ))}
-          
-          <div className="pt-6 border-t border-gray-200/50 dark:border-slate-800 space-y-1">
-             <p className="px-4 text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-widest mb-3">Accesos Directos</p>
-             
-             <a href="https://algoritmiadesarrollos.com.ar/" target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 font-medium hover:text-black dark:hover:text-white transition-colors hover:bg-gray-100/50 dark:hover:bg-slate-800 rounded-lg">
-                <Globe className="w-4 h-4 text-indigo-500" /> Mi Web
-             </a>
-             
-             <a href="https://drive.google.com/drive/u/0/my-drive" target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-600 dark:text-gray-300 font-medium hover:text-black dark:hover:text-white transition-colors hover:bg-gray-100/50 dark:hover:bg-slate-800 rounded-lg">
-                <div className="w-2 h-2 rounded-full bg-green-500 ml-1 mr-1"></div> Google Drive
-             </a>
+
+          {/* Shortcuts */}
+          <div className="border-t border-black/[0.05] dark:border-white/[0.04] pt-4">
+            <p className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.08em] px-3 mb-1">
+              Accesos
+            </p>
+            <div className="space-y-0.5">
+              <a
+                href="https://algoritmiadesarrollos.com.ar/"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] font-medium text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-all duration-150"
+              >
+                <Globe className="w-[15px] h-[15px] text-zinc-400 dark:text-zinc-600" />
+                <span className="tracking-[-0.01em]">Mi Web</span>
+              </a>
+              <a
+                href="https://drive.google.com/drive/u/0/my-drive"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] font-medium text-zinc-500 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] transition-all duration-150"
+              >
+                <HardDrive className="w-[15px] h-[15px] text-zinc-400 dark:text-zinc-600" />
+                <span className="tracking-[-0.01em]">Google Drive</span>
+              </a>
+            </div>
           </div>
         </nav>
 
-        <div className="p-6 border-t border-gray-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50">
-          <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center text-xs font-bold shadow-md">
-                  LU
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">Luca</p>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Admin</p>
-                  </div>
-                </div>
+        {/* Footer */}
+        <div className="flex-shrink-0 px-3 py-3 border-t border-black/[0.05] dark:border-white/[0.04]">
+          <div className="flex items-center gap-2.5 px-2">
+            <div className="w-8 h-8 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center text-[11px] font-bold flex-shrink-0 shadow-[0_1px_4px_rgba(0,0,0,0.15)]">
+              LU
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-zinc-900 dark:text-white tracking-[-0.01em] leading-none">Luca</p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500 font-medium">Admin</p>
               </div>
-              <button 
-                onClick={toggleDarkMode}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                  {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
-              </button>
+            </div>
+            <button
+              onClick={toggleDarkMode}
+              className="p-1.5 rounded-[7px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/[0.08] transition-all flex-shrink-0"
+            >
+              {darkMode
+                ? <Sun className="w-4 h-4 text-amber-400" />
+                : <Moon className="w-4 h-4" />}
+            </button>
           </div>
         </div>
       </aside>

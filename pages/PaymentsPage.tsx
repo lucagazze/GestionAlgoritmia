@@ -702,98 +702,95 @@ export default function PaymentsPage() {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-500 pb-20 h-full flex flex-col">
-            
-            {/* Header & View Switcher */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">Finanzas</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Control de caja y proyecciones.</p>
-                </div>
-                
-                
-                <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-xl flex">
-                    <button 
-                        onClick={() => handleOpenManualTransaction('IN')} 
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-all mr-2 shadow-lg"
-                    >
-                        <DollarSign className="w-4 h-4" /> Registrar Transacción
-                    </button>
+        <div className="space-y-5 pb-20 h-full flex flex-col">
 
-                    <button 
-                        onClick={() => setViewMode('CALENDAR')} 
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'CALENDAR' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white">Finanzas</h1>
+                    <p className="text-[14px] text-zinc-400 dark:text-zinc-500 mt-0.5 font-medium">Control de caja y proyecciones.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => handleOpenManualTransaction('IN')}
+                        className="flex items-center gap-2 h-10 px-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.15)] hover:bg-black dark:hover:bg-zinc-100 active:scale-[0.97] transition-all"
                     >
-                        <CalendarRange className="w-4 h-4" />
+                        <DollarSign className="w-3.5 h-3.5" /> Registrar
                     </button>
-                    <button 
-                        onClick={() => setViewMode('FORECAST')} 
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'FORECAST' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                    >
-                        <TrendingUp className="w-4 h-4" /> 
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('HISTORY')} 
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow text-black dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
-                    >
-                        <History className="w-4 h-4" /> 
-                    </button>
+                    <div className="bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] flex gap-0.5">
+                        {([
+                            { id: 'CALENDAR', icon: CalendarRange },
+                            { id: 'FORECAST', icon: TrendingUp },
+                            { id: 'HISTORY',  icon: History },
+                        ] as const).map(({ id, icon: Icon }) => (
+                            <button key={id} onClick={() => setViewMode(id)}
+                                className={`p-2 rounded-[8px] transition-all ${viewMode === id ? 'bg-white dark:bg-zinc-700 shadow-[0_1px_3px_rgba(0,0,0,0.1)] text-zinc-900 dark:text-white' : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'}`}>
+                                <Icon className="w-4 h-4" />
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
             {/* --- VIEW: CALENDAR --- */}
             {viewMode === 'CALENDAR' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-left-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card className="p-4 flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-900">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-full text-emerald-600 dark:text-emerald-400"><TrendingUp className="w-5 h-5"/></div>
-                            <div>
-                                <p className="text-xs text-emerald-800 dark:text-emerald-300 font-bold uppercase">Entradas (Mes)</p>
-                                <p className="text-lg font-bold text-emerald-900 dark:text-emerald-100">{formatMoney(totalInUSD, 'USD')}</p>
-                                {totalInARS > 0 && <p className="text-sm font-bold text-emerald-700 dark:text-emerald-200">{formatMoney(totalInARS, 'ARS')}</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                            <div className="w-9 h-9 rounded-[10px] bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center flex-shrink-0">
+                                <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400"/>
                             </div>
-                        </Card>
-                        <Card className="p-4 flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900">
-                            <div className="p-2 bg-red-100 dark:bg-red-900 rounded-full text-red-600 dark:text-red-400"><TrendingDown className="w-5 h-5"/></div>
                             <div>
-                                <p className="text-xs text-red-800 dark:text-red-300 font-bold uppercase">Salidas (Mes)</p>
-                                <p className="text-lg font-bold text-red-900 dark:text-red-100">{formatMoney(totalOutUSD, 'USD')}</p>
-                                {totalOutARS > 0 && <p className="text-sm font-bold text-red-700 dark:text-red-200">{formatMoney(totalOutARS, 'ARS')}</p>}
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-400">Entradas (Mes)</p>
+                                <p className="text-[17px] font-bold text-zinc-900 dark:text-white tracking-[-0.02em]">{formatMoney(totalInUSD, 'USD')}</p>
+                                {totalInARS > 0 && <p className="text-[12px] font-semibold text-zinc-500">{formatMoney(totalInARS, 'ARS')}</p>}
                             </div>
-                        </Card>
-                        <Card className="p-4 flex items-center gap-3 bg-gray-900 dark:bg-white text-white dark:text-black border-gray-800">
-                            <div className="p-2 bg-gray-700 dark:bg-gray-200 rounded-full text-white dark:text-black"><Wallet className="w-5 h-5"/></div>
+                        </div>
+                        <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl p-4 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                            <div className="w-9 h-9 rounded-[10px] bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                                <TrendingDown className="w-4 h-4 text-red-500 dark:text-red-400"/>
+                            </div>
                             <div>
-                                <p className="text-xs text-gray-400 dark:text-gray-600 font-bold uppercase">Neto Estimado</p>
-                                <p className="text-lg font-bold">{formatMoney(netUSD, 'USD')}</p>
-                                {netARS !== 0 && <p className="text-sm font-bold">{formatMoney(netARS, 'ARS')}</p>}
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-400">Salidas (Mes)</p>
+                                <p className="text-[17px] font-bold text-zinc-900 dark:text-white tracking-[-0.02em]">{formatMoney(totalOutUSD, 'USD')}</p>
+                                {totalOutARS > 0 && <p className="text-[12px] font-semibold text-zinc-500">{formatMoney(totalOutARS, 'ARS')}</p>}
                             </div>
-                        </Card>
+                        </div>
+                        <div className="bg-zinc-900 dark:bg-white border border-zinc-900 dark:border-zinc-200 rounded-2xl p-4 flex items-center gap-3 shadow-[0_1px_3px_rgba(0,0,0,0.15)]">
+                            <div className="w-9 h-9 rounded-[10px] bg-white/10 dark:bg-zinc-100 flex items-center justify-center flex-shrink-0">
+                                <Wallet className="w-4 h-4 text-white dark:text-zinc-900"/>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-zinc-400 dark:text-zinc-500">Neto Estimado</p>
+                                <p className="text-[17px] font-bold text-white dark:text-zinc-900 tracking-[-0.02em]">{formatMoney(netUSD, 'USD')}</p>
+                                {netARS !== 0 && <p className="text-[12px] font-semibold text-zinc-400 dark:text-zinc-600">{formatMoney(netARS, 'ARS')}</p>}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col">
-                        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-slate-800">
-                            <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d); }} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-600 dark:text-gray-400"><ChevronLeft className="w-5 h-5"/></button>
-                            <h2 className="text-lg font-bold capitalize text-gray-900 dark:text-white">{referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
-                            <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d); }} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-gray-600 dark:text-gray-400"><ChevronRight className="w-5 h-5"/></button>
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex flex-col">
+                        <div className="flex justify-between items-center p-3 border-b border-zinc-100 dark:border-zinc-800">
+                            <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()-1); setReferenceDate(d); }} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] text-zinc-500 transition-colors"><ChevronLeft className="w-4 h-4"/></button>
+                            <h2 className="text-[15px] font-semibold capitalize text-zinc-900 dark:text-white tracking-[-0.02em]">{referenceDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h2>
+                            <button onClick={() => { const d = new Date(referenceDate); d.setMonth(d.getMonth()+1); setReferenceDate(d); }} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-[8px] text-zinc-500 transition-colors"><ChevronRight className="w-4 h-4"/></button>
                         </div>
-                        
-                        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800/50">
+
+                        <div className="grid grid-cols-7 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
                             {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-                                <div key={d} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">{d}</div>
+                                <div key={d} className="py-2.5 text-center text-[10px] font-semibold text-zinc-400 uppercase tracking-[0.06em]">{d}</div>
                             ))}
                         </div>
-                        
-                        <div className="grid grid-cols-7 bg-gray-100 dark:bg-slate-800 gap-px">
+
+                        <div className="grid grid-cols-7 bg-zinc-100 dark:bg-zinc-800 gap-px">
                             {daysArray.map((date, i) => {
-                                if (!date) return <div key={i} className="bg-gray-50/50 dark:bg-slate-900/50"></div>;
-                                
+                                if (!date) return <div key={i} className="bg-zinc-50/50 dark:bg-zinc-900/50"></div>;
+
                                 const isToday = new Date().toDateString() === date.toDateString();
                                 const events = getEventsForDate(date);
 
                                 return (
-                                    <div key={i} className={`bg-white dark:bg-slate-900 p-2 flex flex-col gap-1 min-h-[100px] ${isToday ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}>
-                                        <span className={`text-xs font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-black dark:bg-white text-white dark:text-black' : 'text-gray-400'}`}>
+                                    <div key={i} className={`bg-white dark:bg-zinc-900 p-2 flex flex-col gap-1 min-h-[100px] ${isToday ? 'bg-zinc-50 dark:bg-zinc-800/40' : ''}`}>
+                                        <span className={`text-[11px] font-bold mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900' : 'text-zinc-400'}`}>
                                             {date.getDate()}
                                         </span>
                                         
@@ -803,8 +800,8 @@ export default function PaymentsPage() {
                                                 let colorClass = '';
 
                                                 if (evt.cancelled) {
-                                                    // CANCELLED: Muted purple/slate with strikethrough
-                                                    colorClass = 'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 opacity-60 line-through';
+                                                    // CANCELLED: Muted with strikethrough
+                                                    colorClass = 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 opacity-60 line-through';
                                                 } else if (evt.type === 'IN') {
                                                     if (evt.paid) {
                                                         // Check if PARTIAL or FULL payment
@@ -827,8 +824,8 @@ export default function PaymentsPage() {
                                                             // OVERDUE: Red
                                                             colorClass = 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800';
                                                         } else {
-                                                            // PENDING: Gray
-                                                            colorClass = 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-slate-700';
+                                                            // PENDING: Zinc
+                                                            colorClass = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700';
                                                         }
                                                     }
                                                 } else {
@@ -887,28 +884,28 @@ export default function PaymentsPage() {
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {forecastData.map((month, idx) => (
-                            <Card key={idx} className={`p-6 border-t-4 ${idx === 0 ? 'border-t-black dark:border-t-white' : 'border-t-gray-200 dark:border-t-slate-700'} relative overflow-hidden`}>
+                            <Card key={idx} className={`p-6 border-t-4 ${idx === 0 ? 'border-t-black dark:border-t-white' : 'border-t-zinc-200 dark:border-t-zinc-700'} relative overflow-hidden`}>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-bold text-lg capitalize text-gray-900 dark:text-white">{month.name}</h3>
+                                    <h3 className="font-bold text-lg capitalize text-zinc-900 dark:text-white">{month.name}</h3>
                                     {idx === 0 && <span className="text-[10px] font-bold bg-black text-white px-2 py-1 rounded">ACTUAL</span>}
                                 </div>
                                 <div className="space-y-3">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Ingresos</span>
+                                        <span className="text-zinc-500">Ingresos</span>
                                         <div className="text-right">
                                             <span className="font-bold text-green-600">+{formatMoney(month.ingresosUSD, 'USD')}</span>
                                             {month.ingresosARS > 0 && <div className="font-bold text-green-600 text-xs">+{formatMoney(month.ingresosARS, 'ARS')}</div>}
                                         </div>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Gastos Fijos</span>
+                                        <span className="text-zinc-500">Gastos Fijos</span>
                                         <div className="text-right">
                                             <span className="font-bold text-red-600">-{formatMoney(month.gastosUSD, 'USD')}</span>
                                             {month.gastosARS > 0 && <div className="font-bold text-red-600 text-xs">-{formatMoney(month.gastosARS, 'ARS')}</div>}
                                         </div>
                                     </div>
-                                    <div className="pt-3 border-t border-gray-100 dark:border-slate-800 flex justify-between items-center">
-                                        <span className="font-bold text-gray-900 dark:text-white">Flujo Neto</span>
+                                    <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                                        <span className="font-bold text-zinc-900 dark:text-white">Flujo Neto</span>
                                         <div className="text-right">
                                             <span className={`text-xl font-bold ${month.netoUSD >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600'}`}>
                                                 {formatMoney(month.netoUSD, 'USD')}
@@ -926,7 +923,7 @@ export default function PaymentsPage() {
                     </div>
 
                     <Card className="p-6 h-[400px] flex flex-col">
-                        <h3 className="font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2 shrink-0">
+                        <h3 className="font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-2 shrink-0">
                             <BarChart3 className="w-5 h-5"/> Tendencia de Liquidez (3 Meses)
                         </h3>
                         <div className="w-full flex-1 min-h-0 min-w-0">
@@ -955,29 +952,29 @@ export default function PaymentsPage() {
             {viewMode === 'HISTORY' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                     <Card className="p-6">
-                        <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                        <h2 className="text-xl font-bold mb-6 text-zinc-900 dark:text-white flex items-center gap-2">
                              <History className="w-5 h-5"/> Historial de Transacciones
                         </h2>
                         
                         {payments.length === 0 ? (
-                            <p className="text-gray-500 text-center py-10">No hay pagos registrados aún.</p>
+                            <p className="text-zinc-500 text-center py-10">No hay pagos registrados aún.</p>
                         ) : (
                             <div className="space-y-3">
                                 {payments.map((payment) => (
                                     <div 
                                         key={payment.id} 
                                         onClick={() => { setSelectedPayment(payment); setIsDetailModalOpen(true); }}
-                                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex justify-between items-center group"
+                                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 flex justify-between items-center group"
                                     >
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                                                 <DollarSign className="w-5 h-5"/>
                                             </div>
                                             <div>
-                                                <h4 className="font-bold text-gray-900 dark:text-white">
+                                                <h4 className="font-bold text-zinc-900 dark:text-white">
                                                     {payment.client?.name || 'Cliente'}
                                                 </h4>
-                                                <p className="text-xs text-gray-500">
+                                                <p className="text-xs text-zinc-500">
                                                     {new Date(payment.date).toLocaleDateString()}
                                                 </p>
                                             </div>
@@ -990,7 +987,7 @@ export default function PaymentsPage() {
                                                 </p>
                                                 <Badge variant="outline" className="text-[10px]">PAGADO</Badge>
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                                            <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-500 transition-colors" />
                                         </div>
                                     </div>
                                 ))}
@@ -1007,14 +1004,14 @@ export default function PaymentsPage() {
              <Modal isOpen={isPaymentDetailModalOpen} onClose={() => setIsPaymentDetailModalOpen(false)} title="Detalle del Pago">
                 {selectedPaymentDetail && (
                     <div className="space-y-6">
-                        <div className="bg-gray-50 dark:bg-slate-900 p-4 rounded-xl text-center">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{selectedPaymentDetail.label}</h3>
-                            <p className="text-sm text-gray-500">{new Date(selectedPaymentDetail.date || new Date()).toLocaleDateString()}</p>
+                        <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-xl text-center">
+                            <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{selectedPaymentDetail.label}</h3>
+                            <p className="text-sm text-zinc-500">{new Date(selectedPaymentDetail.date || new Date()).toLocaleDateString()}</p>
                             <p className="text-3xl font-black text-indigo-600 mt-2">{formatMoney(selectedPaymentDetail.amount, selectedPaymentDetail.currency || 'ARS')}</p>
                             
                             {/* DESCRIPTION / NOTES */}
                             {(selectedPaymentDetail.notes || selectedPaymentDetail.description) && (
-                                <div className="mt-3 p-2 bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700 text-sm text-gray-600 dark:text-gray-300 italic">
+                                <div className="mt-3 p-2 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-100 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 italic">
                                     "{selectedPaymentDetail.notes || selectedPaymentDetail.description}"
                                 </div>
                             )}
@@ -1030,15 +1027,15 @@ export default function PaymentsPage() {
                             <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
                                 <div className="flex items-center gap-2 mb-3">
                                     <DollarSign className="w-5 h-5 text-yellow-600" />
-                                    <h4 className="font-bold text-gray-900 dark:text-white">Pago Parcial</h4>
+                                    <h4 className="font-bold text-zinc-900 dark:text-white">Pago Parcial</h4>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
-                                        <p className="text-xs text-gray-500 mb-1">Pagado</p>
+                                    <div className="bg-white dark:bg-zinc-800 p-3 rounded-lg">
+                                        <p className="text-xs text-zinc-500 mb-1">Pagado</p>
                                         <p className="text-xl font-bold text-green-600">{formatMoney(selectedPaymentDetail.paymentAmount, selectedPaymentDetail.currency || 'ARS')}</p>
                                     </div>
-                                    <div className="bg-white dark:bg-slate-800 p-3 rounded-lg">
-                                        <p className="text-xs text-gray-500 mb-1">Falta</p>
+                                    <div className="bg-white dark:bg-zinc-800 p-3 rounded-lg">
+                                        <p className="text-xs text-zinc-500 mb-1">Falta</p>
                                         <p className="text-xl font-bold text-red-600">{formatMoney(selectedPaymentDetail.amount - selectedPaymentDetail.paymentAmount, selectedPaymentDetail.currency || 'ARS')}</p>
                                     </div>
                                 </div>
@@ -1054,14 +1051,14 @@ export default function PaymentsPage() {
                                     <Label className="mb-2 block font-bold">Servicios Incluidos</Label>
                                     <div className="space-y-2">
                                         {activeProposalDetails.items?.map((item: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                            <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-indigo-600">
                                                         <Briefcase className="w-4 h-4"/>
                                                     </div>
                                                     <div>
-                                                        <p className="font-bold text-gray-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
-                                                        {item.serviceSnapshotDescription && <p className="text-xs text-gray-500">{item.serviceSnapshotDescription}</p>}
+                                                        <p className="font-bold text-zinc-900 dark:text-white text-sm">{item.serviceSnapshotName}</p>
+                                                        {item.serviceSnapshotDescription && <p className="text-xs text-zinc-500">{item.serviceSnapshotDescription}</p>}
                                                     </div>
                                                 </div>
                                                 {/* Optional: Show cost if you want to be transparent, or hide it if it's internal */}
@@ -1078,7 +1075,7 @@ export default function PaymentsPage() {
                                             <div className="flex items-center gap-3">
                                                 <Briefcase className="w-5 h-5 text-emerald-600"/>
                                                 <div>
-                                                    <p className="font-bold text-gray-900 dark:text-white">Agencia (Tú)</p>
+                                                    <p className="font-bold text-zinc-900 dark:text-white">Agencia (Tú)</p>
                                                     <p className="text-xs text-emerald-600 font-bold">Ganancia Neta</p>
                                                 </div>
                                             </div>
@@ -1091,12 +1088,12 @@ export default function PaymentsPage() {
                                         {activeProposalDetails.items?.filter((i: any) => i.outsourcingCost > 0).map((item: any, idx: number) => {
                                             const partnerName = item.contractor?.name || 'Socio';
                                             return (
-                                                <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                                                <div key={idx} className="flex justify-between items-center p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                                     <div className="flex items-center gap-3">
                                                         <User className="w-5 h-5 text-indigo-600"/>
                                                         <div>
-                                                            <p className="font-bold text-gray-900 dark:text-white">{partnerName}</p>
-                                                            <p className="text-xs text-gray-500">{item.serviceSnapshotName}</p>
+                                                            <p className="font-bold text-zinc-900 dark:text-white">{partnerName}</p>
+                                                            <p className="text-xs text-zinc-500">{item.serviceSnapshotName}</p>
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -1126,13 +1123,13 @@ export default function PaymentsPage() {
                                         })}
                                         
                                         {(!activeProposalDetails.items?.some((i: any) => i.outsourcingCost > 0)) && (
-                                            <p className="text-center text-sm text-gray-400 py-2">Sin costos de socios asociados.</p>
+                                            <p className="text-center text-sm text-zinc-400 py-2">Sin costos de socios asociados.</p>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="text-center py-4 text-gray-500">
+                            <div className="text-center py-4 text-zinc-500">
                                 <p>No se encontraron detalles del contrato activo.</p>
                             </div>
                         )}
@@ -1147,12 +1144,12 @@ export default function PaymentsPage() {
             {/* NEW: Context Menu (Restored) */}
             {contextMenu && (
                 <div 
-                    className="fixed z-50 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-200 dark:border-slate-700 py-1 w-48 animate-in fade-in zoom-in-95 duration-100"
+                    className="fixed z-50 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 py-1 w-48 animate-in fade-in zoom-in-95 duration-100"
                     style={{ top: contextMenu.y, left: contextMenu.x }}
                 >
-                    <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700 mb-1">
-                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{contextMenu.event.label}</p>
-                        <p className="text-[10px] text-gray-500">Acciones</p>
+                    <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-700 mb-1">
+                        <p className="text-xs font-bold text-zinc-900 dark:text-white truncate">{contextMenu.event.label}</p>
+                        <p className="text-[10px] text-zinc-500">Acciones</p>
                     </div>
                     
                     {contextMenu.event.type === 'IN' && (
@@ -1163,15 +1160,15 @@ export default function PaymentsPage() {
                             <button onClick={() => handleMarkAsPaid('PARTIAL')} className="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 flex items-center gap-2">
                                 <DollarSign className="w-4 h-4" /> Pagó Parcial...
                             </button>
-                            <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                            <div className="border-t border-zinc-100 dark:border-zinc-700 my-1"></div>
                         </>
                     )}
 
                     {/* Won't Pay - show for any projected (unpaid) event */}
                     {!contextMenu.event.paid && (
                         <>
-                            <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
-                            <button onClick={handleMarkWontPay} className="w-full text-left px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-2">
+                            <div className="border-t border-zinc-100 dark:border-zinc-700 my-1"></div>
+                            <button onClick={handleMarkWontPay} className="w-full text-left px-4 py-2 text-sm text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 flex items-center gap-2">
                                 <Ban className="w-4 h-4" /> No se va a pagar
                             </button>
                         </>
@@ -1182,7 +1179,7 @@ export default function PaymentsPage() {
                             <button onClick={openContractorPaymentModal} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-2">
                                 <DollarSign className="w-4 h-4" /> Registrar Pago Socio
                             </button>
-                             <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                             <div className="border-t border-zinc-100 dark:border-zinc-700 my-1"></div>
                         </>
                     )}
                     
@@ -1220,7 +1217,7 @@ export default function PaymentsPage() {
                             autoFocus
                         />
                          {selectedEventForPayment && (
-                            <p className="text-xs text-gray-500 mt-1">Total esperado: {formatMoney(selectedEventForPayment.amount, selectedEventForPayment.currency || 'ARS')}</p>
+                            <p className="text-xs text-zinc-500 mt-1">Total esperado: {formatMoney(selectedEventForPayment.amount, selectedEventForPayment.currency || 'ARS')}</p>
                         )}
                     </div>
                     <div className="flex justify-end gap-2">
@@ -1275,9 +1272,9 @@ export default function PaymentsPage() {
                             onChange={(e) => setContractorPaymentAmount(e.target.value)} 
                         />
                     </div>
-                    <div className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg">
-                        <p className="text-xs text-gray-500">Proyecto Asociado</p>
-                        <p className="font-bold text-gray-900 dark:text-white">
+                    <div className="bg-zinc-50 dark:bg-zinc-800 p-3 rounded-lg">
+                        <p className="text-xs text-zinc-500">Proyecto Asociado</p>
+                        <p className="font-bold text-zinc-900 dark:text-white">
                             {projects.find(p => p.id === selectedEventForPayment?.projectId)?.name || 'Desconocido'}
                         </p>
                     </div>
@@ -1296,13 +1293,13 @@ export default function PaymentsPage() {
                     <div className="flex gap-2 mb-4">
                         <button 
                             onClick={() => setManualType('IN')}
-                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'IN' ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-500 text-emerald-700 dark:text-emerald-300' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'}`}
+                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'IN' ? 'bg-emerald-100 dark:bg-emerald-900 border-emerald-500 text-emerald-700 dark:text-emerald-300' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}
                         >
                             Ingreso (Cobro)
                         </button>
                         <button 
                             onClick={() => setManualType('OUT')}
-                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'OUT' ? 'bg-red-100 dark:bg-red-900 border-red-500 text-red-700 dark:text-red-300' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700'}`}
+                            className={`flex-1 py-2 px-4 rounded-lg font-bold border ${manualType === 'OUT' ? 'bg-red-100 dark:bg-red-900 border-red-500 text-red-700 dark:text-red-300' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'}`}
                         >
                             Salida (Pago)
                         </button>
@@ -1351,7 +1348,7 @@ export default function PaymentsPage() {
                         />
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-slate-800">
+                    <div className="flex justify-end gap-2 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                         <Button variant="ghost" onClick={() => setIsManualTransactionModalOpen(false)}>Cancelar</Button>
                         <Button onClick={submitManualTransaction} disabled={!manualEntityId || !manualAmount}>
                              Guardar Transacción

@@ -48,7 +48,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, isOpen, onClose,
         <div 
             ref={menuRef}
             style={{ top: adjustedY, left: adjustedX }}
-            className="absolute bg-white/95 backdrop-blur-xl border border-gray-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
+            className="absolute bg-white/95 backdrop-blur-xl border border-zinc-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
         >
             {items.map((item, idx) => {
                 const Icon = item.icon;
@@ -65,7 +65,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, isOpen, onClose,
                         className={`w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 transition-colors
                             ${item.variant === 'destructive' 
                                 ? 'text-red-600 hover:bg-red-50' 
-                                : 'text-gray-700 hover:bg-black hover:text-white'
+                                : 'text-zinc-700 hover:bg-black hover:text-white'
                             }
                         `}
                     >

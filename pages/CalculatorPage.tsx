@@ -987,7 +987,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
     }
   };
 
-  if (isLoading) return <div className="flex h-screen items-center justify-center text-gray-400"><Loader2 className="animate-spin w-8 h-8 mr-2" /> Cargando Sistema...</div>;
+  if (isLoading) return <div className="flex h-screen items-center justify-center text-zinc-400"><Loader2 className="animate-spin w-8 h-8 mr-2" /> Cargando Sistema...</div>;
 
   return (
     <div className="pb-20 animate-in fade-in duration-500 max-w-5xl mx-auto">
@@ -995,8 +995,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       {/* HEADER WITH TOGGLE */}
       <div className="mb-6 mt-2 flex items-center justify-between px-2">
           <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Cotizador</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Generador de presupuestos High-Ticket.</p>
+              <h1 className="text-2xl md:text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white">Cotizador</h1>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Generador de presupuestos High-Ticket.</p>
           </div>
           
           {/* Si estamos viendo una propuesta cargada, mostrar botón de cerrar */}
@@ -1005,16 +1005,16 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                   <X className="w-4 h-4 mr-2"/> Cerrar Propuesta
               </Button>
           ) : (
-              <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+              <div className="flex bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                   <button 
                     onClick={handleNewProposal} 
-                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'CALCULATOR' ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'CALCULATOR' ? 'bg-white dark:bg-zinc-700 shadow-sm text-black dark:text-white' : 'text-zinc-500 hover:text-zinc-700'}`}
                   >
                     Generador
                   </button>
                   <button 
                     onClick={() => {setViewMode('HISTORY'); handleRefreshHistory();}} 
-                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-slate-700 shadow-sm text-black dark:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${viewMode === 'HISTORY' ? 'bg-white dark:bg-zinc-700 shadow-sm text-black dark:text-white' : 'text-zinc-500 hover:text-zinc-700'}`}
                   >
                     Historial
                   </button>
@@ -1025,14 +1025,14 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       {viewMode === 'HISTORY' ? (
            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                {/* FILTERS */}
-               <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm">
+               <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
                    <div className="flex-1">
                        <Label>Buscar Cliente</Label>
                        <Input 
                            placeholder="Nombre del cliente..." 
                            value={searchTerm}
                            onChange={e => setSearchTerm(e.target.value)}
-                           className="bg-gray-50 dark:bg-slate-950"
+                           className="bg-zinc-50 dark:bg-zinc-950"
                        />
                    </div>
                    <div className="w-full md:w-48">
@@ -1041,25 +1041,25 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                            type="month" 
                            value={filterMonth}
                            onChange={e => setFilterMonth(e.target.value)}
-                           className="bg-gray-50 dark:bg-slate-950"
+                           className="bg-zinc-50 dark:bg-zinc-950"
                        />
                    </div>
                    <div className="flex items-end">
-                        <Button variant="ghost" onClick={() => {setSearchTerm(''); setFilterMonth('');}} className="text-gray-400 hover:text-gray-600">
+                        <Button variant="ghost" onClick={() => {setSearchTerm(''); setFilterMonth('');}} className="text-zinc-400 hover:text-zinc-600">
                             Limpiar
                         </Button>
                    </div>
                </div>
 
                {filteredProposals.length === 0 ? (
-                   <div className="text-center py-20 bg-gray-50 dark:bg-slate-900 rounded-3xl border border-dashed border-gray-200 dark:border-slate-800">
-                       <p className="text-gray-400 font-medium">No se encontraron cotizaciones.</p>
+                   <div className="text-center py-20 bg-zinc-50 dark:bg-zinc-900 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                       <p className="text-zinc-400 font-medium">No se encontraron cotizaciones.</p>
                        <Button variant="ghost" onClick={handleNewProposal}>Crear Nueva</Button>
                    </div>
                ) : (
-                   <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                   <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
                        <table className="w-full text-sm text-left">
-                           <thead className="bg-gray-50 dark:bg-slate-950 text-gray-500 uppercase font-bold text-xs">
+                           <thead className="bg-zinc-50 dark:bg-zinc-950 text-zinc-500 uppercase font-bold text-xs">
                                <tr>
                                    <th className="px-6 py-4">Fecha</th>
                                    <th className="px-6 py-4">Cliente</th>
@@ -1069,25 +1069,25 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                    <th className="px-6 py-4 text-center">Acciones</th>
                                </tr>
                            </thead>
-                           <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                                {filteredProposals.map(p => (
-                                   <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group cursor-pointer" onClick={() => handleLoadProposal(p)}>
-                                       <td className="px-6 py-4 text-gray-500 whitespace-nowrap">
+                                   <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group cursor-pointer" onClick={() => handleLoadProposal(p)}>
+                                       <td className="px-6 py-4 text-zinc-500 whitespace-nowrap">
                                            {new Date(p.createdAt).toLocaleDateString()}
                                        </td>
-                                       <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                                       <td className="px-6 py-4 font-medium text-zinc-900 dark:text-white">
                                            <div>{p.client?.name || 'Cliente sin nombre'}</div>
-                                           <div className="text-xs text-gray-400 font-normal">{p.client?.industry}</div>
+                                           <div className="text-xs text-zinc-400 font-normal">{p.client?.industry}</div>
                                        </td>
                                        <td className="px-6 py-4">
                                            <Badge variant={p.status === 'DRAFT' ? 'outline' : p.status === 'ACCEPTED' ? 'green' : p.status === 'REJECTED' ? 'red' : 'blue'}>
                                                {p.status === 'DRAFT' ? 'Borrador' : p.status === 'ACCEPTED' ? 'Aprobado' : p.status === 'REJECTED' ? 'Rechazado' : p.status}
                                            </Badge>
                                        </td>
-                                       <td className="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
+                                       <td className="px-6 py-4 text-right font-bold text-zinc-900 dark:text-white">
                                            ${p.totalContractValue?.toLocaleString()}
                                        </td>
-                                       <td className="px-6 py-4 text-right text-gray-500">
+                                       <td className="px-6 py-4 text-right text-zinc-500">
                                            ${p.totalRecurringPrice?.toLocaleString()}
                                        </td>
                                        <td className="px-6 py-4 flex justify-center gap-2" onClick={e => e.stopPropagation()}>
@@ -1095,7 +1095,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                <ChevronRight className="w-4 h-4"/>
                                            </Button>
                                            {(p.status !== ProposalStatus.ACCEPTED && p.status !== ProposalStatus.PARTIALLY_ACCEPTED) && (
-                                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleDeleteProposal(p.id, e)}>
+                                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-zinc-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => handleDeleteProposal(p.id, e)}>
                                                    <Trash2 className="w-4 h-4" />
                                                </Button>
                                            )}
@@ -1111,7 +1111,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
         /* WIZARD CONTENT */
         <>
             {/* STEPS HEADER */}
-            <div className="flex justify-between items-center mb-8 px-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-full border border-gray-100 dark:border-slate-800 shadow-lg sticky top-2 z-20 mx-2 md:mx-4">
+            <div className="flex justify-between items-center mb-8 px-4 py-3 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-full border border-zinc-100 dark:border-zinc-800 shadow-lg sticky top-2 z-20 mx-2 md:mx-4">
                {STEPS.map((step, idx) => {
                    const Icon = step.icon;
                    const isActive = currentStep === step.number;
@@ -1119,13 +1119,13 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                    
                    return (
                        <div key={step.number} onClick={() => setCurrentStep(step.number)} className={`flex items-center gap-2 md:gap-3 cursor-pointer group`}>
-                           <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-all duration-300 ${isActive ? 'bg-black dark:bg-white text-white dark:text-black shadow-md scale-110' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-500 group-hover:bg-gray-200'}`}>
+                           <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-xs md:text-sm transition-all duration-300 ${isActive ? 'bg-black dark:bg-white text-white dark:text-black shadow-md scale-110' : isCompleted ? 'bg-green-500 text-white' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 group-hover:bg-zinc-200'}`}>
                                {isCompleted ? <Check className="w-4 h-4 md:w-5 md:h-5"/> : step.number}
                            </div>
                            <div className={`${isActive ? 'opacity-100' : 'opacity-40'} hidden sm:block transition-opacity`}>
-                               <div className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-gray-800 dark:text-gray-200">{step.title}</div>
+                               <div className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">{step.title}</div>
                            </div>
-                           {idx < STEPS.length - 1 && <div className="w-4 md:w-12 h-[1px] bg-gray-200 dark:bg-slate-800 mx-1 md:mx-2"></div>}
+                           {idx < STEPS.length - 1 && <div className="w-4 md:w-12 h-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1 md:mx-2"></div>}
                        </div>
                    )
                })}
@@ -1154,7 +1154,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                   <div>
                                       <Label>Cliente</Label>
                                       {isReadOnly ? (
-                                          <Input value={clientInfo.name} disabled className="bg-gray-100 dark:bg-slate-800" />
+                                          <Input value={clientInfo.name} disabled className="bg-zinc-100 dark:bg-zinc-800" />
                                       ) : (
                                           <Select 
                                             value={selectedClientId || ''} 
@@ -1203,7 +1203,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                 {/* STEP 2: STRATEGY (SERVICES) */}
                 {currentStep === 2 && (
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-gray-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex justify-between items-center bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
                           <h2 className="text-xl font-bold dark:text-white">Selecciona Servicios</h2>
                           <Badge variant="blue" className="bg-black text-white px-3 py-1 rounded-full">{selectedServiceIds.length} Seleccionados</Badge>
                         </div>
@@ -1211,28 +1211,28 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(Object.entries(servicesByCategory) as [string, Service[]][]).map(([cat, items]) => (
                                 <div key={cat} className="space-y-3">
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">{cat}</h3>
+                                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest pl-1">{cat}</h3>
                                     {items.map(s => {
                                         const isSelected = selectedServiceIds.includes(s.id);
                                         const assignedId = assignedContractors[s.id];
                                         return (
                                             <div key={s.id} onClick={() => toggleService(s.id)} 
-                                                 className={`cursor-pointer border rounded-2xl p-4 transition-all duration-200 ${isSelected ? 'border-black dark:border-white bg-white dark:bg-slate-800 ring-2 ring-black/5 dark:ring-white/5 shadow-lg scale-[1.02]' : 'border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-gray-300 dark:hover:border-slate-600 hover:shadow-md'}`}>
+                                                 className={`cursor-pointer border rounded-2xl p-4 transition-all duration-200 ${isSelected ? 'border-black dark:border-white bg-white dark:bg-zinc-800 ring-2 ring-black/5 dark:ring-white/5 shadow-lg scale-[1.02]' : 'border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-slate-600 hover:shadow-md'}`}>
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className="font-semibold text-sm leading-tight dark:text-white">{s.name}</span>
                                                     {isSelected && <div className="w-5 h-5 bg-black dark:bg-white rounded-full flex items-center justify-center"><Check className="w-3 h-3 text-white dark:text-black" /></div>}
                                                 </div>
                                                 {isSelected && (
-                                                    <div className="space-y-2 mt-3 pt-3 border-t border-gray-100 dark:border-slate-700 animate-in fade-in" onClick={e => e.stopPropagation()}>
+                                                    <div className="space-y-2 mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-700 animate-in fade-in" onClick={e => e.stopPropagation()}>
                                                         <div className="flex justify-between items-center">
-                                                            <label className="text-[10px] text-gray-500 font-bold uppercase">Precio de Venta</label>
-                                                            <input type="number" className="w-20 text-right text-xs bg-gray-50 dark:bg-slate-900 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white" 
+                                                            <label className="text-[10px] text-zinc-500 font-bold uppercase">Precio de Venta</label>
+                                                            <input type="number" className="w-20 text-right text-xs bg-zinc-50 dark:bg-zinc-900 rounded px-1 py-1 font-bold outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-zinc-900 dark:text-white" 
                                                                    value={getSellingPrice(s)} onChange={e => setCustomPrices({...customPrices, [s.id]: parseFloat(e.target.value)})} />
                                                         </div>
                                                         <div className="flex justify-between items-center">
-                                                            <label className="text-[10px] text-gray-500 font-bold uppercase">Tipo de Cobro</label>
+                                                            <label className="text-[10px] text-zinc-500 font-bold uppercase">Tipo de Cobro</label>
                                                             <select 
-                                                                className="text-xs bg-gray-50 dark:bg-slate-900 rounded px-2 py-1 font-medium outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-gray-900 dark:text-white"
+                                                                className="text-xs bg-zinc-50 dark:bg-zinc-900 rounded px-2 py-1 font-medium outline-none focus:ring-1 focus:ring-black dark:focus:ring-white text-zinc-900 dark:text-white"
                                                                 value={getServiceType(s)}
                                                                 onChange={e => setCustomTypes({...customTypes, [s.id]: e.target.value as 'ONE_TIME' | 'RECURRING'})}
                                                             >
@@ -1240,7 +1240,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                                 <option value="RECURRING">Mensual</option>
                                                             </select>
                                                         </div>
-                                                        <div className="flex justify-between items-center bg-gray-50 dark:bg-slate-800 p-1.5 rounded-lg">
+                                                        <div className="flex justify-between items-center bg-zinc-50 dark:bg-zinc-800 p-1.5 rounded-lg">
                                                             <select 
                                                               className="text-[10px] bg-transparent outline-none w-24 font-medium dark:text-white" 
                                                               value={assignedId || ''} 
@@ -1264,7 +1264,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                                 {contractors.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                                             </select>
                                                             {assignedId && (
-                                                                <input type="number" placeholder="$ Costo" className="w-12 text-right text-[10px] bg-white dark:bg-slate-900 rounded px-1 border border-gray-200 dark:border-slate-700 dark:text-white"
+                                                                <input type="number" placeholder="$ Costo" className="w-12 text-right text-[10px] bg-white dark:bg-zinc-900 rounded px-1 border border-zinc-200 dark:border-zinc-700 dark:text-white"
                                                                        value={outsourcingCosts[s.id] || ''} onChange={e => setOutsourcingCosts({...outsourcingCosts, [s.id]: parseFloat(e.target.value)})} />
                                                             )}
                                                         </div>
@@ -1272,7 +1272,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                         {/* CUSTOM DESCRIPTION & AI REWRITE */}
                                                         <div className="pt-2">
                                                             <div className="flex justify-between items-center mb-1">
-                                                                <label className="text-[10px] text-gray-500 font-bold uppercase">Descripción</label>
+                                                                <label className="text-[10px] text-zinc-500 font-bold uppercase">Descripción</label>
                                                                 <button 
                                                                     className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-0.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                                     onClick={(e) => {
@@ -1294,7 +1294,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                                 </button>
                                                             </div>
                                                             <Textarea 
-                                                                className="text-xs min-h-[60px] bg-gray-50 dark:bg-slate-800 border-0 focus:ring-1 focus:ring-black dark:text-white"
+                                                                className="text-xs min-h-[60px] bg-zinc-50 dark:bg-zinc-800 border-0 focus:ring-1 focus:ring-black dark:text-white"
                                                                 value={getServiceDescription(s)}
                                                                 onChange={e => setCustomDescriptions({...customDescriptions, [s.id]: e.target.value})}
                                                                 onClick={e => e.stopPropagation()} 
@@ -1326,8 +1326,8 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                         {/* LEFT COLUMN: Variables & Actions */}
                         <div className="lg:col-span-5 space-y-6">
                             {/* Financial Variables Control Panel */}
-                            <Card className="border-2 border-black/5 dark:border-white/5 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                                <CardHeader className="bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-100 dark:border-slate-800">
+                            <Card className="border-2 border-black/5 dark:border-white/5 shadow-xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm">
+                                <CardHeader className="bg-zinc-50/50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
                                     <CardTitle className="flex items-center gap-2 text-base"><RefreshCw className="w-4 h-4"/> Variables del Contrato</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-6 pt-6">
@@ -1338,7 +1338,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                   <button 
                                                       key={m}
                                                       onClick={() => setContractVars({...contractVars, duration: m})}
-                                                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${contractVars.duration === m ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700'}`}
+                                                      className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${contractVars.duration === m ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700'}`}
                                                   >
                                                       {m} Meses
                                                   </button>
@@ -1370,7 +1370,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-xs text-gray-500 mb-3">Generar PDF individual con presupuesto de costo:</p>
+                                    <p className="text-xs text-zinc-500 mb-3">Generar PDF individual con presupuesto de costo:</p>
                                     <div className="flex flex-wrap gap-2">
                                         {/* Buscamos los socios únicos asignados en esta propuesta */}
                                         {Array.from(new Set(Object.values(assignedContractors))).map(partnerId => {
@@ -1382,31 +1382,31 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                     variant="outline" 
                                                     size="sm" 
                                                     onClick={() => generatePartnerPDF(partnerId)}
-                                                    className="text-xs bg-white dark:bg-slate-800 hover:bg-indigo-50"
+                                                    className="text-xs bg-white dark:bg-zinc-800 hover:bg-indigo-50"
                                                 >
                                                     📄 PDF para {partner.name.split(' ')[0]}
                                                 </Button>
                                             );
                                         })}
                                         {Object.keys(assignedContractors).length === 0 && (
-                                            <span className="text-xs text-gray-400 italic">No hay socios asignados aún.</span>
+                                            <span className="text-xs text-zinc-400 italic">No hay socios asignados aún.</span>
                                         )}
                                     </div>
                                 </CardContent>
                             </Card>
       
-                            <Card className="bg-gray-900 dark:bg-slate-800 text-white border-0">
+                            <Card className="bg-zinc-900 dark:bg-zinc-800 text-white border-0">
                                 <CardHeader>
                                     <CardTitle className="text-white flex items-center gap-2"><Wand2 className="w-5 h-5"/> Generador de Propuesta</CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     {!showPrompt ? (
-                                        <Button onClick={generatePrompt} className="bg-white text-black hover:bg-gray-200 w-full font-bold">
+                                        <Button onClick={generatePrompt} className="bg-white text-black hover:bg-zinc-200 w-full font-bold">
                                             Generar Copy con IA
                                         </Button>
                                     ) : (
                                         <div className="space-y-4">
-                                            <Textarea readOnly value={generatedPrompt} className="bg-gray-800 border-gray-700 text-gray-300 min-h-[200px] font-mono text-xs rounded-xl" />
+                                            <Textarea readOnly value={generatedPrompt} className="bg-zinc-800 border-gray-700 text-zinc-300 min-h-[200px] font-mono text-xs rounded-xl" />
                                             <Button variant="secondary" onClick={() => navigator.clipboard.writeText(generatedPrompt)} className="w-full">
                                                 <Copy className="w-4 h-4 mr-2" /> Copiar Texto
                                             </Button>
@@ -1418,16 +1418,16 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       
                         {/* RIGHT COLUMN: Final Pricing Display */}
                         <div className="lg:col-span-7 space-y-6">
-                            <Card className="h-full border-0 shadow-2xl shadow-black/5 bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-950 flex flex-col justify-between">
+                            <Card className="h-full border-0 shadow-2xl shadow-black/5 bg-gradient-to-br from-white to-zinc-50 dark:from-zinc-900 dark:to-zinc-950 flex flex-col justify-between">
                                 <div className="p-8">
-                                    <h3 className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-8">Resumen Económico</h3>
+                                    <h3 className="text-zinc-400 font-bold uppercase tracking-widest text-xs mb-8">Resumen Económico</h3>
                                     
                                     <div className="mb-6">
-                                      <Label className="text-xs text-gray-500 block mb-1">Moneda de la Propuesta</Label>
+                                      <Label className="text-xs text-zinc-500 block mb-1">Moneda de la Propuesta</Label>
                                       <select
                                         value={contractVars.currency || 'ARS'}
                                         onChange={e => setContractVars({...contractVars, currency: e.target.value as 'ARS' | 'USD'})}
-                                        className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400"
+                                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-400"
                                         disabled={isReadOnly}
                                       >
                                         <option value="ARS">Pesos Argentinos (ARS)</option>
@@ -1436,25 +1436,25 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                     </div>
 
                                     <div className="space-y-8">
-                                        <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
+                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-4">
                                             <div>
-                                                <p className="text-sm font-medium text-gray-500 mb-1">Fee Mensual (Recurrente)</p>
-                                                <p className="text-xs text-gray-400">Durante {contractVars.duration} meses</p>
+                                                <p className="text-sm font-medium text-zinc-500 mb-1">Fee Mensual (Recurrente)</p>
+                                                <p className="text-xs text-zinc-400">Durante {contractVars.duration} meses</p>
                                             </div>
                                             <div className="text-4xl font-bold tracking-tighter dark:text-white">{formatMoney(calculations.monthlyFee, contractVars.currency)}</div>
                                         </div>
       
-                                        <div className="flex justify-between items-end border-b border-gray-100 dark:border-slate-800 pb-4">
+                                        <div className="flex justify-between items-end border-b border-zinc-100 dark:border-zinc-800 pb-4">
                                             <div>
-                                                <p className="text-sm font-medium text-gray-500 mb-1">Setup / Onboarding</p>
-                                                <p className="text-xs text-gray-400">Pago Único</p>
+                                                <p className="text-sm font-medium text-zinc-500 mb-1">Setup / Onboarding</p>
+                                                <p className="text-xs text-zinc-400">Pago Único</p>
                                             </div>
-                                            <div className="text-3xl font-bold tracking-tighter text-gray-700 dark:text-gray-300">{formatMoney(calculations.setupFee, contractVars.currency)}</div>
+                                            <div className="text-3xl font-bold tracking-tighter text-zinc-700 dark:text-zinc-300">{formatMoney(calculations.setupFee, contractVars.currency)}</div>
                                         </div>
       
                                         <div className="bg-black dark:bg-white text-white dark:text-black p-6 rounded-2xl flex justify-between items-center shadow-lg">
                                             <div>
-                                                <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">Valor Total Contrato</p>
+                                                <p className="text-xs font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Valor Total Contrato</p>
                                                 <p className="text-xs opacity-50 mt-1">LTV (Life Time Value)</p>
                                             </div>
                                             <div className="text-3xl font-bold tracking-tight">{formatMoney(calculations.contractValue, contractVars.currency)}</div>
@@ -1474,7 +1474,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                     </div>
                                 </div>
       
-                                <div className="p-6 bg-gray-50 dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 flex gap-3">
+                                <div className="p-6 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 flex gap-3">
                                     <div className="flex flex-col gap-2 flex-1">
                                         <div className="flex items-center gap-2 px-1">
                                             <input 
@@ -1482,11 +1482,11 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                                                 id="includeStrategicPlan" 
                                                 checked={includeStrategicPlan} 
                                                 onChange={e => setIncludeStrategicPlan(e.target.checked)}
-                                                className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                                                className="rounded border-zinc-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                                             />
-                                            <label htmlFor="includeStrategicPlan" className="text-xs text-gray-500 cursor-pointer select-none">Incluir Plan Estratégico</label>
+                                            <label htmlFor="includeStrategicPlan" className="text-xs text-zinc-500 cursor-pointer select-none">Incluir Plan Estratégico</label>
                                         </div>
-                                        <Button variant="outline" className="w-full bg-white dark:bg-slate-800" onClick={generatePDF}>
+                                        <Button variant="outline" className="w-full bg-white dark:bg-zinc-800" onClick={generatePDF}>
                                             <FileDown className="w-4 h-4 mr-2" /> PDF
                                         </Button>
                                     </div>
@@ -1501,7 +1501,7 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
       
                 {/* AI CHAT OVERLAY */}
                 {isChatOpen && (
-                  <div className="fixed bottom-6 right-6 w-80 h-[500px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-gray-200 dark:border-slate-700 flex flex-col z-50 animate-in slide-in-from-bottom-10 overflow-hidden">
+                  <div className="fixed bottom-6 right-6 w-80 h-[500px] bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-700 flex flex-col z-50 animate-in slide-in-from-bottom-10 overflow-hidden">
                       <div className="p-4 bg-black dark:bg-white text-white dark:text-black flex justify-between items-center">
                           <div className="flex items-center gap-2">
                               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
@@ -1509,16 +1509,16 @@ ${(Object.entries(phases) as [string, string[]][]).map(([phase, items]) => `\n${
                           </div>
                           <button onClick={() => setIsChatOpen(false)}><X className="w-4 h-4"/></button>
                       </div>
-                      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-slate-950">
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50 dark:bg-zinc-950">
                           {chatMessages.filter(m => m.role !== 'system').map((msg, idx) => (
-                              <div key={idx} className={`p-3 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-black dark:bg-white text-white dark:text-black ml-auto rounded-tr-none' : 'bg-white dark:bg-slate-800 border dark:border-slate-700 text-gray-700 dark:text-gray-300 rounded-tl-none shadow-sm'} max-w-[90%]`}>
+                              <div key={idx} className={`p-3 rounded-2xl text-xs leading-relaxed ${msg.role === 'user' ? 'bg-black dark:bg-white text-white dark:text-black ml-auto rounded-tr-none' : 'bg-white dark:bg-zinc-800 border dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-tl-none shadow-sm'} max-w-[90%]`}>
                                   {msg.content}
                               </div>
                           ))}
-                          {isAiThinking && <div className="flex gap-1 items-center text-gray-400 text-xs ml-2"><Loader2 className="w-3 h-3 animate-spin"/> Escribiendo...</div>}
+                          {isAiThinking && <div className="flex gap-1 items-center text-zinc-400 text-xs ml-2"><Loader2 className="w-3 h-3 animate-spin"/> Escribiendo...</div>}
                           <div ref={chatEndRef} />
                       </div>
-                      <div className="p-3 border-t dark:border-slate-700 bg-white dark:bg-slate-900">
+                      <div className="p-3 border-t dark:border-zinc-700 bg-white dark:bg-zinc-900">
                           <form onSubmit={(e) => {e.preventDefault(); handleAiChat();}} className="flex gap-2">
                               <Input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Pregunta algo..." className="h-10 text-xs rounded-full pl-4" />
                               <Button type="submit" size="sm" className="h-10 w-10 rounded-full p-0 flex-shrink-0"><TrendingUp className="w-4 h-4" /></Button>

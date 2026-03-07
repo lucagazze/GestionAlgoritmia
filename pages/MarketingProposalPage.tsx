@@ -47,33 +47,33 @@ const REQUIRED_FIELDS: (keyof MarketingProposalData)[] = ['clientName'];
 const Section: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; hasErrors?: boolean }> = ({ title, icon, children, defaultOpen = true, hasErrors }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`bg-white dark:bg-slate-900 rounded-2xl border overflow-hidden transition-all ${hasErrors ? 'border-red-300 dark:border-red-700' : 'border-gray-100 dark:border-slate-800'}`}>
-      <button className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors" onClick={() => setOpen(!open)}>
-        <div className="flex items-center gap-3 font-bold text-gray-900 dark:text-white text-sm">
+    <div className={`bg-white dark:bg-zinc-900 rounded-2xl border overflow-hidden transition-all ${hasErrors ? 'border-red-300 dark:border-red-700' : 'border-zinc-100 dark:border-zinc-800'}`}>
+      <button className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors" onClick={() => setOpen(!open)}>
+        <div className="flex items-center gap-3 font-bold text-zinc-900 dark:text-white text-sm">
           <span className="text-indigo-600">{icon}</span>
           {title}
           {hasErrors && <span className="flex items-center gap-1 text-red-500 text-xs font-semibold"><AlertCircle className="w-3.5 h-3.5" />Campos requeridos</span>}
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        {open ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
       </button>
-      {open && <div className="px-5 pb-5 space-y-3 border-t border-gray-50 dark:border-slate-800 pt-4">{children}</div>}
+      {open && <div className="px-5 pb-5 space-y-3 border-t border-zinc-50 dark:border-zinc-800 pt-4">{children}</div>}
     </div>
   );
 };
 
 const FormField: React.FC<{ label: string; children: React.ReactNode; hint?: string; required?: boolean; missing?: boolean }> = ({ label, children, hint, required, missing }) => (
   <div className="space-y-1">
-    <label className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${missing ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+    <label className={`text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${missing ? 'text-red-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
       {label}
       {required && <span className="text-red-400">*</span>}
       {missing && <span className="text-red-400 text-[10px] normal-case font-medium">(requerido)</span>}
     </label>
     <div className={missing ? 'ring-2 ring-red-400 ring-offset-1 rounded-xl' : ''}>{children}</div>
-    {hint && <p className="text-[11px] text-gray-400">{hint}</p>}
+    {hint && <p className="text-[11px] text-zinc-400">{hint}</p>}
   </div>
 );
 
-const inputCls = "w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-gray-900 dark:text-white";
+const inputCls = "w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition text-zinc-900 dark:text-white";
 const textareaCls = inputCls + " resize-none";
 
 import { AIFillModal } from '../components/modals/AIFillModal';
@@ -214,14 +214,14 @@ export default function MarketingProposalPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+          <h1 className="text-[26px] font-bold tracking-[-0.03em] text-zinc-900 dark:text-white flex items-center gap-2">
             <Megaphone className="w-8 h-8 text-indigo-600" /> Propuesta de Marketing
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Completá el formulario y generá un PDF profesional listo para enviar.</p>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Completá el formulario y generá un PDF profesional listo para enviar.</p>
         </div>
         <div className="flex items-center gap-3">
           {selectedClientId && (
-            <button onClick={saveToClient} className="flex items-center gap-2 border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300 font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-800 transition-all text-sm">
+            <button onClick={saveToClient} className="flex items-center gap-2 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 font-bold px-4 py-2.5 rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all text-sm">
               <Save className="w-4 h-4" /> Guardar en cliente
             </button>
           )}
@@ -259,7 +259,7 @@ export default function MarketingProposalPage() {
                 </button>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Con <strong>Completar con IA</strong> podés dictar o escribir toda la info del cliente y la IA llena los bloques automáticamente.</p>
+            <p className="text-xs text-zinc-500 mt-2">Con <strong>Completar con IA</strong> podés dictar o escribir toda la info del cliente y la IA llena los bloques automáticamente.</p>
           </div>
 
           {/* Missing fields banner */}
@@ -346,7 +346,7 @@ export default function MarketingProposalPage() {
           <Section title="Bloque 4 — Planes y Precios" icon={<CreditCard className="w-4 h-4" />}>
             <div className="space-y-4">
               {data.plans.map((plan, idx) => (
-                <div key={idx} className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3 border border-gray-100 dark:border-slate-700">
+                <div key={idx} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 space-y-3 border border-zinc-100 dark:border-zinc-700">
                   <div className="flex items-center justify-between font-bold text-sm text-indigo-700 dark:text-indigo-300">
                     <div className="flex items-center gap-2">
                        <span className="w-6 h-6 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center text-[10px] font-black">{idx + 1}</span>
@@ -371,7 +371,7 @@ export default function MarketingProposalPage() {
                   </FormField>
                 </div>
               ))}
-              <button onClick={addPlan} className="mt-3 w-full py-2.5 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 text-gray-500 font-bold text-sm hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors">
+              <button onClick={addPlan} className="mt-3 w-full py-2.5 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 text-zinc-500 font-bold text-sm hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-zinc-800 transition-colors">
                  + Añadir otro plan
               </button>
             </div>
@@ -397,7 +397,7 @@ export default function MarketingProposalPage() {
               </FormField>
               <FormField label="Color de acento (hex)">
                 <div className="flex gap-2 items-center">
-                  <input type="color" className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer" value={data.brandColor} onChange={e => set('brandColor', e.target.value)} />
+                  <input type="color" className="w-10 h-10 rounded-lg border border-zinc-200 cursor-pointer" value={data.brandColor} onChange={e => set('brandColor', e.target.value)} />
                   <input className={inputCls} value={data.brandColor} onChange={e => set('brandColor', e.target.value)} placeholder="#6366f1" />
                 </div>
               </FormField>
@@ -417,7 +417,7 @@ export default function MarketingProposalPage() {
 
         {/* RIGHT — Preview */}
         <div className="xl:sticky xl:top-4 h-fit space-y-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-100 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
             <div className="px-5 py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
               <h3 className="font-bold text-sm">Vista previa</h3>
               <p className="text-indigo-200 text-xs mt-0.5">Resumen de contenido</p>
@@ -425,35 +425,35 @@ export default function MarketingProposalPage() {
             <div className="p-5 space-y-4 text-sm">
               <div className="rounded-xl bg-indigo-50 dark:bg-indigo-900/20 p-4 border border-indigo-100 dark:border-indigo-800">
                 <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Portada</p>
-                <p className="font-bold text-gray-900 dark:text-white mt-1 text-base">{data.clientName || '— cliente —'}</p>
-                <p className="text-gray-500 text-xs">{data.clientIndustry}</p>
+                <p className="font-bold text-zinc-900 dark:text-white mt-1 text-base">{data.clientName || '— cliente —'}</p>
+                <p className="text-zinc-500 text-xs">{data.clientIndustry}</p>
                 <p className="text-indigo-600 font-semibold text-xs mt-1">{data.agencyName} · {new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">Inv. Pauta/día</p>
-                  <p className="font-bold text-gray-900 dark:text-white">${data.dailyAdBudget || '—'}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Inv. Pauta/día</p>
+                  <p className="font-bold text-zinc-900 dark:text-white">${data.dailyAdBudget || '—'}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">Inv. Pauta/mes</p>
-                  <p className="font-bold text-gray-900 dark:text-white">${(data.dailyAdBudget * 30).toLocaleString()}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Inv. Pauta/mes</p>
+                  <p className="font-bold text-zinc-900 dark:text-white">${(data.dailyAdBudget * 30).toLocaleString()}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">Ticket prom.</p>
-                  <p className="font-bold text-gray-900 dark:text-white">${data.avgTicket || '—'}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Ticket prom.</p>
+                  <p className="font-bold text-zinc-900 dark:text-white">${data.avgTicket || '—'}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-slate-800 rounded-xl p-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase">Plataformas</p>
-                  <p className="font-bold text-gray-900 dark:text-white text-xs">{String(data.platforms || '').split(',')[0] || '—'}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-800 rounded-xl p-3">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Plataformas</p>
+                  <p className="font-bold text-zinc-900 dark:text-white text-xs">{String(data.platforms || '').split(',')[0] || '—'}</p>
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Planes</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Planes</p>
                 {data.plans.map((plan, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-gray-50 dark:bg-slate-800 rounded-xl px-3 py-2.5">
+                  <div key={idx} className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-800 rounded-xl px-3 py-2.5">
                     <div>
-                      <p className="font-bold text-gray-900 dark:text-white text-sm">{plan.name || `Plan ${idx + 1}`}</p>
-                      <p className="text-[11px] text-gray-500">{plan.includes.length} servicios</p>
+                      <p className="font-bold text-zinc-900 dark:text-white text-sm">{plan.name || `Plan ${idx + 1}`}</p>
+                      <p className="text-[11px] text-zinc-500">{plan.includes.length} servicios</p>
                     </div>
                     <span className="font-black text-indigo-600 dark:text-indigo-400 text-base">${plan.price}/mes</span>
                   </div>
@@ -466,9 +466,9 @@ export default function MarketingProposalPage() {
                 </div>
               )}
               <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Secciones del PDF</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Secciones del PDF</p>
                 {['1. Portada', '2. El Objetivo', '3. Sobre el Negocio', '4. La Estrategia', '5. Plan de Acción 3 Meses', '6. Planes y Precios', '7. Compromiso / Garantía', '8. Lo que necesitamos', data.includeCTA ? '9. CTA Final' : null].filter(Boolean).map(s => (
-                  <div key={s} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 py-0.5">
+                  <div key={s} className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400 py-0.5">
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />{s}
                   </div>
                 ))}
