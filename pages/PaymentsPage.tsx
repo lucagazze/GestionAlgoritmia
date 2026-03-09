@@ -288,10 +288,10 @@ export default function PaymentsPage() {
             projectStart.setHours(0, 0, 0, 0);
             
             const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
-            if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
+            if (projectEnd) projectEnd.setHours(0, 0, 0, 0);
 
             if (date < projectStart) return;
-            if (projectEnd && date > projectEnd) return;
+            if (projectEnd && date >= projectEnd) return;
 
             // Billing Day
             const billDay = p.billingDay || 1;
@@ -346,10 +346,10 @@ export default function PaymentsPage() {
             const projectStart = new Date(pStart);
             projectStart.setHours(0, 0, 0, 0);
             const projectEnd = p.contractEndDate ? new Date(p.contractEndDate) : null;
-            if (projectEnd) projectEnd.setHours(23, 59, 59, 999);
+            if (projectEnd) projectEnd.setHours(0, 0, 0, 0);
 
             if (date < projectStart) return;
-            if (projectEnd && date > projectEnd) return;
+            if (projectEnd && date >= projectEnd) return;
 
             const paidAmount = contractorPayments
                 .filter(cp => {
