@@ -512,39 +512,48 @@ export default function PaymentsPage() {
     const handleMarkAsPaid = async (type: 'FULL' | 'PARTIAL') => {
         if (!contextMenu?.event) return;
         const evt = contextMenu.event;
-        
-        if (type === 'FULL') {
-            await db.payments.create({
-                clientId: evt.projectId,
-                amount: evt.amount,
-                date: evt.date ? new Date(evt.date).toISOString() : new Date().toISOString(), // Use event date
-                type: 'FULL'
-            });
-            // Reload
-            const paymentsData = await db.payments.getAll();
-            setPayments(paymentsData);
-        } else {
-            setSelectedEventForPayment(evt);
-            setIsPartialPaymentModalOpen(true);
-        }
         setContextMenu(null);
+
+        try {
+            if (type === 'FULL') {
+                await db.payments.create({
+                    clientId: evt.projectId,
+                    amount: evt.amount,
+                    date: evt.date ? new Date(evt.date).toISOString() : new Date().toISOString(),
+                    type: 'FULL'
+                });
+                const paymentsData = await db.payments.getAll();
+                setPayments(paymentsData);
+            } else {
+                setSelectedEventForPayment(evt);
+                setIsPartialPaymentModalOpen(true);
+            }
+        } catch (e) {
+            console.error("Error al marcar como pagado:", e);
+            alert("Error al registrar el pago. Revisá la consola para más detalles.");
+        }
     };
 
     const handlePartialPaymentSubmit = async () => {
         if (!selectedEventForPayment || !partialAmount) return;
-        
-        await db.payments.create({
-            clientId: selectedEventForPayment.projectId,
-            amount: parseFloat(partialAmount),
-            date: selectedEventForPayment.date ? new Date(selectedEventForPayment.date).toISOString() : new Date().toISOString(),
-            type: 'PARTIAL'
-        });
 
-        const paymentsData = await db.payments.getAll();
-        setPayments(paymentsData);
-        setIsPartialPaymentModalOpen(false);
-        setPartialAmount('');
-        setSelectedEventForPayment(null);
+        try {
+            await db.payments.create({
+                clientId: selectedEventForPayment.projectId,
+                amount: parseFloat(partialAmount),
+                date: selectedEventForPayment.date ? new Date(selectedEventForPayment.date).toISOString() : new Date().toISOString(),
+                type: 'PARTIAL'
+            });
+
+            const paymentsData = await db.payments.getAll();
+            setPayments(paymentsData);
+            setIsPartialPaymentModalOpen(false);
+            setPartialAmount('');
+            setSelectedEventForPayment(null);
+        } catch (e) {
+            console.error("Error al registrar pago parcial:", e);
+            alert("Error al registrar el pago parcial. Revisá la consola para más detalles.");
+        }
     };
 
     const handleDeletePayment = async () => {
