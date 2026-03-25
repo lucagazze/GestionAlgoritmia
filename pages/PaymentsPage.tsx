@@ -972,6 +972,16 @@ export default function PaymentsPage() {
                         .filter(p => p.contractEndDate)
                         .map(p => ({ ...p, endDate: new Date(p.contractEndDate!) }))
                         .filter(p => p.endDate >= today && p.endDate <= in90)
+                        .filter(p => {
+                            // Pago único ya cobrado → no mostrar vencimiento
+                            if (!p.monthlyRevenue || p.monthlyRevenue === 0) {
+                                return !payments.some(pay =>
+                                    (pay.clientId === p.id || pay.client_id === p.id) &&
+                                    !pay.metadata?.cancelled
+                                );
+                            }
+                            return true;
+                        })
                         .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
                     if (upcoming.length === 0) return null;
                     return (
