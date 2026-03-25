@@ -1,28 +1,47 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { db } from '../services/db';
 import { ai } from '../services/ai';
 import { useProjects } from '../hooks/queries/useProjects';
 import { Project, ProjectStatus, Contractor, ClientHealth } from '../types';
 import { Badge, Button, Input, Label, Textarea } from '../components/UIComponents';
 import { ContextMenu } from '../components/ContextMenu';
-import { 
-  Plus, Edit2, User, Search, Trash2, Columns, Table as TableIcon, Heart, 
-  AlertTriangle, ShieldAlert, Ghost, Info, Sparkles, Loader2
+import { formatMoney } from '../utils/currency';
+import {
+  Plus, Edit2, User, Search, Trash2, Columns, Table as TableIcon, Heart,
+  AlertTriangle, ShieldAlert, Ghost, Info, Sparkles, Loader2, MessageCircle, X,
+  Phone, Users, FileText,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+type NoteType = 'CALL' | 'MEETING' | 'NOTE';
+
+interface QuickContactState {
+  project: Project | null;
+  note: string;
+  noteType: NoteType;
+  saving: boolean;
+}
+
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { projects, isLoading, createProject, updateStatus, archiveProject } = useProjects();
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   // View States
   const [viewMode, setViewMode] = useState<'LIST' | 'KANBAN'>('LIST');
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'ALL'>('ALL');
 
   // Context Menu
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; project: Project | null }>({ x: 0, y: 0, project: null });
+
+  // Quick Contact Log
+  const [quickContact, setQuickContact] = useState<QuickContactState>({
+    project: null, note: '', noteType: 'CALL', saving: false,
+  });
 
   const handleContextMenu = (e: React.MouseEvent, project: Project) => {
       e.preventDefault();
@@ -30,10 +49,6 @@ export default function ProjectsPage() {
   };
 
   const handleDragDropStatus = async (projectId: string, newStatus: ProjectStatus) => {
-      // Optimistic-like UI: The hook will invalidate and refresh. 
-      // For true optimistic UI, we would implement onMutate in the hook, 
-      // but usually Supabase is fast enough that the flicker is minimal.
-      // We keep the confetti for instant gratification.
       if (newStatus === ProjectStatus.ACTIVE) {
           confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#22c55e', '#16a34a', '#dcfce7'] });
       }
@@ -45,13 +60,27 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async (id: string) => {
-      // Cambiamos el mensaje para que sea claro que se archiva
       if(confirm('¿Archivar este proyecto? Desaparecerá de la lista activa.')) {
-          // ✅ Soft Delete: Actualizamos estado en vez de borrar
           await archiveProject(id);
-          // No need to manually update local state, Query will refetch
       }
   }
+
+  const handleSaveContact = async () => {
+    if (!quickContact.project) return;
+    setQuickContact(q => ({ ...q, saving: true }));
+    try {
+      await db.clientNotes.create({
+        clientId: quickContact.project.id,
+        content: quickContact.note.trim() || `Contacto registrado (${quickContact.noteType})`,
+        type: quickContact.noteType,
+      });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setQuickContact({ project: null, note: '', noteType: 'CALL', saving: false });
+    } catch (e) {
+      console.error(e);
+      setQuickContact(q => ({ ...q, saving: false }));
+    }
+  };
 
   // --- HELPERS ---
   const isPaymentCurrent = (p: Project) => {
@@ -64,7 +93,7 @@ export default function ProjectsPage() {
   const getGhostingStatus = (lastContactDate?: string) => {
       if (!lastContactDate) return 'UNKNOWN';
       const diffTime = Math.abs(new Date().getTime() - new Date(lastContactDate).getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays > 7) return 'GHOSTING';
       return 'OK';
   };
@@ -72,11 +101,12 @@ export default function ProjectsPage() {
   const filteredProjects = React.useMemo(() => {
     return projects.filter(p => {
       if (!p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      // Filter out Sales statuses (Lead, Discovery, etc.) if they exist in DB
       const activeStages = [ProjectStatus.ONBOARDING, ProjectStatus.ACTIVE, ProjectStatus.PAUSED, ProjectStatus.COMPLETED];
-      return activeStages.includes(p.status);
+      if (!activeStages.includes(p.status)) return false;
+      if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+      return true;
     });
-  }, [projects, searchTerm]);
+  }, [projects, searchTerm, statusFilter]);
 
   const renderHealthBadge = (health: ClientHealth) => {
       switch(health) {
@@ -111,7 +141,7 @@ export default function ProjectsPage() {
           <div className="flex h-full gap-4 overflow-x-auto pb-4 px-2 snap-x snap-mandatory">
               {columns.map(col => {
                   const colProjects = filteredProjects.filter(p => p.status === col.id);
-                  
+
                   return (
                       <div
                         key={col.id}
@@ -128,6 +158,7 @@ export default function ProjectsPage() {
                           <div className="px-2 pb-3 space-y-2 flex-1 overflow-y-auto">
                               {colProjects.map(p => {
                                   const ghostStatus = getGhostingStatus(p.lastContactDate);
+                                  const margin = p.monthlyRevenue - (p.outsourcingCost || 0);
                                   return (
                                       <div
                                         key={p.id}
@@ -149,7 +180,12 @@ export default function ProjectsPage() {
                                                   <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider block">{p.industry || 'General'}</span>
                                                   <span className="text-[13px] text-zinc-700 dark:text-zinc-300 font-semibold">${p.monthlyRevenue.toLocaleString()}</span>
                                               </div>
-                                              <div className={`w-2 h-2 rounded-full ${isPaymentCurrent(p) ? 'bg-emerald-400' : 'bg-red-400'}`}/>
+                                              <div className="text-right">
+                                                <span className={`text-[11px] font-bold block ${margin > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                                                  +{Math.round(p.monthlyRevenue > 0 ? (margin / p.monthlyRevenue) * 100 : 0)}%
+                                                </span>
+                                                <div className={`w-2 h-2 rounded-full ml-auto mt-0.5 ${isPaymentCurrent(p) ? 'bg-emerald-400' : 'bg-red-400'}`}/>
+                                              </div>
                                           </div>
                                       </div>
                                   );
@@ -184,19 +220,60 @@ export default function ProjectsPage() {
         </div>
       </div>
 
+      {/* Status filter tabs — only in list view */}
+      {viewMode === 'LIST' && (
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+          {([
+            ['ALL', 'Todos'],
+            [ProjectStatus.ACTIVE, 'Activos'],
+            [ProjectStatus.ONBOARDING, 'Onboarding'],
+            [ProjectStatus.PAUSED, 'Pausados'],
+            [ProjectStatus.COMPLETED, 'Completados'],
+          ] as [ProjectStatus | 'ALL', string][]).map(([status, label]) => {
+            const count = status === 'ALL'
+              ? projects.filter(p => [ProjectStatus.ONBOARDING, ProjectStatus.ACTIVE, ProjectStatus.PAUSED, ProjectStatus.COMPLETED].includes(p.status)).length
+              : projects.filter(p => p.status === status).length;
+            const isActive = statusFilter === status;
+            return (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold transition-all ${
+                  isActive
+                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-[0_1px_3px_rgba(0,0,0,0.15)]'
+                    : 'bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                }`}
+              >
+                {label}
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  isActive ? 'bg-white/20 text-white dark:text-zinc-900 dark:bg-black/20' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+                }`}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* --- CONTENT AREA --- */}
       {viewMode === 'KANBAN' ? <KanbanBoard /> : (
           <div className="bg-white dark:bg-zinc-900 border border-black/[0.04] dark:border-white/[0.06] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex-1 flex flex-col min-h-0">
               <div className="overflow-auto flex-1">
-                  <table className="w-full text-sm text-left min-w-[800px]">
+                  <table className="w-full text-sm text-left min-w-[900px]">
                       <thead className="bg-zinc-50/80 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-500 border-b border-zinc-100 dark:border-zinc-800 uppercase text-[10px] tracking-[0.06em] font-semibold sticky top-0 z-10 backdrop-blur-sm">
-                          <tr><th className="px-5 py-3">Cliente</th><th className="px-5 py-3">Estado</th><th className="px-5 py-3 text-right">Fee / mes</th><th className="px-5 py-3 text-center">Salud</th><th className="px-5 py-3 text-center">Pago</th><th className="px-5 py-3"></th></tr>
+                          <tr>
+                            <th className="px-5 py-3">Cliente</th>
+                            <th className="px-5 py-3">Estado</th>
+                            <th className="px-5 py-3 text-right">Fee / mes</th>
+                            <th className="px-5 py-3 text-right">Margen</th>
+                            <th className="px-5 py-3 text-center">Salud</th>
+                            <th className="px-5 py-3 text-center">Pago</th>
+                            <th className="px-5 py-3"></th>
+                          </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
-                          {isLoading ? (<tr><td colSpan={6} className="text-center py-20 text-zinc-400"><div className="animate-pulse">Cargando...</div></td></tr>) : 
+                          {isLoading ? (<tr><td colSpan={7} className="text-center py-20 text-zinc-400"><div className="animate-pulse">Cargando...</div></td></tr>) :
                               filteredProjects.map((p) => {
                                   const getPaymentInfo = (proj: Project) => {
-                                      // 1. Check if paid this month
                                       if (proj.lastPaymentDate) {
                                           const last = new Date(proj.lastPaymentDate);
                                           const now = new Date();
@@ -204,11 +281,8 @@ export default function ProjectsPage() {
                                               return { label: 'PAGADO', className: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' };
                                           }
                                       }
-                                      
-                                      // 2. Check if Overdue
                                       const today = new Date().getDate();
                                       const billingDay = proj.billingDay || 1;
-                                      
                                       if (today > billingDay) {
                                           return { label: 'VENCIDO', className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 animate-pulse' };
                                       } else if (today === billingDay) {
@@ -220,6 +294,9 @@ export default function ProjectsPage() {
 
                                   const paymentStatus = getPaymentInfo(p);
                                   const ghostStatus = getGhostingStatus(p.lastContactDate);
+                                  const margin = p.monthlyRevenue - (p.outsourcingCost || 0);
+                                  const marginPct = p.monthlyRevenue > 0 ? Math.round((margin / p.monthlyRevenue) * 100) : 0;
+
                                   return (
                                       <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} onContextMenu={(e) => handleContextMenu(e, p)} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors cursor-pointer group">
                                           <td className="px-5 py-3">
@@ -232,7 +309,19 @@ export default function ProjectsPage() {
                                               </div>
                                           </td>
                                           <td className="px-5 py-3"><Badge variant={p.status === ProjectStatus.ACTIVE ? 'green' : 'outline'} className="text-[10px] px-1.5 py-0">{p.status}</Badge></td>
-                                          <td className="px-5 py-3 text-right font-medium text-zinc-700 dark:text-zinc-300 text-[13px]">${p.monthlyRevenue.toLocaleString()}</td>
+                                          <td className="px-5 py-3 text-right font-medium text-zinc-700 dark:text-zinc-300 text-[13px]">
+                                            {formatMoney(p.monthlyRevenue, p.currency || 'ARS')}
+                                          </td>
+                                          <td className="px-5 py-3 text-right">
+                                            <div className="flex flex-col items-end">
+                                              <span className={`text-[13px] font-semibold ${margin >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                                                {formatMoney(margin, p.currency || 'ARS')}
+                                              </span>
+                                              <span className={`text-[10px] font-bold ${marginPct >= 50 ? 'text-emerald-500' : marginPct >= 25 ? 'text-amber-500' : 'text-red-500'}`}>
+                                                {marginPct}%
+                                              </span>
+                                            </div>
+                                          </td>
                                           <td className="px-5 py-3 text-center"><div className="flex justify-center">{renderHealthBadge(p.healthScore || 'GOOD')}</div></td>
                                           <td className="px-5 py-3 text-center">
                                               <div className="flex flex-col items-center">
@@ -244,7 +333,24 @@ export default function ProjectsPage() {
                                                   )}
                                               </div>
                                           </td>
-                                          <td className="px-5 py-3 text-center"><button onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}} className="p-1.5 rounded-[7px] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-all"><Edit2 className="w-3.5 h-3.5" /></button></td>
+                                          <td className="px-5 py-3 text-center">
+                                            <div className="flex items-center gap-1 justify-center">
+                                              {/* Quick contact log */}
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); setQuickContact({ project: p, note: '', noteType: 'CALL', saving: false }); }}
+                                                className="p-1.5 rounded-[7px] hover:bg-blue-50 dark:hover:bg-blue-500/10 text-zinc-300 hover:text-blue-500 transition-all opacity-0 group-hover:opacity-100"
+                                                title="Registrar contacto"
+                                              >
+                                                <MessageCircle className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                onClick={(e) => {e.stopPropagation(); navigate(`/projects/${p.id}`);}}
+                                                className="p-1.5 rounded-[7px] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-all"
+                                              >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </td>
                                       </tr>
                                   );
                               })
@@ -255,13 +361,83 @@ export default function ProjectsPage() {
           </div>
       )}
 
-      <ContextMenu 
+      <ContextMenu
         x={contextMenu.x} y={contextMenu.y} isOpen={!!contextMenu.project} onClose={() => setContextMenu({ ...contextMenu, project: null })}
         items={[
             { label: 'Abrir Expediente', icon: Edit2, onClick: () => contextMenu.project && navigate(`/projects/${contextMenu.project.id}`) },
+            { label: 'Registrar contacto', icon: MessageCircle, onClick: () => contextMenu.project && setQuickContact({ project: contextMenu.project, note: '', noteType: 'CALL', saving: false }) },
             { label: 'Eliminar', icon: Trash2, variant: 'destructive', onClick: () => contextMenu.project && handleDelete(contextMenu.project.id) }
         ]}
       />
+
+      {/* Quick Contact Modal */}
+      {quickContact.project && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setQuickContact(q => ({ ...q, project: null }))}>
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-2xl p-5 w-full max-w-sm shadow-2xl border border-zinc-200 dark:border-zinc-700 animate-in zoom-in-95 fade-in duration-150"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-zinc-900 dark:text-white text-[15px] tracking-[-0.01em]">Registrar contacto</h3>
+                <p className="text-[12px] text-zinc-400 mt-0.5">{quickContact.project.name}</p>
+              </div>
+              <button
+                onClick={() => setQuickContact(q => ({ ...q, project: null }))}
+                className="p-1.5 rounded-[8px] hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Type selector */}
+            <div className="flex gap-1.5 mb-3">
+              {([['CALL', 'Llamada', Phone], ['MEETING', 'Reunión', Users], ['NOTE', 'Nota', FileText]] as [NoteType, string, any][]).map(([type, label, Icon]) => (
+                <button
+                  key={type}
+                  onClick={() => setQuickContact(q => ({ ...q, noteType: type }))}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-semibold transition-all flex-1 justify-center ${
+                    quickContact.noteType === type
+                      ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900'
+                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />{label}
+                </button>
+              ))}
+            </div>
+
+            {/* Note */}
+            <textarea
+              value={quickContact.note}
+              onChange={e => setQuickContact(q => ({ ...q, note: e.target.value }))}
+              placeholder="¿De qué hablaron? (opcional)"
+              className="w-full p-3 rounded-[10px] border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-[13px] text-zinc-800 dark:text-zinc-200 placeholder-zinc-400 resize-none focus:outline-none focus:ring-2 focus:ring-black/[0.08] dark:focus:ring-white/[0.08] transition-all"
+              rows={3}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSaveContact(); }}
+            />
+            <p className="text-[10px] text-zinc-400 mt-1">Cmd+Enter para guardar</p>
+
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => setQuickContact(q => ({ ...q, project: null }))}
+                className="flex-1 h-9 rounded-[8px] text-[13px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveContact}
+                disabled={quickContact.saving}
+                className="flex-1 h-9 rounded-[8px] text-[13px] font-semibold bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-black dark:hover:bg-zinc-100 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {quickContact.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

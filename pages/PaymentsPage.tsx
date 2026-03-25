@@ -968,26 +968,32 @@ export default function PaymentsPage() {
                     today.setHours(0, 0, 0, 0);
                     const in90 = new Date(today);
                     in90.setDate(in90.getDate() + 90);
-                    const upcoming = projects
+                    const ago30 = new Date(today);
+                    ago30.setDate(ago30.getDate() - 30);
+                    const isPaidOnce = (p: any) => {
+                        if (!p.monthlyRevenue || p.monthlyRevenue === 0) {
+                            return payments.some((pay: any) =>
+                                (pay.clientId === p.id || pay.client_id === p.id) &&
+                                !pay.metadata?.cancelled
+                            );
+                        }
+                        return false;
+                    };
+                    const allContracts = projects
                         .filter(p => p.contractEndDate)
                         .map(p => ({ ...p, endDate: new Date(p.contractEndDate!) }))
+                        .filter(p => !isPaidOnce(p));
+                    const upcoming = allContracts
                         .filter(p => p.endDate >= today && p.endDate <= in90)
-                        .filter(p => {
-                            // Pago único ya cobrado → no mostrar vencimiento
-                            if (!p.monthlyRevenue || p.monthlyRevenue === 0) {
-                                return !payments.some(pay =>
-                                    (pay.clientId === p.id || pay.client_id === p.id) &&
-                                    !pay.metadata?.cancelled
-                                );
-                            }
-                            return true;
-                        })
                         .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
-                    if (upcoming.length === 0) return null;
+                    const recentlyExpired = allContracts
+                        .filter(p => p.endDate < today && p.endDate >= ago30)
+                        .sort((a, b) => b.endDate.getTime() - a.endDate.getTime());
+                    if (upcoming.length === 0 && recentlyExpired.length === 0) return null;
                     return (
                         <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                             <h3 className="text-[13px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
-                                <Clock className="w-4 h-4" /> Contratos próximos a vencer
+                                <Clock className="w-4 h-4" /> Vencimientos de contratos
                             </h3>
                             <div className="space-y-2">
                                 {upcoming.map(p => {
@@ -999,12 +1005,32 @@ export default function PaymentsPage() {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[11px] text-zinc-500">{p.endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                                                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isUrgent ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
-                                                    {diffDays === 0 ? 'Hoy' : `${diffDays}d`}
+                                                    {diffDays === 0 ? 'Hoy' : `en ${diffDays}d`}
                                                 </span>
                                             </div>
                                         </div>
                                     );
                                 })}
+                                {recentlyExpired.length > 0 && (
+                                    <>
+                                        {upcoming.length > 0 && <div className="border-t border-zinc-200 dark:border-zinc-700 my-2" />}
+                                        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Recién vencidos</p>
+                                        {recentlyExpired.map(p => {
+                                            const diffDays = Math.ceil((today.getTime() - p.endDate.getTime()) / (1000 * 60 * 60 * 24));
+                                            return (
+                                                <div key={p.id} className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0 opacity-70">
+                                                    <span className="text-[13px] font-semibold text-zinc-900 dark:text-white">{p.name}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] text-zinc-500">{p.endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                                                            hace {diffDays}d
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </>
+                                )}
                             </div>
                         </div>
                     );

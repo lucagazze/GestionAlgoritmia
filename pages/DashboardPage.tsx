@@ -6,10 +6,10 @@ import {
 } from 'recharts';
 import {
   TrendingUp, Zap, AlertTriangle, ArrowRight, Target,
-  CheckSquare, DollarSign, Users, Activity,
+  CheckSquare, DollarSign, Users, Activity, CheckCircle2, FileText,
 } from 'lucide-react';
 import { db } from '../services/db';
-import { Project, Task, TaskStatus, ProjectStatus, Contractor } from '../types';
+import { Project, Task, TaskStatus, ProjectStatus, Contractor, ProposalStatus } from '../types';
 import { formatMoney } from '../utils/currency';
 
 // ── Stat card ──────────────────────────────────────────────────────────
@@ -40,6 +40,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [proposals, setProposals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [riskClients, setRiskClients] = useState<any[]>([]);
   const [overdueTasksList, setOverdueTasksList] = useState<Task[]>([]);
@@ -48,14 +49,16 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const [p, t, c] = await Promise.all([
+      const [p, t, c, props] = await Promise.all([
         db.projects.getAll(),
         db.tasks.getAll(),
         db.contractors.getAll(),
+        db.proposals.getAll(),
       ]);
       setProjects(p);
       setTasks(t);
       setContractors(c);
+      setProposals(props);
       calculateRisks(p, t);
     } catch (e) {
       console.error(e);
@@ -82,10 +85,30 @@ export default function DashboardPage() {
     ));
   };
 
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      await db.tasks.update(taskId, { status: TaskStatus.DONE });
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: TaskStatus.DONE } : t));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const activeProjects = useMemo(() => projects.filter(p => p.status === ProjectStatus.ACTIVE), [projects]);
   const mrrUSD = useMemo(() => activeProjects.filter(p => !p.currency || p.currency === 'USD').reduce((s, p) => s + (p.monthlyRevenue || 0), 0), [activeProjects]);
   const mrrARS = useMemo(() => activeProjects.filter(p => p.currency === 'ARS').reduce((s, p) => s + (p.monthlyRevenue || 0), 0), [activeProjects]);
   const pendingTasks = useMemo(() => tasks.filter(t => t.status !== TaskStatus.DONE), [tasks]);
+
+  const pendingProposals = useMemo(() => {
+    const today = new Date();
+    return proposals
+      .filter(p => p.status === ProposalStatus.SENT)
+      .map(p => ({
+        ...p,
+        daysSent: Math.ceil((today.getTime() - new Date(p.createdAt).getTime()) / 86_400_000),
+      }))
+      .sort((a, b) => b.daysSent - a.daysSent);
+  }, [proposals]);
 
   // MRR trend last 6 months
   const mrrData = useMemo(() => {
@@ -280,7 +303,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Foco de hoy */}
+        {/* Foco de hoy — MEJORADO: se pueden completar tareas */}
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
           <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-800/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -316,11 +339,21 @@ export default function DashboardPage() {
                 const isOverdue = t.dueDate && t.dueDate < todayStr;
                 const isToday   = t.dueDate?.startsWith(todayStr);
                 return (
-                  <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      t.priority === 'HIGH' ? 'bg-red-500' :
-                      t.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-zinc-300 dark:bg-zinc-600'
-                    }`} />
+                  <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors group">
+                    {/* Checkbox para completar tarea */}
+                    <button
+                      onClick={() => handleCompleteTask(t.id)}
+                      className="w-5 h-5 rounded-full border-2 border-zinc-200 dark:border-zinc-700 hover:border-emerald-500 dark:hover:border-emerald-400 flex items-center justify-center flex-shrink-0 transition-all group/cb"
+                      title="Marcar como hecha"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 opacity-0 group-hover/cb:opacity-100 transition-opacity" />
+                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className={`w-2 h-2 rounded-full ${
+                        t.priority === 'HIGH' ? 'bg-red-500' :
+                        t.priority === 'MEDIUM' ? 'bg-amber-400' : 'bg-zinc-300 dark:bg-zinc-600'
+                      }`} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium text-zinc-800 dark:text-zinc-200 truncate">{t.title}</p>
                       {t.dueDate && (
@@ -371,6 +404,52 @@ export default function DashboardPage() {
                   p.daysSinceContact > 14 ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
                 }`}>
                   {p.daysSinceContact}d
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Propuestas esperando respuesta */}
+      {pendingProposals.length > 0 && (
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-50 dark:border-zinc-800/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-[7px] bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+                <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-[13px] font-semibold text-zinc-900 dark:text-white tracking-[-0.01em]">
+                Propuestas esperando respuesta
+              </p>
+            </div>
+            <Link to="/quotations" className="text-[12px] font-medium text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors flex items-center gap-1">
+              Ver todas <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
+            {pendingProposals.slice(0, 5).map(prop => (
+              <Link key={prop.id} to="/quotations" className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-[11px] font-bold text-blue-500 flex-shrink-0">
+                    {(prop.client?.name || '?').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-zinc-800 dark:text-zinc-200">{prop.client?.name || 'Sin cliente'}</p>
+                    <p className="text-[11px] text-zinc-400">
+                      {prop.totalRecurringPrice > 0
+                        ? formatMoney(prop.totalRecurringPrice, prop.currency || 'ARS') + '/mes'
+                        : formatMoney(prop.totalOneTimePrice, prop.currency || 'ARS')}
+                      {prop.durationMonths > 0 && ` · ${prop.durationMonths} meses`}
+                    </p>
+                  </div>
+                </div>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-[6px] ${
+                  prop.daysSent > 7 ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400' :
+                  prop.daysSent > 3 ? 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                  'bg-zinc-50 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
+                }`}>
+                  {prop.daysSent === 0 ? 'Hoy' : `${prop.daysSent}d`}
                 </span>
               </Link>
             ))}
