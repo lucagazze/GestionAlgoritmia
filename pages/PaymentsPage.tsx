@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../services/db';
 import { Project, Contractor, ProjectStatus, ContractorPayment } from '../types';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users, Ban } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, Wallet, CalendarRange, BarChart3, History, User, Briefcase, ArrowRight, Check, X, MessageSquare, Edit2, Loader2, Users, Ban, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import { Card, Button, Modal, Badge, Input, Label, Select } from '../components/UIComponents';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { formatMoney } from '../utils/currency';
@@ -28,6 +28,7 @@ export default function PaymentsPage() {
         notes?: string;
         description?: string;
         currency?: 'ARS' | 'USD';
+        contractEnd?: boolean;
     }
 
     const [referenceDate, setReferenceDate] = useState(new Date());
@@ -56,6 +57,11 @@ export default function PaymentsPage() {
     const [selectedPaymentDetail, setSelectedPaymentDetail] = useState<any>(null);
     const [activeProposalDetails, setActiveProposalDetails] = useState<any>(null);
     const [loadingProposal, setLoadingProposal] = useState(false);
+
+    // Delete Contract Modal State
+    const [isDeleteContractModalOpen, setIsDeleteContractModalOpen] = useState(false);
+    const [deletingContractProjectId, setDeletingContractProjectId] = useState<string | null>(null);
+    const [deletingContractName, setDeletingContractName] = useState('');
 
     // Manual Transaction Modal State
     const [isManualTransactionModalOpen, setIsManualTransactionModalOpen] = useState(false);
@@ -390,6 +396,22 @@ export default function PaymentsPage() {
             });
         }
 
+        // 5. CONTRACT END MARKERS — show when a contract expires
+        projects.forEach(p => {
+            if (!p.contractEndDate) return;
+            const endDate = new Date(p.contractEndDate);
+            if (endDate.getDate() === day && endDate.getMonth() === eventMonth && endDate.getFullYear() === eventYear) {
+                events.push({
+                    type: 'IN',
+                    label: `Vence: ${p.name}`,
+                    amount: 0,
+                    projectId: p.id,
+                    contractEnd: true,
+                    currency: p.currency || 'ARS',
+                });
+            }
+        });
+
         return events;
     };
 
@@ -578,6 +600,56 @@ export default function PaymentsPage() {
             alert("Error al eliminar");
         }
         setContextMenu(null);
+    };
+
+    const openDeleteContractModal = () => {
+        if (!contextMenu?.event?.projectId) return;
+        const project = projects.find(p => p.id === contextMenu.event.projectId);
+        setDeletingContractProjectId(contextMenu.event.projectId);
+        setDeletingContractName(project?.name || 'este cliente');
+        setContextMenu(null);
+        setIsDeleteContractModalOpen(true);
+    };
+
+    const handleDeleteContractFull = async () => {
+        if (!deletingContractProjectId) return;
+        setIsDeleteContractModalOpen(false);
+
+        try {
+            // 1. Delete all proposals (and their items) for this client
+            const proposals = await db.proposals.getAllByClientId(deletingContractProjectId);
+            for (const proposal of proposals) {
+                await db.proposals.delete(proposal.id);
+            }
+
+            // 2. Delete all payments for this client
+            const clientPayments = payments.filter(p => p.clientId === deletingContractProjectId || p.client_id === deletingContractProjectId);
+            for (const pay of clientPayments) {
+                await db.payments.delete(pay.id);
+            }
+
+            // 3. Clear contract data on client
+            await db.projects.update(deletingContractProjectId, {
+                contract_start_date: null,
+                contract_end_date: null,
+                billing_day: null,
+                monthlyRevenue: 0,
+                outsourcingCost: 0,
+                status: 'PAUSED' as any,
+            } as any);
+
+            // 4. Reload
+            const [projectsData, paymentsData] = await Promise.all([
+                db.projects.getAll(),
+                db.payments.getAll(),
+            ]);
+            setProjects(projectsData);
+            setPayments(paymentsData);
+        } catch (e) {
+            console.error(e);
+            alert('Error al eliminar el contrato. Revisá la consola.');
+        }
+        setDeletingContractProjectId(null);
     };
 
     const handleWhatsAppReminder = () => {
@@ -808,7 +880,10 @@ export default function PaymentsPage() {
                                                 // LOGIC FOR COLOR CODING
                                                 let colorClass = '';
 
-                                                if (evt.cancelled) {
+                                                if (evt.contractEnd) {
+                                                    // CONTRACT END: Amber warning
+                                                    colorClass = 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
+                                                } else if (evt.cancelled) {
                                                     // CANCELLED: Muted with strikethrough
                                                     colorClass = 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 opacity-60 line-through';
                                                 } else if (evt.type === 'IN') {
@@ -860,9 +935,10 @@ export default function PaymentsPage() {
                                                     }
                                                 >
                                                     <div className="flex items-center gap-1 overflow-hidden">
-                                                        {/* EDIT BUTTON (Visible on Hover) */}
-                                                        {evt.paymentId && (
-                                                            <button 
+                                                        {evt.contractEnd ? (
+                                                            <Clock className="w-3 h-3 flex-shrink-0" />
+                                                        ) : evt.paymentId ? (
+                                                            <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     openEditDateModalForEvent(evt);
@@ -872,10 +948,10 @@ export default function PaymentsPage() {
                                                             >
                                                                 <Edit2 className="w-3 h-3" />
                                                             </button>
-                                                        )}
+                                                        ) : null}
                                                         <span className="truncate">{evt.label}</span>
                                                     </div>
-                                                    <span className="font-bold ml-1">{formatMoney(evt.amount, evt.currency || 'USD')}</span>
+                                                    {!evt.contractEnd && <span className="font-bold ml-1">{formatMoney(evt.amount, evt.currency || 'USD')}</span>}
                                                 </div>
                                                 );
                                             })}
@@ -885,6 +961,44 @@ export default function PaymentsPage() {
                             })}
                         </div>
                     </div>
+
+                {/* PRÓXIMOS VENCIMIENTOS */}
+                {(() => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const in90 = new Date(today);
+                    in90.setDate(in90.getDate() + 90);
+                    const upcoming = projects
+                        .filter(p => p.contractEndDate)
+                        .map(p => ({ ...p, endDate: new Date(p.contractEndDate!) }))
+                        .filter(p => p.endDate >= today && p.endDate <= in90)
+                        .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
+                    if (upcoming.length === 0) return null;
+                    return (
+                        <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-800/50 rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                            <h3 className="text-[13px] font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
+                                <Clock className="w-4 h-4" /> Contratos próximos a vencer
+                            </h3>
+                            <div className="space-y-2">
+                                {upcoming.map(p => {
+                                    const diffDays = Math.ceil((p.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                                    const isUrgent = diffDays <= 30;
+                                    return (
+                                        <div key={p.id} className="flex items-center justify-between py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                            <span className="text-[13px] font-semibold text-zinc-900 dark:text-white">{p.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] text-zinc-500">{p.endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isUrgent ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
+                                                    {diffDays === 0 ? 'Hoy' : `${diffDays}d`}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
                 </div>
             )}
 
@@ -989,13 +1103,30 @@ export default function PaymentsPage() {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-3">
                                             <div className="text-right">
                                                 <p className="font-mono font-bold text-lg text-emerald-600 dark:text-emerald-400">
                                                     +${payment.amount.toLocaleString()}
                                                 </p>
                                                 <Badge variant="outline" className="text-[10px]">PAGADO</Badge>
                                             </div>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!confirm(`¿Eliminar el pago de ${payment.client?.name || 'este cliente'}?`)) return;
+                                                    try {
+                                                        await db.payments.delete(payment.id);
+                                                        setPayments(prev => prev.filter(p => p.id !== payment.id));
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        alert('Error al eliminar el pago');
+                                                    }
+                                                }}
+                                                className="p-2 text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Eliminar pago"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                             <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-indigo-500 transition-colors" />
                                         </div>
                                     </div>
@@ -1203,6 +1334,15 @@ export default function PaymentsPage() {
                         </>
                     )}
 
+                    {contextMenu.event.projectId && contextMenu.event.type === 'IN' && !contextMenu.event.contractEnd && (
+                        <>
+                            <div className="border-t border-zinc-100 dark:border-zinc-700 my-1"></div>
+                            <button onClick={openDeleteContractModal} className="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 font-semibold">
+                                <Trash2 className="w-4 h-4" /> Eliminar contrato completo
+                            </button>
+                        </>
+                    )}
+
                     <button onClick={handleWhatsAppReminder} className="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 flex items-center gap-2">
                         <MessageSquare className="w-4 h-4" /> Enviar Recordatorio
                     </button>
@@ -1361,6 +1501,30 @@ export default function PaymentsPage() {
                         <Button variant="ghost" onClick={() => setIsManualTransactionModalOpen(false)}>Cancelar</Button>
                         <Button onClick={submitManualTransaction} disabled={!manualEntityId || !manualAmount}>
                              Guardar Transacción
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL: Confirmar eliminación de contrato completo */}
+            <Modal isOpen={isDeleteContractModalOpen} onClose={() => setIsDeleteContractModalOpen(false)} title="Eliminar contrato completo">
+                <div className="space-y-4">
+                    <div className="flex gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                        <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-red-700 dark:text-red-400 text-sm">Esta acción no se puede deshacer</p>
+                            <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                                Se eliminarán <strong>todos los pagos</strong>, la <strong>propuesta</strong> y el <strong>contrato</strong> de <strong>{deletingContractName}</strong>. El cliente quedará pausado.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsDeleteContractModalOpen(false)}>Cancelar</Button>
+                        <Button
+                            onClick={handleDeleteContractFull}
+                            className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                        >
+                            <Trash2 className="w-4 h-4 mr-1" /> Sí, eliminar todo
                         </Button>
                     </div>
                 </div>

@@ -919,9 +919,15 @@ export const db = {
     delete: async (id: string): Promise<void> => {
         // Delete items first (cascade usually handles this but explicit is safer if no cascade)
         await supabase.from('ProposalItem').delete().eq('proposalId', id);
-        
+
         const { error } = await supabase.from('Proposal').delete().eq('id', id);
         if (error) throw error;
+    },
+
+    getAllByClientId: async (clientId: string): Promise<{ id: string }[]> => {
+        const { data, error } = await supabase.from('Proposal').select('id').eq('clientId', clientId);
+        if (error) throw error;
+        return data || [];
     },
 
     // 1. Función para cambiar estado simple (ej: Rechazar o Poner en Espera)
