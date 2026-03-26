@@ -94,8 +94,8 @@ const META_ANALYST_SYSTEM = `Sos el analista senior de Meta Ads de Algoritmia. A
 ## BENCHMARKS META ADS
 - **CTR de enlace**: bueno ≥1.5% | aceptable 1–1.5% | malo <1% ← este sí es universal (porcentaje, no depende de moneda ni nicho)
 - **Frecuencia**: OK ≤2.5 | atención 2.5–3.5 | fatiga >3.5 ← universal
-- **CPM, CPC, CPA**: NO tienen benchmark universal. Dependen del nicho, país, formato y moneda. NUNCA decir "el CPM es caro" o "el CPC es alto" basándote en un valor numérico absoluto. Un CPM de 3000 en ARS equivale a ~$2 USD, lo cual sería excelente. Un CPM de $50 USD en e-commerce de lujo puede ser perfectamente normal.
-- Para evaluar CPM/CPC: compará relativo — ¿el gasto total es coherente con el alcance? ¿el costo por resultado principal es sostenible para el negocio?
+- **CPM**: benchmark según moneda → ARS: bueno <10.000 | USD: bueno <15. Para otras monedas, evaluá relativo al alcance obtenido.
+- **CPC, CPA**: sin umbral fijo — dependen del ticket promedio del negocio. Evaluá si el costo por resultado es sostenible dado el margen del cliente.
 - **ROAS**: depende del margen del negocio. Un ROAS de 2 puede ser excelente con márgenes altos y malo con márgenes bajos.
 - **CTR ≥ 1.5%** y **Frecuencia ≤ 2.5** sí son benchmarks universales (son ratios, no dependen de moneda ni nicho).
 
@@ -994,11 +994,19 @@ INICIO: ${planStartDate}
                             icon={Activity}
                             color={ctr >= 1.5 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : 'text-red-500'}
                           />
-                          <KpiCard
-                            label="CPM"
-                            value={`${fmtNum(accountInsights?.cpm, 2)}${curr ? ` ${curr}` : ''}`}
-                            sub={curr && curr !== 'USD' ? curr : undefined}
-                          />
+                          {(() => {
+                            const cpmVal = parseFloat(accountInsights?.cpm || 0);
+                            const cpmThreshold = curr === 'ARS' ? 10000 : 15;
+                            const cpmOk = currencyKnown ? cpmVal <= cpmThreshold : true;
+                            return (
+                              <KpiCard
+                                label="CPM"
+                                value={`${fmtNum(cpmVal, 2)}${curr ? ` ${curr}` : ''}`}
+                                sub={currencyKnown && cpmVal > 0 ? (cpmOk ? '✓ OK' : '⚠ Alto') : undefined}
+                                color={currencyKnown && !cpmOk ? 'text-red-500' : 'text-zinc-900 dark:text-white'}
+                              />
+                            );
+                          })()}
                           <KpiCard label="CPC" value={`${fmtNum(accountInsights?.cpc, 2)}${curr ? ` ${curr}` : ''}`} />
                           <KpiCard label="Impresiones" value={parseInt(accountInsights?.impressions || 0).toLocaleString('es-AR')} />
                         </div>
@@ -1102,9 +1110,17 @@ INICIO: ${planStartDate}
                                     <td className={`px-2 py-2 text-right font-mono ${ctr >= 1.5 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : ctr > 0 ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
                                       {ins ? fmtNum(ctr, 2) : '—'}
                                     </td>
-                                    <td className="px-2 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">
-                                      {ins ? fmtNum(ins.cpm, 0) : '—'}
-                                    </td>
+                                    {(() => {
+                                      const cpmVal = parseFloat(ins?.cpm || 0);
+                                      const acctCurr = accountOverview?.currency || '';
+                                      const cpmThreshold = acctCurr === 'ARS' ? 10000 : 15;
+                                      const cpmBad = acctCurr && cpmVal > cpmThreshold;
+                                      return (
+                                        <td className={`px-2 py-2 text-right font-mono ${cpmBad ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                          {ins ? fmtNum(cpmVal, 0) : '—'}
+                                        </td>
+                                      );
+                                    })()}
                                     <td className={`px-2 py-2 text-right font-mono ${freq > 3.5 ? 'text-red-500' : freq > 2.5 ? 'text-amber-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
                                       {ins ? fmtNum(freq, 1) : '—'}
                                     </td>
@@ -1141,10 +1157,10 @@ INICIO: ${planStartDate}
                     <div className="flex items-center gap-4 text-[10px] text-zinc-400 dark:text-zinc-600 flex-wrap pb-4">
                       <span><span className="text-emerald-500 font-bold">●</span> CTR ≥ 1.5%</span>
                       <span><span className="text-emerald-500 font-bold">●</span> Frecuencia ≤ 2.5</span>
+                      <span><span className="text-emerald-500 font-bold">●</span> CPM ≤ {accountOverview?.currency === 'ARS' ? '10.000 ARS' : '$15 USD'}</span>
                       <span className="text-zinc-300 dark:text-zinc-700">|</span>
                       <span><span className="text-amber-500 font-bold">●</span> Puede mejorar</span>
                       <span><span className="text-red-500 font-bold">●</span> Problema</span>
-                      <span className="italic text-zinc-300 dark:text-zinc-600">CPM/CPC sin umbral fijo — depende de nicho y moneda</span>
                     </div>
                   </>
                 )}
