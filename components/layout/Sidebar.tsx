@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Home, Briefcase, Activity, CalendarDays, Calculator, FileText, CheckSquare,
   Users, Rocket, Book, MessageSquareMore, LayoutGrid, Workflow, Settings,
-  X, Sun, Moon, Globe, Megaphone, Target, Sparkles, HardDrive,
+  X, Sun, Moon, Globe, Megaphone, Target, Sparkles, HardDrive, BrainCircuit,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -38,6 +38,7 @@ const sections = [
     title: 'Estrategia',
     items: [
       { path: '/ai-studio',          icon: Sparkles,         label: 'AI Studio',  ai: true },
+      { path: '/ai-analyst',         icon: BrainCircuit,     label: 'AI Analyst', ai: true },
       { path: '/sales-copilot',      icon: MessageSquareMore,label: 'Copiloto IA' },
       { path: '/lab',                icon: Rocket,           label: 'The Lab' },
       { path: '/playbooks',          icon: Book,             label: 'Playbooks' },

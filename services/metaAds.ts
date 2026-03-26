@@ -148,6 +148,20 @@ export const metaAds = {
       limit: '100',
     }),
 
+  // ── CHECK if account has spend in the last 15 days ────────
+  hasRecentSpend: async (accountId: string): Promise<boolean> => {
+    const since = new Date();
+    since.setDate(since.getDate() - 15);
+    const sinceStr = since.toISOString().split('T')[0];
+    const untilStr = new Date().toISOString().split('T')[0];
+    const res = await apiGet(`${accountId}/insights`, {
+      fields: 'spend',
+      time_range: JSON.stringify({ since: sinceStr, until: untilStr }),
+      limit: '1',
+    });
+    return parseFloat(res?.data?.[0]?.spend || 0) > 0;
+  },
+
   // ── ADSETS ────────────────────────────────────────────────
   getAdsets: (campaignId?: string, accountId = META_AD_ACCOUNT) =>
     apiGet(campaignId ? `${campaignId}/adsets` : `${accountId}/adsets`, {

@@ -32,7 +32,7 @@ import MarketingProposalPage from '../../pages/MarketingProposalPage';
 import NewClientPage from '../../pages/NewClientPage';
 import MetaAdsPage from '../../pages/MetaAdsPage';
 import AIStudioPage from '../../pages/AIStudioPage';
-import { GhostingAlert } from '../GhostingAlert';
+import AIAnalystPage from '../../pages/AIAnalystPage';
 
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -115,6 +115,7 @@ export const MainLayout = () => {
             <Route path="/marketing-proposal"   element={<MarketingProposalPage />} />
             <Route path="/meta-ads"             element={<MetaAdsPage />} />
             <Route path="/ai-studio"            element={<AIStudioPage />} />
+            <Route path="/ai-analyst"           element={<AIAnalystPage />} />
           </Routes>
         </div>
 
@@ -122,7 +123,6 @@ export const MainLayout = () => {
           <>
             <AIActionCenter />
             <CommandPalette />
-            <GhostingAlert />
           </>
         )}
       </main>

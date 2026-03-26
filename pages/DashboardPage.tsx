@@ -322,7 +322,12 @@ export default function DashboardPage() {
               const overdue  = pendingTasks.filter(t => t.dueDate && t.dueDate < todayStr);
               const today    = pendingTasks.filter(t => t.dueDate?.startsWith(todayStr));
               const upcoming = pendingTasks.filter(t => !t.dueDate || t.dueDate > todayStr);
-              const sorted   = [...overdue, ...today, ...upcoming].slice(0, 5);
+              const seen = new Set<string>();
+              const sorted = [...overdue, ...today, ...upcoming].filter(t => {
+                if (seen.has(t.id)) return false;
+                seen.add(t.id);
+                return true;
+              }).slice(0, 5);
 
               if (sorted.length === 0) {
                 return (
