@@ -138,7 +138,7 @@ export const metaAds = {
   // ── AD ACCOUNT ────────────────────────────────────────────
   getAccount: (accountId = META_AD_ACCOUNT) =>
     apiGet(accountId, {
-      fields: 'name,currency,timezone_name,account_status,amount_spent,balance,daily_spend_limit',
+      fields: 'name,currency,timezone_name,account_status,amount_spent,balance',
     }),
 
   // ── CAMPAIGNS ─────────────────────────────────────────────
@@ -165,7 +165,7 @@ export const metaAds = {
   // ── ADSETS ────────────────────────────────────────────────
   getAdsets: (campaignId?: string, accountId = META_AD_ACCOUNT) =>
     apiGet(campaignId ? `${campaignId}/adsets` : `${accountId}/adsets`, {
-      fields: 'id,name,status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,start_time,end_time',
+      fields: 'id,name,status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event',
       limit: '50',
     }),
 

@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  metaAds, INSIGHT_FIELDS, daysAgo, today as todayFn, presetToRange,
+  metaAds, INSIGHT_FIELDS, daysAgo, today as todayFn, presetToRange, getPrevPeriod,
   type DatePreset, type TimeRange,
 } from '../services/metaAds';
 import { ai } from '../services/ai';
+import { useToast } from '../components/Toast';
 type ClaudeMessage = { role: 'user' | 'assistant'; content: string };
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
@@ -13,7 +14,9 @@ import {
   BrainCircuit, Settings, Upload, FileDown, Loader2, Send,
   X, Plus, Trash2, BarChart2, Palette, ClipboardList,
   ToggleLeft, ToggleRight, RefreshCw, Zap, TrendingUp, DollarSign,
-  Activity, AlertCircle, CheckCircle2, ExternalLink,
+  Activity, AlertCircle, AlertTriangle, CheckCircle2, ExternalLink,
+  Calendar, ChevronDown, ChevronLeft, ChevronRight, Building2, MessageSquare,
+  PanelRightClose, PanelRightOpen,
 } from 'lucide-react';
 
 // ── Default YT channels ─────────────────────────────────────────────────────
@@ -57,23 +60,13 @@ const buildMetaAnalystSystem = (activeChannels: string[]) => {
 - **El creativo ES la segmentación**: el contenido le dice al algoritmo quién es el público objetivo
 - Señal de cuenta sana: sin intereses, sin Lookalikes, sin exclusiones de audiencias
 
-### Estructura correcta (Andromeda 1)
-  1 Campaña CBO por objetivo de negocio
-    ├── Conjunto Control  → Post IDs de anuncios ganadores validados
-    └── Conjunto Testeo   → DCT 3:2:2 (Broad, sin intereses)
+### Estructura de cuenta (metodología Algoritmia)
+- **Campaña = Buyer Persona**: cada campaña apunta a un segmento de cliente específico (quién es, qué desea, qué le duele)
+- **Conjunto de anuncios = Punto de dolor**: cada conjunto aborda un problema concreto de ese buyer persona
+- **Anuncios = Mensaje por nivel de consciencia**: los creativos dentro del conjunto hablan al mismo dolor pero desde distintos niveles (Inconsciente → Problema → Solución → Producto → Decisión)
 - **CBO obligatorio** (Campaign Budget Optimization): gestiona presupuesto en tiempo real donde hay oportunidad
 - **ABO = ineficiente**: fuerza gasto donde puede no haber oportunidad real ese día
 - Ubicaciones: **Advantage+ automático** en todos los conjuntos (Meta decide el placement óptimo)
-
-### Framework de testeo: DCT 3:2:2
-| Elemento | Cantidad |
-|---|---|
-| Creativos (videos O imágenes, NUNCA mezclados) | 3 |
-| Textos principales | 2 |
-| Títulos | 2 |
-- Meta genera miles de combinaciones → después de 3-7 días identifica el ganador
-- **Cosecha de ganadores**: extraer Post ID del ganador → mover al Conjunto Control
-- El testeo sigue corriendo mientras sea rentable (no se apaga ni se escala)
 
 ### Escalado: Regla del 5%
 - Aumentar presupuesto CBO un **5% tres veces por semana** (≈20% semanal distribuido)
@@ -113,7 +106,7 @@ const buildMetaAnalystSystem = (activeChannels: string[]) => {
 - NO uses frases vacías como "excelente pregunta" o "es importante mencionar"
 - Nombrá cada campaña exactamente como aparece en los datos
 - Cuantificá siempre: no "el CTR es bajo" → "el CTR es 0.75% cuando el benchmark es ≥1.5%"
-- NUNCA inventes datos. Si no podés confirmar al 100% que están usando CBO, ABO, exclusiones o Broad basándote SÓLO en la tabla, no lo asumas. Evaluá estrictamente lo que ves (Nombres, Gasto, ROAS, Costo).
+- NUNCA inventes datos. Evaluá estrictamente lo que ves en los números: Gasto, ROAS, CTR, CPM, Frecuencia, Alcance, CPA. No asumas nada sobre configuración interna (CBO, ABO, targeting, exclusiones) que no esté explícitamente en los datos.
 - Para cada campaña: MANTENER / ESCALAR / EVALUAR / PAUSAR / DESACTIVAR con razón concreta`;
 };
 
@@ -127,6 +120,142 @@ const ACTION_STYLES: Record<string, string> = {
 
 const PIE_COLORS = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6','#f97316','#84cc16'];
 
+// ── Funnel Badge with rich tooltip ───────────────────────────────────────────
+const FunnelBadge: React.FC<{
+  stage: 'TOFU'|'MOFU'|'BOFU';
+  info: { reason: string; description: string };
+  ins?: any;
+  currency?: string;
+  size?: 'xs' | 'sm';
+}> = ({ stage, info, ins, currency = 'ARS', size = 'xs' }) => {
+  const styles = {
+    TOFU: { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
+    MOFU: { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', border: 'border-amber-200 dark:border-amber-800' },
+    BOFU: { badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' },
+  };
+  const s = styles[stage];
+  const textSize = size === 'xs' ? 'text-[7px]' : 'text-[9px]';
+  const ctr = ins ? parseFloat(ins.inline_link_click_ctr || 0) : null;
+  const freq = ins ? parseFloat(ins.frequency || 0) : null;
+  const roas = ins?.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : null;
+  const spend = ins ? parseFloat(ins.spend || 0) : null;
+  const cpm = ins ? parseFloat(ins.cpm || 0) : null;
+  const reach = ins?.reach ? parseInt(ins.reach) : null;
+  const score = ins ? calcPerfScore(ins, currency) : null;
+  const scoreColor = score !== null ? (score >= 70 ? 'text-emerald-600' : score >= 45 ? 'text-amber-500' : 'text-red-500') : '';
+
+  const benchmarks: Record<string, { ctr: number; freq: number }> = {
+    TOFU: { ctr: 0.8, freq: 3 }, MOFU: { ctr: 1.0, freq: 4 }, BOFU: { ctr: 1.5, freq: 3.5 },
+  };
+  const bench = benchmarks[stage];
+
+  return (
+    <div className="relative group inline-flex flex-shrink-0">
+      <span className={`${textSize} font-bold px-1 py-0.5 rounded cursor-help ${s.badge}`}>{stage}</span>
+      {/* Tooltip */}
+      <div className={`absolute bottom-full left-0 mb-2 w-64 bg-zinc-900 dark:bg-zinc-800 text-white rounded-xl shadow-2xl border ${s.border} opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-150 z-[100]`}
+           style={{ minWidth: '240px' }}>
+        {/* Header */}
+        <div className={`px-3 py-2 border-b border-zinc-700 flex items-center justify-between`}>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${s.badge}`}>{stage}</span>
+          {score !== null && <span className={`text-[11px] font-bold ${scoreColor}`}>Score {score}</span>}
+        </div>
+        {/* Description */}
+        <div className="px-3 py-2 border-b border-zinc-700/50">
+          <p className="text-[10px] text-zinc-300 leading-snug">{info.description}</p>
+          <p className="text-[9px] text-zinc-500 mt-1">{info.reason}</p>
+        </div>
+        {/* Metrics */}
+        {ins && (
+          <div className="px-3 py-2 grid grid-cols-2 gap-1.5">
+            {spend !== null && spend > 0 && <div><p className="text-[8px] text-zinc-500 uppercase">Gasto</p><p className="text-[11px] font-bold text-white">{fmtNum(spend, 0)} {currency}</p></div>}
+            {reach !== null && <div><p className="text-[8px] text-zinc-500 uppercase">Alcance</p><p className="text-[11px] font-bold text-white">{reach.toLocaleString('es-AR')}</p></div>}
+            {ctr !== null && ctr > 0 && <div><p className="text-[8px] text-zinc-500 uppercase">CTR</p><p className={`text-[11px] font-bold ${ctr >= bench.ctr ? 'text-emerald-400' : 'text-red-400'}`}>{fmtNum(ctr, 2)}% {ctr >= bench.ctr ? '✓' : `↓ bench ${bench.ctr}%`}</p></div>}
+            {freq !== null && freq > 0 && <div><p className="text-[8px] text-zinc-500 uppercase">Frecuencia</p><p className={`text-[11px] font-bold ${freq <= bench.freq ? 'text-emerald-400' : 'text-red-400'}`}>{fmtNum(freq, 2)} {freq > bench.freq ? '⚠ alta' : '✓'}</p></div>}
+            {cpm !== null && cpm > 0 && <div><p className="text-[8px] text-zinc-500 uppercase">CPM</p><p className="text-[11px] font-bold text-white">{fmtNum(cpm, 0)} {currency}</p></div>}
+            {roas !== null && roas > 0 && <div><p className="text-[8px] text-zinc-500 uppercase">ROAS</p><p className={`text-[11px] font-bold ${roas >= 2 ? 'text-emerald-400' : roas >= 1 ? 'text-amber-400' : 'text-red-400'}`}>{fmtNum(roas, 2)}</p></div>}
+          </div>
+        )}
+        {!ins && <p className="px-3 py-2 text-[10px] text-zinc-500 italic">Sin métricas en el período seleccionado</p>}
+        {/* Arrow */}
+        <div className="absolute top-full left-3 border-4 border-transparent border-t-zinc-900 dark:border-t-zinc-800" />
+      </div>
+    </div>
+  );
+};
+
+const FUNNEL_STYLES = {
+  TOFU: { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', row: 'bg-blue-50/20 dark:bg-blue-900/5', dot: 'bg-blue-400', label: 'TOFU', desc: 'Frío — Atraer' },
+  MOFU: { badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300', row: 'bg-amber-50/20 dark:bg-amber-900/5', dot: 'bg-amber-400', label: 'MOFU', desc: 'Tibio — Considerar' },
+  BOFU: { badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', row: 'bg-emerald-50/20 dark:bg-emerald-900/5', dot: 'bg-emerald-400', label: 'BOFU', desc: 'Caliente — Cerrar' },
+} as const;
+type FunnelStage = 'TOFU' | 'MOFU' | 'BOFU';
+
+function classifyFunnel(objective: string, optimizationGoal?: string): FunnelStage {
+  return getFunnelInfo(objective, optimizationGoal).stage;
+}
+
+interface FunnelInfo { stage: FunnelStage; reason: string; description: string; }
+function getFunnelInfo(objective: string, optimizationGoal?: string): FunnelInfo {
+  const obj = (objective || '').toUpperCase();
+  const goal = (optimizationGoal || '').toUpperCase();
+
+  // — TOFU: alcance puro, awareness, impresiones
+  if (['REACH', 'IMPRESSIONS', 'BRAND_AWARENESS', 'AD_RECALL_LIFT', 'OUTCOME_AWARENESS'].some(k => goal.includes(k) || obj.includes(k)))
+    return { stage: 'TOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'TOFU = audiencia fría. El creativo busca generar conocimiento de marca. Benchmark: CTR >0.8%, Frecuencia <3.' };
+
+  // — MOFU: consideración, tráfico, engagement, video, mensajes, clics
+  if (['LINK_CLICKS', 'LANDING_PAGE_VIEWS', 'POST_ENGAGEMENT', 'VIDEO_VIEWS', 'PAGE_LIKES',
+       'CONVERSATIONS', 'THRUPLAY', 'MESSAGING_APPOINTMENT', 'MESSAGING_PURCHASE'].some(k => goal.includes(k)))
+    return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'MOFU = audiencia tibia. El creativo busca interacción y consideración. Benchmark: CTR >1%, Frecuencia <4.' };
+  if (['TRAFFIC', 'ENGAGEMENT', 'VIDEO_VIEWS', 'MESSAGES', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].some(k => obj.includes(k) || goal.includes(k)))
+    return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'MOFU = audiencia tibia. El creativo busca interacción y consideración. Benchmark: CTR >1%, Frecuencia <4.' };
+
+  // — BOFU: conversiones, leads, compras, valor
+  if (['OFFSITE_CONVERSIONS', 'VALUE', 'PURCHASE_ROAS', 'LEAD_GENERATION', 'QUALITY_LEAD',
+       'QUALIFIED_LEAD', 'CONVERTED_LEAD', 'STORE_VISITS'].some(k => goal.includes(k)))
+    return { stage: 'BOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'BOFU = audiencia caliente. El creativo busca cerrar una conversión directa. Benchmark: CTR >1.5%, ROAS >2, Frecuencia <3.5.' };
+  if (['SALES', 'CONVERSION', 'LEAD', 'APP', 'OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_APP'].some(k => obj.includes(k)))
+    return { stage: 'BOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'BOFU = audiencia caliente. El creativo busca cerrar una conversión directa. Benchmark: CTR >1.5%, ROAS >2, Frecuencia <3.5.' };
+
+  if (['AWARENESS', 'REACH', 'OUTCOME_AWARENESS', 'OUTCOME_REACH'].some(k => obj.includes(k)))
+    return { stage: 'TOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'TOFU = audiencia fría. El creativo busca generar conocimiento de marca. Benchmark: CTR >0.8%.' };
+
+  return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'Clasificación por defecto — objetivo no reconocido. Se asume etapa de consideración.' };
+}
+
+function funnelBadPerf(stage: FunnelStage, ins: any): string[] {
+  if (!ins) return [];
+  const issues: string[] = [];
+  const ctr = parseFloat(ins.inline_link_click_ctr || 0);
+  const freq = parseFloat(ins.frequency || 0);
+  const roas = parseFloat(ins.purchase_roas?.[0]?.value || 0);
+  const spend = parseFloat(ins.spend || 0);
+  const cpm = parseFloat(ins.cpm || 0);
+  const actions: any[] = ins.actions || [];
+  const hasAnyResult = actions.some((a: any) =>
+    ['lead','offsite_conversion.fb_pixel_purchase','omni_purchase','onsite_conversion.lead_grouped',
+     'onsite_conversion.messaging_conversation_started_7d','offsite_conversion.fb_pixel_lead'].includes(a.action_type)
+    && parseFloat(a.value || 0) > 0
+  );
+  if (stage === 'TOFU') {
+    if (ctr > 0 && ctr < 0.8) issues.push('CTR bajo para TOFU');
+    if (freq > 3.5) issues.push('Frecuencia alta — rotar');
+    if (ctr === 0 && spend > 200) issues.push('Sin clics — creativo frío');
+  } else if (stage === 'MOFU') {
+    if (ctr > 0 && ctr < 0.5) issues.push('CTR muy bajo');
+    if (freq > 4) issues.push('Frecuencia alta — rotar');
+  } else {
+    // BOFU: evaluar según el tipo de conversión real
+    if (roas > 0 && roas < 1) issues.push('ROAS < 1 — pierde dinero');
+    if (spend > 500 && roas === 0 && !hasAnyResult) issues.push('Sin conversiones — revisar pixel');
+    if (freq > 4) issues.push('Frecuencia alta — saturado');
+    if (ctr > 0 && ctr < 0.5) issues.push('CTR muy bajo');
+    if (cpm > 0 && roas === 0 && !hasAnyResult && spend > 1000) issues.push('CPM sin retorno');
+  }
+  return issues;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const getMetaVal = (actions: any[], ...types: string[]): string | null => {
   for (const t of types) {
@@ -139,7 +268,7 @@ const getMetaVal = (actions: any[], ...types: string[]): string | null => {
 const fmtNum = (v: any, decimals = 0): string => {
   const n = parseFloat(v || 0);
   if (isNaN(n)) return '—';
-  return n.toFixed(decimals);
+  return n.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 };
 
 // Returns the primary result matching Meta Ads Manager — strictly objective-based
@@ -277,36 +406,47 @@ CUENTA: ${accountName} (${accountId})
 MONEDA PRINCIPAL PARA EL ANÁLISIS: ${currency}
 PERÍODO: ${period}
 
-DATOS DE CAMPAÑAS:
+DATOS DE CAMPAÑAS (incluye conjuntos de anuncios y anuncios individuales):
 ${campData}
 
-Generá el análisis con estas secciones (usá los números de las campañas reales de los datos):
+Generá el análisis con estas secciones. Usá emojis de semáforo para marcar el estado rápidamente: 🟢 bien, 🟡 atencion, 🔴 problema critico.
 
 ## DIAGNÓSTICO GENERAL
-Estado de la cuenta: inversión total, ROAS blended estimado, métricas clave con benchmark. Una frase de diagnóstico general.
+Estado de la cuenta en 3-4 líneas: inversión total, ROAS blended, CTR cuenta, frecuencia. Benchmarks: CTR >1.5% bueno, >2.5% excelente. Frecuencia <2.5 ok, >3.5 fatiga crítica. Una frase de diagnóstico general con emoji de semáforo.
 
-## ANÁLISIS DE RENDIMIENTO Y ESTRUCTURA (Basado estrictamente en datos reales)
-Analizá SÓLO la información numérica y de nomenclatura de la tabla:
-- ¿Hay demasiada fragmentación de presupuesto en múltiples campañas pequeñas, o está consolidado?
-- ¿La nomenclatura revela segmentaciones erróneas que perjudican al algoritmo (ej: intereses en vez de Broad)?
-- Costos de Negocio: ROAS y CPA comparados con la inversión. ¿Son rentables?
-- Atención algorítmica: Frecuencia (fatiga), CTR (atención) y CPM.
-- IMPORTANTE: No intentes adivinar si usa CBO, ABO, DCT, o exclusiones internamente si los datos no lo dicen 100%. Sé analítico con los KPIs tangibles de esta cuenta.
+## ANÁLISIS POR CAMPAÑA (detalle completo)
+IMPORTANTE: En los datos, los nombres vienen entre comillas: CAMPAÑA "Nombre Real", CONJUNTO "Nombre Real", ANUNCIO "Nombre Real". Usá EXACTAMENTE ese texto entre comillas, sin agregar Estado, Objetivo, funnel ni ningún otro sufijo.
 
-## ANÁLISIS POR CAMPAÑA
-Para cada campaña activa con datos, evaluala según su objetivo real (Mensajes, Leads, Clics, Compras, Interacciones, etc. — lo que figura como "Resultado principal" en los datos). NO evalúes todas por compras si su objetivo es otro.
-Formato exacto: **[Nombre exacto]**: MANTENER/ESCALAR/EVALUAR/PAUSAR — [razón en 1 línea con el número concreto que lo justifica]
+Para CADA campaña en los datos, hacer un bloque así:
+
+### [nombre entre comillas tal como aparece] — 🟢/🟡/🔴 MANTENER/ESCALAR/EVALUAR/PAUSAR
+**Métricas clave:** Gasto: X | ROAS: X | CTR: X% | Frecuencia: X | CPM: X
+**Veredicto en 1 línea:** [razón con número concreto que lo justifica]
+
+**Conjuntos de anuncios:**
+Para cada conjunto con datos, una línea:
+- [nombre del conjunto entre comillas]: 🟢/🟡/🔴 Gasto=X | CTR=X% | Frec=X | [acción: mantener/testear/pausar] — [razón en 5 palabras]
+
+**Anuncios individuales:**
+Para cada anuncio con datos, una línea:
+- [nombre del anuncio entre comillas] ([TOFU/MOFU/BOFU]): 🟢/🟡/🔴 Gasto=X | CTR=X% | [problema si existe] — [acción concreta]
+Si un anuncio tiene alertas detectadas (alta frecuencia, CTR bajo, ROAS negativo), marcarlo con 🔴 y explicar brevemente.
+Si no tiene datos en el período, indicar: ⚫ Sin gasto en período
 
 ## PROBLEMAS DETECTADOS (según Andromeda)
-Los 3-5 problemas concretos: estructura incorrecta, métricas fuera de benchmark, posibles "ladrones de crédito", fase de aprendizaje reiniciada, presupuesto mal distribuido, etc.
+Los 3-5 problemas concretos marcados con 🔴: estructura incorrecta, métricas fuera de benchmark, posibles "ladrones de crédito", fase de aprendizaje reiniciada, presupuesto mal distribuido, fragmentación excesiva, etc.
+Cada problema: **Problema:** descripción | **Evidencia:** número concreto | **Impacto:** consecuencia
 
 ## OPORTUNIDADES INMEDIATAS
-3 acciones concretas ordenadas por impacto. Para cada una: qué hacer, por qué, qué resultado esperar.
+3 acciones marcadas con 🟢, ordenadas por impacto esperado:
+1. **[Qué hacer]** → [Por qué] → [Resultado esperado con estimación]
+2. ...
+3. ...
 
-## PRÓXIMO PASO (esta semana)
-Una sola acción prioritaria. Concisa, accionable, sin vaguedades.
+## PRÓXIMO PASO ESTA SEMANA
+Una sola acción. Concisa, accionable, con la campaña o conjunto exacto a modificar.
 
-Sé específico: usá números reales de los datos, nombrá campañas exactamente, comparalos siempre contra benchmarks.`;
+Sé específico: usá números reales de los datos, nombrá campañas y anuncios exactamente, siempre compará contra benchmarks. Si un conjunto o anuncio no tiene datos en el período, indicarlo con ⚫ y no inventar métricas.`;
 }
 
 function buildCreativityPrompt(campData: string, accountName: string, period: string, currency = 'USD'): string {
@@ -321,11 +461,12 @@ ${campData}
 ## ESTADO CREATIVO GENERAL
 CTR promedio vs benchmark (≥1.5%), frecuencia, señales de fatiga creativa.
 
-## EVALUACIÓN DCT 3:2:2
-¿Los conjuntos de testeo tienen 3 creativos + 2 textos + 2 títulos? ¿Los creativos son todos del mismo formato (todos video O todas imágenes, no mezclados)? ¿Hay ganadores siendo cosechados al Conjunto Control vía Post ID?
+## ESTRUCTURA CREATIVA (Metodología Algoritmia)
+La estructura correcta es: Campaña = Buyer Persona, Conjunto = Punto de dolor, Creativos = Mensajes para distintos niveles de consciencia (Inconsciente / Problema / Solución / Producto / Decisión).
+Basándote SOLO en los datos de CTR, frecuencia y rendimiento por campaña: ¿los anuncios parecen estar hablándole a públicos específicos o son genéricos? ¿Hay señales de que todos los anuncios dicen lo mismo (misma tasa de CTR, misma frecuencia) o hay variación que sugiere mensajes diferenciados?
 
 ## EL CREATIVO COMO SEGMENTACIÓN
-¿Los creativos actuales le "hablan" claramente a un perfil específico? ¿Le están comunicando un dolor o deseo concreto que permite al algoritmo encontrar al público correcto? Ejemplos de qué dice cada anuncio principal.
+¿El CTR y el alcance sugieren que los creativos actuales le "hablan" claramente a un perfil específico? ¿Un dolor o deseo concreto que permite al algoritmo encontrar al público correcto? Evaluá esto solo desde los números, no desde los nombres.
 
 ## SEÑALES DE "LADRÓN DE CRÉDITO"
 ¿Hay anuncios de retargeting agresivo, cupones o descuentos directos corriendo por separado? Si los hay, explicar el riesgo y recomendar integrarlos al CBO Broad principal.
@@ -335,6 +476,145 @@ CTR promedio vs benchmark (≥1.5%), frecuencia, señales de fatiga creativa.
 
 ## 5 IDEAS DE CREATIVOS A TESTEAR
 Para cada idea: formato (video/imagen/carrusel), ángulo del mensaje, nivel de consciencia del avatar (Inconsciente / Problema / Solución / Producto / Decisión), y gancho de los primeros 3 segundos.`;
+}
+
+function buildClientCampData(camps: any[], insights: Record<string, any>): string {
+  return camps.map((c: any) => {
+    const ins = insights[c.id];
+    if (!ins || parseFloat(ins.spend || '0') <= 0) return null;
+    const metric = getPrimaryMetric(c.objective || '', ins);
+    const roas = ins.purchase_roas?.[0]?.value ? fmtNum(ins.purchase_roas[0].value, 2) : '—';
+    return `Campaña: ${c.name}\n  Gasto: ${fmtNum(ins.spend, 0)} | Resultado: ${metric.label}=${metric.value} | Costo/Resultado: ${metric.cost} | ROAS: ${roas} | Alcance: ${ins.reach || '0'} | CTR: ${fmtNum(ins.inline_link_click_ctr, 2)}% | Impresiones: ${ins.impressions || '0'} | Clicks: ${ins.clicks || '0'}`;
+  }).filter(Boolean).join('\n');
+}
+
+const getCpmThreshold = (currency: string) => currency === 'ARS' ? 10000 : 15;
+
+function calcPerfScore(ins: any, currency: string): number {
+  // Score 0-100 basado en todas las métricas — no solo conversiones
+  // CTR: engagement del creativo (25pts)
+  // CPM: eficiencia de entrega (15pts)
+  // Frecuencia: saturación de audiencia (20pts)
+  // Resultados relativos: lead/compra/click por cada 1000 ARS/USD invertidos (20pts)
+  // ROAS: solo si hay datos de compra (20pts)
+  if (!ins || parseFloat(ins.spend || '0') <= 0) return 0;
+  const cpmThreshold = getCpmThreshold(currency);
+  let score = 50;
+  const ctr = parseFloat(ins.inline_link_click_ctr || 0);
+  const roas = ins.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : 0;
+  const freq = parseFloat(ins.frequency || 0);
+  const cpm = parseFloat(ins.cpm || 0);
+  const spend = parseFloat(ins.spend || 0);
+  const actions: any[] = ins.actions || [];
+  // Contar resultados de cualquier tipo (leads, compras, mensajes)
+  const totalResults = actions
+    .filter((a: any) => ['lead','offsite_conversion.fb_pixel_purchase','omni_purchase',
+      'onsite_conversion.lead_grouped','onsite_conversion.messaging_conversation_started_7d',
+      'offsite_conversion.fb_pixel_lead','link_click'].includes(a.action_type))
+    .reduce((s: number, a: any) => s + parseFloat(a.value || 0), 0);
+  const costPerResult = totalResults > 0 ? spend / totalResults : 0;
+
+  // CTR — señal de engagement del creativo (±20)
+  if (ctr >= 2.5) score += 20;
+  else if (ctr >= 1.5) score += 12;
+  else if (ctr >= 1) score += 5;
+  else if (ctr >= 0.5) score -= 8;
+  else if (ctr > 0) score -= 18;
+
+  // Frecuencia — saturación de audiencia (solo penaliza, no premia)
+  if (freq > 5) score -= 25;
+  else if (freq > 4) score -= 18;
+  else if (freq > 3.5) score -= 12;
+  else if (freq > 2.5) score -= 5;
+
+  // CPM — eficiencia de entrega (±10)
+  if (cpm > 0 && cpm < cpmThreshold * 0.5) score += 8;
+  else if (cpm > cpmThreshold * 2) score -= 12;
+  else if (cpm > cpmThreshold * 1.5) score -= 7;
+  else if (cpm > cpmThreshold) score -= 3;
+
+  // ROAS — solo si hay datos de compra (±20)
+  if (roas >= 4) score += 20;
+  else if (roas >= 2.5) score += 12;
+  else if (roas >= 1.5) score += 6;
+  else if (roas > 0 && roas < 1) score -= 18;
+
+  // Eficiencia relativa: resultados por unidad de gasto (±8)
+  // Si tiene resultados sin datos de compra, al menos suma algo
+  if (roas === 0 && costPerResult > 0) {
+    const efficiency = (currency === 'ARS' ? 1000 : 1) / costPerResult;
+    if (efficiency > 0.5) score += 8;
+    else if (efficiency > 0.1) score += 4;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function buildClientReportPrompt(camps: any[], insights: Record<string, any>, accountName: string, period: string, currency: string, accountInsights: any, prevInsights?: any, prevPeriod?: string): string {
+  const campData = buildClientCampData(camps, insights);
+  const curr = currency || 'ARS';
+  const totalSpend = accountInsights ? fmtNum(accountInsights.spend, 0) : '—';
+  const totalReach = accountInsights?.reach ? parseInt(accountInsights.reach).toLocaleString('es-AR') : '—';
+  const blendedRoas = accountInsights?.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2) : '—';
+  const ctr = accountInsights ? fmtNum(accountInsights.inline_link_click_ctr, 2) : '—';
+  const cpm = accountInsights ? fmtNum(accountInsights.cpm, 0) : '—';
+  const freq = accountInsights ? fmtNum(accountInsights.frequency, 2) : '—';
+
+  let comparisonBlock = '';
+  let prevSpend = '';
+  let prevReach = '';
+  let prevRoas = '';
+  let prevCtr = '';
+  if (prevInsights && prevPeriod) {
+    prevSpend = fmtNum(prevInsights.spend, 0);
+    prevReach = prevInsights?.reach ? parseInt(prevInsights.reach).toLocaleString('es-AR') : '—';
+    prevRoas = prevInsights?.purchase_roas?.[0]?.value ? fmtNum(prevInsights.purchase_roas[0].value, 2) : '—';
+    prevCtr = fmtNum(prevInsights.inline_link_click_ctr, 2);
+    const spendDiff = prevInsights.spend && accountInsights?.spend ? ((parseFloat(accountInsights.spend) - parseFloat(prevInsights.spend)) / parseFloat(prevInsights.spend) * 100).toFixed(1) : null;
+    const reachDiff = prevInsights.reach && accountInsights?.reach ? ((parseInt(accountInsights.reach) - parseInt(prevInsights.reach)) / parseInt(prevInsights.reach) * 100).toFixed(1) : null;
+    comparisonBlock = `\nCOMPARACIÓN CON PERÍODO ANTERIOR (${prevPeriod}):
+- Inversión anterior: ${prevSpend} ${curr}${spendDiff ? ` → variación: ${parseFloat(spendDiff) >= 0 ? '+' : ''}${spendDiff}%` : ''}
+- Personas alcanzadas anterior: ${prevReach}${reachDiff ? ` → variación: ${parseFloat(reachDiff) >= 0 ? '+' : ''}${reachDiff}%` : ''}
+- ROAS anterior: ${prevRoas}
+- CTR anterior: ${prevCtr}%\n`;
+  }
+
+  return `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera EXCLUSIVAMENTE en ${curr}. TODOS los valores monetarios deben mostrarse en ${curr}. NUNCA uses USD ni el símbolo $ sin el código de moneda ${curr}.
+
+INSTRUCCIÓN: Generá un reporte para el cliente final. El cliente no sabe de publicidad digital. Explicá todo en lenguaje simple, sin jerga técnica. Solo datos objetivos, SIN recomendaciones de estrategia, SIN proyecciones, SIN decir qué está "bien" o "mal" como juicio — solo describir qué pasó con los números.
+
+CUENTA: ${accountName}
+PERÍODO ACTUAL: ${period}
+MONEDA DE LA CUENTA: ${curr}
+
+DATOS GLOBALES DE LA CUENTA (período actual):
+- Inversión total: ${totalSpend} ${curr}
+- Personas alcanzadas: ${totalReach}
+- ROAS: ${blendedRoas}
+- CTR promedio: ${ctr}%
+- CPM: ${cpm} ${curr}
+- Frecuencia: ${freq}
+${comparisonBlock}
+DATOS POR CAMPAÑA:
+${campData}
+
+Generá el reporte con EXACTAMENTE estas secciones (en este orden):
+
+## Resumen del período
+En 2-3 oraciones simples: cuánto se invirtió, a cuántas personas llegó, cuántos resultados se obtuvieron. Sin tecnicismos. Poné en **negrita** los números más importantes (inversión total, personas alcanzadas, resultados totales).${prevInsights ? '\nIncluí una oración comparando con el período anterior: qué subió o bajó y en qué porcentaje.' : ''}
+
+## Resultados principales
+Una tabla simple. Columnas: Campaña | Inversión (${curr}) | Personas alcanzadas | Resultado principal | Costo por resultado (${curr}). Usá el nombre de la campaña tal como aparece. Omití campañas sin gasto. Los números en la tabla deben estar en **negrita**.${prevInsights ? `\nDebajo de la tabla, agregar una fila de comparación o una nota breve indicando la variación respecto al período anterior (${prevPeriod}): inversión ${prevSpend} ${curr} → ${totalSpend} ${curr}, alcance ${prevReach} → ${totalReach}.` : ''}
+
+## Desglose por campaña
+Para cada campaña con gasto, UN párrafo breve (2-3 oraciones) describiendo qué hizo esa campaña: cuánto se invirtió, a quién llegó (cuántas personas), y cuántos resultados generó. Poné en **negrita** los números clave de cada párrafo (inversión, personas, resultados). Sin análisis técnico, solo descripción de hechos.${prevInsights ? ' Si la campaña tuvo una variación notable respecto al período anterior, mencionarla en 1 frase.' : ''}
+
+Notas de formato:
+- SIEMPRE usá el código de moneda ${curr} junto a los valores monetarios
+- Poné en **negrita** todos los números importantes: inversiones, personas alcanzadas, resultados, costos por resultado
+- No uses palabras como "excelente", "bajo", "alto" como juicio — solo describí el número
+- No uses "se recomienda", "deberías", "es importante" — solo describí lo que pasó
+- Tono: profesional, directo, claro para alguien sin conocimientos técnicos`;
 }
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
@@ -488,6 +768,256 @@ const renderMarkdown = (text: string): React.ReactNode => {
   return <>{elements}</>;
 };
 
+// ── Meta-style Date Picker ────────────────────────────────────
+const AI_DATE_PRESETS: { value: DatePreset; label: string }[] = [
+  { value: 'today',        label: 'Hoy' },
+  { value: 'yesterday',    label: 'Ayer' },
+  { value: 'last_7d',      label: 'Últimos 7 días' },
+  { value: 'last_14d',     label: 'Últimos 14 días' },
+  { value: 'last_28d',     label: 'Últimos 28 días' },
+  { value: 'this_month',   label: 'Este mes' },
+  { value: 'last_month',   label: 'Mes anterior' },
+  { value: 'last_6months', label: 'Últimos 6 meses' },
+  { value: 'last_year',    label: 'Último año' },
+];
+
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const MESES_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function diasEnMes(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
+function primerDia(y: number, m: number) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
+function toISO(y: number, m: number, d: number) { return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+const CalMes = ({ year, month, onYearMonth, since, until, hovering, onDay, onHover, showPrev, showNext }: {
+  year: number; month: number;
+  onYearMonth: (y: number, m: number) => void;
+  since: string; until: string; hovering: string;
+  onDay: (d: string) => void; onHover: (d: string) => void;
+  showPrev: boolean; showNext: boolean;
+}) => {
+  const total = diasEnMes(year, month);
+  const offset = primerDia(year, month);
+  const cells: (number|null)[] = [...Array(offset).fill(null), ...Array.from({length:total},(_,i)=>i+1)];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const years = Array.from({length: 10}, (_, i) => new Date().getFullYear() - 3 + i);
+
+  return (
+    <div className="w-[210px]">
+      {/* Month/Year header */}
+      <div className="flex items-center justify-between mb-2">
+        {showPrev ? (
+          <button onClick={() => { const d = new Date(year, month - 1); onYearMonth(d.getFullYear(), d.getMonth()); }}
+            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-500 transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+        ) : <div className="w-6" />}
+
+        <div className="flex items-center gap-1">
+          <select value={month} onChange={e => onYearMonth(year, parseInt(e.target.value))}
+            className="text-[12px] font-semibold text-zinc-800 dark:text-zinc-100 bg-transparent border-0 cursor-pointer focus:outline-none hover:text-blue-600 dark:hover:text-blue-400 pr-0.5">
+            {MESES_FULL.map((m, i) => <option key={i} value={i}>{m}</option>)}
+          </select>
+          <ChevronDown className="w-3 h-3 text-zinc-400 -ml-1 pointer-events-none" />
+          <select value={year} onChange={e => onYearMonth(parseInt(e.target.value), month)}
+            className="text-[12px] font-semibold text-zinc-800 dark:text-zinc-100 bg-transparent border-0 cursor-pointer focus:outline-none hover:text-blue-600 dark:hover:text-blue-400 pr-0.5">
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <ChevronDown className="w-3 h-3 text-zinc-400 -ml-1 pointer-events-none" />
+        </div>
+
+        {showNext ? (
+          <button onClick={() => { const d = new Date(year, month + 1); onYearMonth(d.getFullYear(), d.getMonth()); }}
+            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-500 transition-colors">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        ) : <div className="w-6" />}
+      </div>
+
+      {/* Day headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {DIAS.map(d => <div key={d} className="text-center text-[10px] font-semibold text-zinc-400 pb-0.5">{d}</div>)}
+      </div>
+
+      {/* Days grid */}
+      <div className="grid grid-cols-7">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} className="h-7" />;
+          const iso = toISO(year, month, day);
+          const isS = iso === since, isE = iso === until;
+          const inR = since && until && iso > since && iso < until;
+          const inH = hovering && since && !until && iso > since && iso <= hovering;
+          const isToday = iso === todayFn();
+          return (
+            <button key={i} onClick={() => onDay(iso)} onMouseEnter={() => onHover(iso)}
+              className={[
+                'h-7 w-full flex items-center justify-center text-[11px] font-medium transition-all relative',
+                isS ? 'bg-blue-600 text-white rounded-l-full' : '',
+                isE ? 'bg-blue-600 text-white rounded-r-full' : '',
+                isS && !until ? 'rounded-full' : '',
+                isS && until ? 'rounded-l-full' : '',
+                isE ? 'rounded-r-full' : '',
+                (inR || inH) ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200' : '',
+                !isS && !isE && !inR && !inH ? 'hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-full text-zinc-700 dark:text-zinc-300' : '',
+              ].filter(Boolean).join(' ')}>
+              <span className={[isS || isE ? '' : '', 'relative z-10'].join(' ')}>{day}</span>
+              {isToday && !isS && !isE && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const MetaDatePicker = ({ mode, preset, since, until, onApply }: {
+  mode: 'preset' | 'custom'; preset: DatePreset; since: string; until: string;
+  onApply: (mode: 'preset' | 'custom', preset: DatePreset, since: string, until: string) => void;
+}) => {
+  const [open, setOpen] = React.useState(false);
+  const [sm, setSm] = React.useState<'preset'|'custom'>(mode);
+  const [sp, setSp] = React.useState<DatePreset>(preset);
+  const [ss, setSs] = React.useState(since);
+  const [su, setSu] = React.useState(until);
+  const [hov, setHov] = React.useState('');
+  const nowD = new Date();
+  const [ly, setLy] = React.useState(nowD.getFullYear());
+  const [lm, setLm] = React.useState(nowD.getMonth() === 0 ? 11 : nowD.getMonth() - 1);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  // Right calendar is always one month ahead of left
+  const rm = lm === 11 ? 0 : lm + 1;
+  const ry = lm === 11 ? ly + 1 : ly;
+
+  React.useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const handleOpen = () => {
+    setSm(mode); setSp(preset); setSs(since); setSu(until); setHov('');
+    if (since) {
+      const d = new Date(since);
+      // Show the month before since in left calendar so since is visible in right
+      const prevM = d.getMonth() === 0 ? 11 : d.getMonth() - 1;
+      const prevY = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+      setLy(prevY); setLm(prevM);
+    }
+    setOpen(true);
+  };
+
+  const pickPreset = (p: DatePreset) => {
+    setSm('preset'); setSp(p);
+    const r = presetToRange(p); setSs(r.since); setSu(r.until); setHov('');
+  };
+
+  const pickDay = (iso: string) => {
+    if (!ss || (ss && su)) { setSs(iso); setSu(''); setSm('custom'); }
+    else if (iso < ss) { setSs(iso); setSu(''); }
+    else { setSu(iso); }
+    setHov('');
+  };
+
+  const handleLeftYM = (y: number, m: number) => { setLy(y); setLm(m); };
+  const handleRightYM = (y: number, m: number) => {
+    // Right month changed: set left to one month before
+    const prevM = m === 0 ? 11 : m - 1;
+    const prevY = m === 0 ? y - 1 : y;
+    setLy(prevY); setLm(prevM);
+  };
+
+  const apply = () => { onApply(sm, sp, ss, su || ss); setOpen(false); };
+
+  const fmtLabel = (iso: string) => iso ? new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+  const currentLabel = mode === 'preset'
+    ? `Últimos 7 días: ${fmtLabel(since)} - ${fmtLabel(until)}`
+      .replace('Últimos 7 días', AI_DATE_PRESETS.find(p => p.value === preset)?.label || preset)
+    : `${fmtLabel(since)} - ${fmtLabel(until)}`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={handleOpen}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-[11px] font-medium bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all shadow-sm">
+        <Calendar className="w-3 h-3 text-zinc-400" />
+        {currentLabel}
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-[100] bg-white dark:bg-zinc-950 rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.2)] border border-zinc-200 dark:border-zinc-700 flex overflow-hidden"
+          style={{minWidth: 580}}>
+
+          {/* Left: Presets */}
+          <div className="w-[185px] border-r border-zinc-100 dark:border-zinc-800 py-2 flex-shrink-0 overflow-y-auto" style={{maxHeight: 440}}>
+            <p className="px-3 pb-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Usados recientemente</p>
+            {AI_DATE_PRESETS.map(p => (
+              <button key={p.value} onClick={() => pickPreset(p.value)}
+                className={`w-full text-left px-3 py-2 text-[12px] flex items-center gap-2.5 transition-colors ${
+                  sm === 'preset' && sp === p.value
+                    ? 'text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/60'
+                }`}>
+                <span className={`w-[15px] h-[15px] rounded-full border-[2px] flex-shrink-0 flex items-center justify-center ${
+                  sm === 'preset' && sp === p.value ? 'border-blue-600 dark:border-blue-400' : 'border-zinc-300 dark:border-zinc-600'
+                }`}>
+                  {sm === 'preset' && sp === p.value && <span className="w-[7px] h-[7px] rounded-full bg-blue-600 dark:bg-blue-400" />}
+                </span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right: Dual calendar */}
+          <div className="flex flex-col p-4 gap-3 flex-1">
+            <div className="flex gap-5" onMouseLeave={() => setHov('')}>
+              <CalMes
+                year={ly} month={lm} onYearMonth={handleLeftYM}
+                since={ss} until={su} hovering={hov}
+                onDay={pickDay} onHover={setHov}
+                showPrev={true} showNext={false}
+              />
+              <CalMes
+                year={ry} month={rm} onYearMonth={handleRightYM}
+                since={ss} until={su} hovering={hov}
+                onDay={pickDay} onHover={setHov}
+                showPrev={false} showNext={true}
+              />
+            </div>
+
+            {/* Date inputs */}
+            <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <select value={sm} onChange={e => setSm(e.target.value as 'preset'|'custom')} className="sr-only" />
+              <input type="date" value={ss} onChange={e => { setSs(e.target.value); setSm('custom'); }}
+                className="flex-1 px-2 py-1.5 text-[11px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[6px] text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span className="text-zinc-400 text-[11px]">—</span>
+              <input type="date" value={su} min={ss} onChange={e => { setSu(e.target.value); setSm('custom'); }}
+                className="flex-1 px-2 py-1.5 text-[11px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[6px] text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+
+            <p className="text-[10px] text-zinc-400 -mt-1">Las fechas se muestran en la Hora de Buenos Aires</p>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setOpen(false)}
+                className="px-3.5 py-1.5 rounded-lg text-[12px] font-medium text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all">
+                Cancelar
+              </button>
+              <button onClick={apply} disabled={!ss}
+                className="px-3.5 py-1.5 rounded-lg text-[12px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-all">
+                Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 const KpiCard = ({ label, value, sub, icon: Icon, color = 'text-zinc-900 dark:text-white' }: {
   label: string; value: string; sub?: string; icon?: any; color?: string;
@@ -504,19 +1034,20 @@ const KpiCard = ({ label, value, sub, icon: Icon, color = 'text-zinc-900 dark:te
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AIAnalystPage() {
+  const { showToast } = useToast();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [loadingAccounts, setLoadingAccounts] = useState(false);
 
   const [dateMode, setDateMode] = useState<'preset' | 'custom'>('preset');
-  const [preset, setPreset] = useState<DatePreset>('last_28d');
+  const [preset, setPreset] = useState<DatePreset>('today');
   const [since, setSince] = useState(daysAgo(28));
   const [until, setUntil] = useState(todayFn());
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'REPORTES' | 'ANALISIS' | 'CREATIVIDAD' | 'PLAN'>('REPORTES');
+  const [activeTab, setActiveTab] = useState<'REPORTES' | 'ANALISIS' | 'CREATIVOS' | 'CREATIVIDAD' | 'PLAN' | 'CLIENTE'>('REPORTES');
 
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
@@ -552,6 +1083,23 @@ export default function AIAnalystPage() {
   });
   const [newChannelName, setNewChannelName] = useState('');
 
+  // ── Drill-down: Conjuntos + Anuncios ─────────────────────────────────────
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [expandedAdSets, setExpandedAdSets] = useState<Set<string>>(new Set());
+  const [campaignAdSets, setCampaignAdSets] = useState<Record<string, any[]>>({});
+  const [adSetAds, setAdSetAds] = useState<Record<string, any[]>>({});
+  const [adSetInsights, setAdSetInsights] = useState<Record<string, any>>({});
+  const [adInsights, setAdInsights] = useState<Record<string, any>>({});
+  const [loadingAdSets, setLoadingAdSets] = useState<Record<string, boolean>>({});
+  const [loadingAds, setLoadingAds] = useState<Record<string, boolean>>({});
+  const [creativeAnalysisText, setCreativeAnalysisText] = useState('');
+  const [isAnalyzingCreatives, setIsAnalyzingCreatives] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [clientReportText, setClientReportText] = useState('');
+  const [isGeneratingClientReport, setIsGeneratingClientReport] = useState(false);
+  const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
+  const [analyzeAllProgress, setAnalyzeAllProgress] = useState('');
+
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [analysisChat, planChat]);
   useEffect(() => { localStorage.setItem('analyst_yt_channels', JSON.stringify(ytChannels)); }, [ytChannels]);
 
@@ -564,24 +1112,303 @@ export default function AIAnalystPage() {
     try {
       const res = await metaAds.getAllAdAccounts();
       const allAccts = res.data || [];
-
-      // Filter to only accounts with at least 1 active campaign
-      const checks = await Promise.all(
+      const tr15: TimeRange = { since: daysAgo(15), until: todayFn() };
+      const enriched = await Promise.all(
         allAccts.map(async (acct: any) => {
-          const hasSpend = await metaAds.hasRecentSpend(acct.id);
-          return hasSpend ? acct : null;
+          const [ins15, campsRes] = await Promise.all([
+            metaAds.getInsights(acct.id, 'spend', undefined, tr15).catch(() => null),
+            metaAds.getCampaigns(acct.id).catch(() => null),
+          ]);
+          const spend15d = parseFloat(ins15?.spend || '0');
+          const activeCamps = (campsRes?.data || []).filter((c: any) => c.status === 'ACTIVE').length;
+          return { ...acct, spend15d, activeCamps };
         })
       );
-      const accts = checks.filter(Boolean);
-
+      const accts = enriched.filter(a => a.spend15d > 0);
       setAccounts(accts);
       if (accts.length > 0 && !selectedAccountId) {
         setSelectedAccountId(accts[0].id);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error loading accounts:', e);
+      showToast(`Error al cargar cuentas: ${e.message || 'Error desconocido'}`, 'error');
     } finally {
       setLoadingAccounts(false);
+    }
+  };
+
+  // ── Toggle campaign drill-down ───────────────────────────────────────────
+  const toggleCampaign = async (campId: string) => {
+    const next = new Set(expandedCampaigns);
+    if (next.has(campId)) { next.delete(campId); setExpandedCampaigns(next); return; }
+    next.add(campId); setExpandedCampaigns(next);
+    if (campaignAdSets[campId]) return;
+    setLoadingAdSets(prev => ({ ...prev, [campId]: true }));
+    const tr = dateMode === 'preset' ? undefined : { since, until };
+    const dp = dateMode === 'preset' ? preset : undefined;
+    const tryLoad = async (attempt: number): Promise<void> => {
+      try {
+        const res = await metaAds.getAdsets(campId);
+        const adsets: any[] = res.data || [];
+        setCampaignAdSets(prev => ({ ...prev, [campId]: adsets }));
+        const insResults = await Promise.all(adsets.map(a => metaAds.getInsights(a.id, undefined, dp, tr).catch(() => null)));
+        const insMap: Record<string, any> = {};
+        adsets.forEach((a, i) => { if (insResults[i]) insMap[a.id] = insResults[i]; });
+        setAdSetInsights(prev => ({ ...prev, ...insMap }));
+      } catch (e: any) {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+          return tryLoad(attempt + 1);
+        }
+        console.error('Error loading adsets:', e);
+        showToast('Error al cargar conjuntos de anuncios', 'error');
+        setCampaignAdSets(prev => ({ ...prev, [campId]: [] }));
+      }
+    };
+    await tryLoad(1);
+    setLoadingAdSets(prev => ({ ...prev, [campId]: false }));
+  };
+
+  const toggleAdSet = async (adsetId: string) => {
+    const next = new Set(expandedAdSets);
+    if (next.has(adsetId)) { next.delete(adsetId); setExpandedAdSets(next); return; }
+    next.add(adsetId); setExpandedAdSets(next);
+    if (adSetAds[adsetId]) return;
+    setLoadingAds(prev => ({ ...prev, [adsetId]: true }));
+    const tr = dateMode === 'preset' ? undefined : { since, until };
+    const dp = dateMode === 'preset' ? preset : undefined;
+    const tryLoad = async (attempt: number): Promise<void> => {
+      try {
+        const res = await metaAds.getAds(adsetId);
+        const adsList: any[] = res.data || [];
+        setAdSetAds(prev => ({ ...prev, [adsetId]: adsList }));
+        const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, undefined, dp, tr).catch(() => null)));
+        const insMap: Record<string, any> = {};
+        adsList.forEach((a, i) => { if (insResults[i]) insMap[a.id] = insResults[i]; });
+        setAdInsights(prev => ({ ...prev, ...insMap }));
+      } catch (e: any) {
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+          return tryLoad(attempt + 1);
+        }
+        console.error('Error loading ads:', e);
+        showToast('Error al cargar anuncios del conjunto', 'error');
+        setAdSetAds(prev => ({ ...prev, [adsetId]: [] }));
+      }
+    };
+    await tryLoad(1);
+    setLoadingAds(prev => ({ ...prev, [adsetId]: false }));
+  };
+
+  const analyzeCreatives = async () => {
+    const allAdSets = Object.values(campaignAdSets).flat();
+    if (allAdSets.length === 0) {
+      setCreativeAnalysisText('Primero expandí algunas campañas en Reportes para cargar los conjuntos y creativos.');
+      setActiveTab('CREATIVOS'); return;
+    }
+    setIsAnalyzingCreatives(true);
+    setActiveTab('CREATIVOS');
+    try {
+      const lines: string[] = [];
+      for (const [campId, adsets] of Object.entries(campaignAdSets)) {
+        const camp = campaigns.find((c: any) => c.id === campId);
+        const campFunnel = classifyFunnel(camp?.objective || '');
+        lines.push(`
+=== CAMPAÑA: ${camp?.name || campId} [${campFunnel}] ===`);
+        for (const adset of (adsets as any[])) {
+          const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal);
+          const adsetIns = adSetInsights[adset.id];
+          lines.push(`  CA: ${adset.name} [${adsetFunnel}|opt:${adset.optimization_goal || '—'}] | Gasto: ${fmtNum(adsetIns?.spend, 0)} | CTR: ${fmtNum(adsetIns?.inline_link_click_ctr, 2)}% | CPM: ${fmtNum(adsetIns?.cpm, 0)} | Frec: ${fmtNum(adsetIns?.frequency, 2)} | ROAS: ${adsetIns?.purchase_roas?.[0]?.value ? fmtNum(adsetIns.purchase_roas[0].value, 2) : '—'}`);
+          const adsList = adSetAds[adset.id] || [];
+          for (const ad of adsList) {
+            const adIns = adInsights[ad.id];
+            const issues = funnelBadPerf(adsetFunnel, adIns);
+            lines.push(`    AD: ${ad.name} [${adsetFunnel}] | Gasto: ${fmtNum(adIns?.spend, 0)} | CTR: ${fmtNum(adIns?.inline_link_click_ctr, 2)}% | Frec: ${fmtNum(adIns?.frequency, 2)} | CPM: ${fmtNum(adIns?.cpm, 0)} | ROAS: ${adIns?.purchase_roas?.[0]?.value ? fmtNum(adIns.purchase_roas[0].value, 2) : '—'} | Alcance: ${adIns?.reach || '0'} | Prob: ${issues.join(', ') || 'OK'}`);
+          }
+        }
+      }
+      const creativeData = lines.join('\n');
+      const currency = accountOverview?.currency || 'ARS';
+      const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
+      const prompt = `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera en ${currency}. Todo benchmark de costos debe ajustarse a ${currency}.
+
+Analizá los creativos de esta cuenta de Meta Ads clasificados por su rol en el funnel (TOFU / MOFU / BOFU).
+
+METODOLOGÍA ALGORITMIA:
+- Campaña = Buyer Persona (a quién le habla)
+- Conjunto de anuncios = Punto de dolor específico de ese buyer persona
+- Creativos = Mensajes para distintos niveles de consciencia (Inconsciente → Problema → Solución → Producto → Decisión)
+
+REGLA FUNDAMENTAL — cada creativo se evalúa solo por su ROL en el funnel:
+- TOFU (frío): Goal = llegar a gente nueva. KPIs: Reach alto, CPM bajo, CTR ≥ 1.5%, Frecuencia ≤ 1.5. NO se le piden conversiones. Un TOFU con ROAS 0 puede estar funcionando bien.
+- MOFU (tibio): Goal = generar consideración e interés. KPIs: CTR ≥ 1%, CPC razonable, engagement, clicks. NO se le piden compras directas.
+- BOFU (caliente): Goal = cerrar la venta. KPIs: ROAS ≥ 2, CPA sostenible, frecuencia 2–4 OK, conversiones directas. Un BOFU con frecuencia baja puede no estar cerrando.
+
+DATOS DE CREATIVOS (por campaña → conjunto → anuncio):
+${creativeData}
+
+## RESUMEN EJECUTIVO
+Estado general: cuántos TOFU / MOFU / BOFU hay, qué stage tiene mejor y peor rendimiento. Una frase de diagnóstico.
+
+## ANÁLISIS POR ETAPA DEL FUNNEL
+
+### 🔵 TOFU — Creativos de Atracción
+Para cada creativo TOFU: ¿está llegando a gente nueva? CTR y alcance vs benchmark. Estado: OK / PROBLEMA + razón.
+
+### 🟡 MOFU — Creativos de Consideración
+Para cada creativo MOFU: ¿genera interés y clicks? CTR y CPC vs benchmark. Estado: OK / PROBLEMA + razón.
+
+### 🟢 BOFU — Creativos de Cierre
+Para cada creativo BOFU: ¿está cerrando ventas? ROAS, CPA, frecuencia. Estado: OK / PROBLEMA + razón.
+
+## ⚠ CREATIVOS CON BAJO RENDIMIENTO PARA SU ROL
+Lista de creativos que fallan en su función. Para cada uno: nombre exacto, stage, problema concreto con número, acción específica.
+
+## GAPS EN EL FUNNEL
+¿Falta alguna etapa? ¿Demasiados BOFU sin TOFU que los alimente? ¿Buyer persona sin cobertura completa del funnel?
+
+## 3 ACCIONES PRIORITARIAS
+Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
+      const resp = await ai.chat([
+        { role: 'system', content: buildMetaAnalystSystem(activeChannels) },
+        { role: 'user', content: prompt }
+      ]);
+      setCreativeAnalysisText(resp);
+    } catch (e: any) {
+      setCreativeAnalysisText('Error: ' + e.message);
+    } finally {
+      setIsAnalyzingCreatives(false);
+    }
+  };
+
+  // ── Build full data string ─────────────────────────────────────────────────
+  // Acepta datos frescos opcionales para evitar stale closure al llamar desde analyzeAll
+  const buildFullDataStringWith = (
+    campAdSetsMap: Record<string, any[]> = campaignAdSets,
+    adSetInsMap: Record<string, any> = adSetInsights,
+    adSetAdsMap: Record<string, any[]> = adSetAds,
+    adInsMap: Record<string, any> = adInsights
+  ): string => {
+    const lines: string[] = [];
+    const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+    const period = `${range.since} al ${range.until}`;
+    lines.push(`PERÍODO: ${period}`);
+    lines.push(`CUENTA: ${accountOverview?.name || selectedAccountId} | Moneda: ${accountOverview?.currency || 'ARS'}`);
+    const totalSpendAcc = parseFloat(accountInsights?.spend || '0');
+    const totalReach = parseInt(accountInsights?.reach || '0');
+    const blendedRoas = accountInsights?.purchase_roas?.[0]?.value ? parseFloat(accountInsights.purchase_roas[0].value) : 0;
+    lines.push(`RESUMEN CUENTA: Gasto total=${fmtNum(totalSpendAcc, 0)} | ROAS blended=${blendedRoas > 0 ? fmtNum(blendedRoas, 2) : '—'} | Alcance total=${totalReach.toLocaleString('es-AR')} | CTR cuenta=${fmtNum(accountInsights?.inline_link_click_ctr, 2)}% | CPM cuenta=${fmtNum(accountInsights?.cpm, 0)} | Frecuencia cuenta=${fmtNum(accountInsights?.frequency, 2)}`);
+    lines.push('');
+    lines.push('NOTA DE FORMATO: Los bloques de datos tienen el formato "[TIPO | FUNNEL] NOMBRE_REAL". El nombre de campaña/conjunto/anuncio es ÚNICAMENTE el texto después del prefijo, sin corchetes ni metadatos. NO agregues Estado, Objetivo ni ningún otro campo al nombre.');
+    lines.push('');
+    for (const c of campaigns) {
+      const ins = campaignInsights[c.id];
+      if (!ins) continue;
+      const campFunnel = classifyFunnel(c.objective || '');
+      const metric = getPrimaryMetric(c.objective || '', ins);
+      const roas = ins.purchase_roas?.[0]?.value ? fmtNum(ins.purchase_roas[0].value, 2) : '—';
+      // Nombre limpio — sin metadata de estado/objetivo
+      const campNameClean = c.name.replace(/\s*\[.*?\]\s*/g, '').trim();
+      lines.push(`CAMPAÑA "${campNameClean}" [Funnel:${campFunnel}]`);
+      lines.push(`  Configuración: Objetivo=${c.objective || '—'} | BidStrategy=${c.bid_strategy || '—'} | Presupuesto=${c.daily_budget ? 'Diario:'+c.daily_budget : c.lifetime_budget ? 'Total:'+c.lifetime_budget : '—'} | Estado=${c.status}`);
+      lines.push(`  Métricas: Gasto=${fmtNum(ins.spend, 0)} | ${metric.label}=${metric.value} | Costo/R=${metric.cost} | ROAS=${roas} | CTR=${fmtNum(ins.inline_link_click_ctr, 2)}% | CPM=${fmtNum(ins.cpm, 0)} | Frecuencia=${fmtNum(ins.frequency, 2)} | Alcance=${parseInt(ins.reach || '0').toLocaleString('es-AR')}`);
+      const adsets = campAdSetsMap[c.id] || [];
+      for (const adset of adsets) {
+        const aIns = adSetInsMap[adset.id];
+        const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal);
+        const aMetric = aIns ? getPrimaryMetric(c.objective || '', aIns) : null;
+        lines.push(`  CONJUNTO "${adset.name}" [Funnel:${adsetFunnel}]`);
+        lines.push(`    Configuración: Optimización=${adset.optimization_goal || '—'} | Presupuesto=${adset.daily_budget ? 'Diario:'+adset.daily_budget : adset.lifetime_budget ? 'Total:'+adset.lifetime_budget : '—'}`);
+        if (aIns) lines.push(`    Métricas: Gasto=${fmtNum(aIns.spend, 0)} | ${aMetric?.label || '—'}=${aMetric?.value || '—'} | CTR=${fmtNum(aIns.inline_link_click_ctr, 2)}% | CPM=${fmtNum(aIns.cpm, 0)} | Frecuencia=${fmtNum(aIns.frequency, 2)} | ROAS=${aIns.purchase_roas?.[0]?.value ? fmtNum(aIns.purchase_roas[0].value, 2) : '—'}`);
+        else lines.push(`    Sin métricas en el período`);
+        const ads = adSetAdsMap[adset.id] || [];
+        for (const ad of ads) {
+          const dIns = adInsMap[ad.id];
+          const issues = funnelBadPerf(adsetFunnel, dIns);
+          lines.push(`    ANUNCIO "${ad.name}" [Funnel:${adsetFunnel}] Estado=${ad.status}`);
+          if (dIns) lines.push(`      Gasto=${fmtNum(dIns.spend, 0)} | CTR=${fmtNum(dIns.inline_link_click_ctr, 2)}% | CPM=${fmtNum(dIns.cpm, 0)} | Frec=${fmtNum(dIns.frequency, 2)} | Alcance=${dIns.reach || '0'} | ROAS=${dIns.purchase_roas?.[0]?.value ? fmtNum(dIns.purchase_roas[0].value, 2) : '—'}${issues.length ? ' | Alertas='+issues.join(', ') : ''}`);
+          else lines.push(`      Sin métricas en el período`);
+        }
+      }
+      lines.push('');
+    }
+    return lines.join('\n');
+  };
+
+  const buildFullDataString = () => buildFullDataStringWith();
+
+  // ── Analyze All ──────────────────────────────────────────────────────────
+  const analyzeAll = async () => {
+    if (!selectedAccountId || campaigns.length === 0) return;
+    setIsAnalyzingAll(true);
+    setAnalysisError(null);
+    const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+    const period = `${range.since} al ${range.until}`;
+    const currency = accountOverview?.currency || 'ARS';
+    const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
+    const system = buildMetaAnalystSystem(activeChannels);
+    try {
+      // Acumuladores locales — evita stale closure de React state
+      const freshCampAdSets: Record<string, any[]> = { ...campaignAdSets };
+      const freshAdSetIns: Record<string, any> = { ...adSetInsights };
+      const freshAdSetAds: Record<string, any[]> = { ...adSetAds };
+      const freshAdIns: Record<string, any> = { ...adInsights };
+
+      // Step 1: load all ad sets for all campaigns with spend
+      const campsWithSpend = campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0);
+      setAnalyzeAllProgress(`Cargando conjuntos de anuncios (${campsWithSpend.length} campañas)...`);
+      const unloadedCamps = campsWithSpend.filter(c => !freshCampAdSets[c.id]);
+      if (unloadedCamps.length > 0) {
+        await Promise.all(unloadedCamps.map(async c => {
+          try {
+            const res = await metaAds.getAdsets(c.id);
+            const adsets: any[] = res.data || [];
+            freshCampAdSets[c.id] = adsets;
+            setCampaignAdSets(prev => ({ ...prev, [c.id]: adsets }));
+            const insResults = await Promise.all(adsets.map(a => metaAds.getInsights(a.id, undefined, dateMode === 'preset' ? preset : undefined, dateMode === 'custom' ? { since, until } : undefined).catch(() => null)));
+            const insMap: Record<string, any> = {};
+            adsets.forEach((a, i) => { if (insResults[i]) { insMap[a.id] = insResults[i]; freshAdSetIns[a.id] = insResults[i]; } });
+            setAdSetInsights(prev => ({ ...prev, ...insMap }));
+          } catch (e) { console.error('adset load error', e); }
+        }));
+      }
+
+      // Step 2: load ads for all ad sets — usa freshCampAdSets (no stale)
+      setAnalyzeAllProgress('Cargando anuncios y creativos...');
+      const allAdSetIds = Object.values(freshCampAdSets).flat().map((a: any) => a.id);
+      const unloadedAdSets = allAdSetIds.filter(id => !freshAdSetAds[id]);
+      if (unloadedAdSets.length > 0) {
+        await Promise.all(unloadedAdSets.map(async id => {
+          try {
+            const res = await metaAds.getAds(id);
+            const adsList: any[] = res.data || [];
+            freshAdSetAds[id] = adsList;
+            setAdSetAds(prev => ({ ...prev, [id]: adsList }));
+            const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, undefined, dateMode === 'preset' ? preset : undefined, dateMode === 'custom' ? { since, until } : undefined).catch(() => null)));
+            const insMap: Record<string, any> = {};
+            adsList.forEach((a, i) => { if (insResults[i]) { insMap[a.id] = insResults[i]; freshAdIns[a.id] = insResults[i]; } });
+            setAdInsights(prev => ({ ...prev, ...insMap }));
+          } catch (e) { console.error('ads load error', e); }
+        }));
+      }
+
+      // Step 3: build data desde acumuladores frescos y correr análisis
+      setAnalyzeAllProgress('Ejecutando análisis IA completo...');
+      const fullData = buildFullDataStringWith(freshCampAdSets, freshAdSetIns, freshAdSetAds, freshAdIns);
+      const [aResult, cResult, rResult] = await Promise.allSettled([
+        ai.chat([{ role: 'system', content: system }, { role: 'user', content: buildAnalysisPrompt(selectedAccountId, period, fullData, accountOverview?.name || selectedAccountId, currency) }]),
+        ai.chat([{ role: 'system', content: system }, { role: 'user', content: buildCreativityPrompt(fullData, accountOverview?.name || selectedAccountId, period, currency) }]),
+        ai.chat([{ role: 'system', content: system }, { role: 'user', content: buildClientReportPrompt(campaigns, campaignInsights, accountOverview?.name || selectedAccountId, period, currency, accountInsights) }]),
+      ]);
+      if (aResult.status === 'fulfilled') { setAnalysisText(aResult.value); setAdActions(parseActionsFromAnalysis(aResult.value, campaigns)); }
+      if (cResult.status === 'fulfilled') setCreativityText(cResult.value);
+      if (rResult.status === 'fulfilled') setClientReportText(rResult.value);
+      setActiveTab('ANALISIS');
+    } catch (e: any) {
+      setAnalysisError('Error en análisis: ' + e.message);
+    } finally {
+      setIsAnalyzingAll(false);
+      setAnalyzeAllProgress('');
     }
   };
 
@@ -594,9 +1421,17 @@ export default function AIAnalystPage() {
     setAnalysisError(null);
     setAnalysisText(''); // Clear previous AI analysis since data changed
     setCreativityText('');
+    setClientReportText('');
+    setCreativeAnalysisText('');
     setAdActions({});
     setPlanText('');
     setAnalysisChat([]);
+    setCampaignAdSets({});
+    setAdSetAds({});
+    setAdSetInsights({});
+    setAdInsights({});
+    setExpandedCampaigns(new Set());
+    setExpandedAdSets(new Set());
 
     const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
 
@@ -610,7 +1445,11 @@ export default function AIAnalystPage() {
       setAccountOverview(acct);
       setAccountInsights(acctIns);
 
-      const camps = (campRes.data || []).slice(0, 25);
+      const allCamps = campRes.data || [];
+      const camps = allCamps.slice(0, 25);
+      if (allCamps.length > 25) {
+        showToast(`Cuenta con ${allCamps.length} campañas — mostrando las primeras 25`, 'info');
+      }
       setAnalysisProgress(`Cargando insights de ${camps.length} campañas...`);
 
       const insights: Record<string, any> = {};
@@ -650,7 +1489,7 @@ export default function AIAnalystPage() {
     const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
     const period = `${range.since} al ${range.until}`;
     const campData = buildCampDataString(campaigns, campaignInsights);
-    const currency = accountOverview?.currency || 'USD';
+    const currency = accountOverview?.currency || 'ARS';
 
     try {
       const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
@@ -688,7 +1527,7 @@ export default function AIAnalystPage() {
     setPlanChat([]);
     try {
       const campData = buildCampDataString(campaigns, campaignInsights);
-      const currency = accountOverview?.currency || 'USD';
+      const currency = accountOverview?.currency || 'ARS';
       const prompt = `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera en ${currency}.
 Ajustá TODO el plan, sugerencias de presupuesto, estimaciones de costos (CPA, CPM) y KPIs a ${currency}. No uses benchmarks de USD si la moneda es otra.
 
@@ -736,7 +1575,7 @@ INICIO: ${planStartDate}
     try {
       const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
       const resp = await ai.chat([
-        { role: 'system', content: `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Recordá que esta cuenta opera en ${accountOverview?.currency || 'USD'}. Ajustá tus respuestas, sugerencias y análisis a esta moneda.\n\n${buildMetaAnalystSystem(activeChannels)}\n\nContexto del análisis:\n${context}` },
+        { role: 'system', content: `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Recordá que esta cuenta opera en ${accountOverview?.currency || 'ARS'}. Ajustá tus respuestas, sugerencias y análisis a esta moneda.\n\n${buildMetaAnalystSystem(activeChannels)}\n\nContexto del análisis:\n${context}` },
         ...chatHistory,
         newMsg,
       ]);
@@ -748,11 +1587,75 @@ INICIO: ${planStartDate}
     }
   };
 
+  // ── Client Report PDF ────────────────────────────────────────────────────────
+  const handleClientReportPDF = () => {
+    const pw = window.open('', '_blank');
+    if (!pw) { showToast('El navegador bloqueó el popup. Permitir popups para exportar PDF.', 'error'); return; }
+    const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+    const cur = accountOverview?.currency || '';
+    const campRows = campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).map(c => {
+      const ins = campaignInsights[c.id];
+      const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
+      const ctr = parseFloat(ins?.inline_link_click_ctr || 0);
+      const statusDot = c.status === 'ACTIVE' ? '#10b981' : '#f59e0b';
+      return `<tr><td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${statusDot};margin-right:6px;"></span>${c.name}</td><td>${cur} ${fmtNum(ins?.spend, 0)}</td><td>${ins?.reach ? parseInt(ins.reach).toLocaleString('es-AR') : '—'}</td><td>${metric ? metric.label+': '+metric.value : '—'}</td><td>${metric?.cost ?? '—'}</td><td style="color:${ctr>=1.5?'#059669':ctr>=1?'#d97706':'#dc2626'}">${fmtNum(ctr, 2)}%</td></tr>`;
+    }).join('');
+    const kpiBlock = accountInsights ? `
+      <div class="kpis">
+        <div class="kpi"><div class="kl">Inversión total</div><div class="kv">${cur} ${fmtNum(accountInsights.spend, 0)}</div></div>
+        <div class="kpi"><div class="kl">Personas alcanzadas</div><div class="kv">${parseInt(accountInsights.reach || '0').toLocaleString('es-AR')}</div></div>
+        <div class="kpi"><div class="kl">ROAS</div><div class="kv">${accountInsights.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2)+'x' : '—'}</div></div>
+        <div class="kpi"><div class="kl">CTR promedio</div><div class="kv">${fmtNum(accountInsights.inline_link_click_ctr, 2)}%</div></div>
+      </div>` : '';
+    const reportContent = clientReportText ? `<div class="ai-content">${clientReportText.replace(/## ([^\n]+)/g, '<h2>$1</h2>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</div>` : '';
+    pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte — ${accountOverview?.name || ''}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0;}
+      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#111;background:#fff;padding:0;font-size:12px;line-height:1.6;}
+      .page{max-width:860px;margin:0 auto;padding:40px 40px 60px;}
+      .header{background:linear-gradient(135deg,#1a1a3e,#312e81);color:white;padding:28px 32px;border-radius:12px;margin-bottom:28px;}
+      .header h1{font-size:22px;font-weight:800;color:white;margin-bottom:4px;}
+      .header .sub{color:#a5b4fc;font-size:12px;}
+      .header .date{color:#c7d2fe;font-size:11px;margin-top:8px;}
+      .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+      .kpi{background:#f8f7ff;border:1px solid #e0e7ff;border-radius:10px;padding:14px;text-align:center;}
+      .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+      .kv{font-size:22px;font-weight:800;color:#4f46e5;}
+      h2{font-size:13px;font-weight:700;color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:5px;margin:20px 0 10px;}
+      table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;}
+      th{background:#4f46e5;color:white;padding:8px 10px;text-align:left;font-weight:600;font-size:10px;letter-spacing:.04em;}
+      td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
+      tr:nth-child(even) td{background:#fafafa;}
+      .ai-content{font-size:12px;line-height:1.7;margin-top:16px;}
+      .ai-content h2{font-size:13px;border-bottom:2px solid #e0e7ff;padding-bottom:4px;color:#4f46e5;margin:20px 0 8px;}
+      .footer{text-align:center;color:#9ca3af;font-size:9px;margin-top:40px;padding-top:16px;border-top:1px solid #f0f0f0;}
+      .footer strong{color:#6366f1;}
+      @media print{body{padding:0;}.page{padding:20px;}}
+    </style></head><body>
+    <div class="page">
+      <div class="header">
+        <h1>${accountOverview?.name || 'Reporte Meta Ads'}</h1>
+        <div class="sub">Reporte de rendimiento publicitario</div>
+        <div class="date">Período: ${range.since} al ${range.until} &nbsp;·&nbsp; Generado: ${new Date().toLocaleDateString('es-AR', {day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      ${kpiBlock}
+      <h2>Resultados por campaña</h2>
+      <table>
+        <thead><tr><th>Campaña</th><th>Inversión</th><th>Alcance</th><th>Resultados</th><th>Costo/R</th><th>CTR</th></tr></thead>
+        <tbody>${campRows}</tbody>
+      </table>
+      ${reportContent}
+      <div class="footer">Generado por <strong>Algoritmia</strong> · Meta Ads Analyst · ${new Date().toLocaleDateString('es-AR')}</div>
+    </div></body></html>`);
+    pw.document.close();
+    setTimeout(() => pw.print(), 500);
+  };
+
   // ── Export PDF ─────────────────────────────────────────────────────────────
   const handleExportPDF = () => {
     const pw = window.open('', '_blank');
-    if (!pw) return;
-    const content = activeTab === 'PLAN' ? planText : activeTab === 'CREATIVIDAD' ? creativityText : analysisText;
+    if (!pw) { showToast('El navegador bloqueó el popup. Permitir popups para exportar PDF.', 'error'); return; }
+    const content = activeTab === 'PLAN' ? planText : activeTab === 'CREATIVIDAD' ? creativityText : activeTab === 'CREATIVOS' ? creativeAnalysisText : activeTab === 'CLIENTE' ? clientReportText : analysisText;
     const campRows = campaigns.map(c => {
       const ins = campaignInsights[c.id];
       const purchases = ins ? (getMetaVal(ins.actions || [], 'offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase') || '0') : '—';
@@ -808,13 +1711,74 @@ INICIO: ${planStartDate}
   const isLoading = isFetchingData || isAnalyzingAI;
 
   const currentChat = activeTab === 'PLAN' ? planChat : analysisChat;
-  const currentQuickPrompts = activeTab === 'PLAN'
+  const currentQuickPrompts: string[] = activeTab === 'PLAN'
     ? ['¿Es realista el objetivo?', '¿Cómo distribuir el presupuesto?', '¿Qué hacer si no se cumplen las metas?', '¿Qué KPI mirar primero?']
     : ['¿Por qué no se vende?', '¿Qué campaña pausar primero?', '¿Hay fatiga de audiencia?', '¿Dónde hay fuga de presupuesto?'];
 
   return (
     <div className="flex h-[calc(100vh-60px)] overflow-hidden bg-[#f5f5f7] dark:bg-[#0a0a0a]">
       {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
+
+      {/* ── LEFT SIDEBAR: Accounts ──────────────────────────────────────── */}
+      <div className="w-[240px] flex-shrink-0 flex flex-col border-r border-black/[0.06] dark:border-white/[0.05] bg-white dark:bg-zinc-900 overflow-y-auto">
+        <div className="px-3 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-800">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Cuentas Meta Ads</p>
+        </div>
+
+        {loadingAccounts ? (
+          <div className="flex flex-col gap-2 p-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="rounded-xl p-3 border border-zinc-100 dark:border-zinc-800 animate-pulse">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex-shrink-0" />
+                  <div className="flex-1 space-y-1">
+                    <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full w-3/4" />
+                    <div className="h-2 bg-zinc-50 dark:bg-zinc-800 rounded-full w-1/3" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <div className="h-12 bg-zinc-50 dark:bg-zinc-800 rounded-lg" />
+                  <div className="h-12 bg-zinc-50 dark:bg-zinc-800 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : accounts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 px-3">
+            <p className="text-[11px] text-zinc-400 text-center">Sin cuentas activas</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1 p-2">
+            {accounts.map(a => {
+              const isSelected = a.id === selectedAccountId;
+              const amt = a.spend15d || 0;
+              const amtLabel = amt === 0 ? '—' : amt >= 1000 ? `$${(amt/1000).toFixed(1)}K` : `$${amt.toFixed(0)}`;
+              return (
+                <button key={a.id}
+                  onClick={() => setSelectedAccountId(a.id)}
+                  className={`w-full text-left rounded-lg px-2.5 py-2 border transition-all duration-150 flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700'
+                  }`}>
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-violet-500' : 'bg-gradient-to-br from-violet-500 to-indigo-600'}`}>
+                    <Building2 className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-[11px] font-semibold truncate leading-tight ${isSelected ? 'text-violet-700 dark:text-violet-300' : 'text-zinc-800 dark:text-zinc-200'}`}>{a.name || a.id}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-zinc-400">{a.currency || 'USD'}</span>
+                      <span className={`text-[10px] font-bold ${isSelected ? 'text-violet-600 dark:text-violet-300' : 'text-zinc-600 dark:text-zinc-400'}`}>{amtLabel}</span>
+                      {(a.activeCamps || 0) > 0 && <span className="text-[10px] text-emerald-500 font-semibold">{a.activeCamps} act.</span>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
 
         {/* Top bar */}
@@ -822,19 +1786,6 @@ INICIO: ${planStartDate}
           <div className="flex items-center gap-1.5">
             <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mr-1 shadow-sm border border-black/10">
               <BrainCircuit className="w-3.5 h-3.5 text-white" />
-            </div>
-            
-            <div className="flex items-center gap-1.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-700 hover:border-violet-300 dark:hover:border-violet-600 transition-colors">
-              <select
-                value={selectedAccountId}
-                onChange={e => setSelectedAccountId(e.target.value)}
-                className="bg-transparent border-0 text-zinc-800 dark:text-zinc-200 font-semibold text-[11px] px-2.5 py-1.5 pr-6 cursor-pointer focus:outline-none focus:ring-0 max-w-[280px] truncate"
-              >
-                {accounts.length === 0 && <option value="">Sin cuentas</option>}
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name || a.id} {a.currency ? `(${a.currency})` : ''}</option>
-                ))}
-              </select>
             </div>
             
             {loadingAccounts && <Loader2 className="w-3 h-3 animate-spin text-violet-500" />}
@@ -892,6 +1843,32 @@ INICIO: ${planStartDate}
             Exportar PDF
           </button>
 
+          {/* Data coverage pill */}
+          {hasData && (() => {
+            const loadedAdSets = Object.values(campaignAdSets).flat().length;
+            const loadedAds = Object.values(adSetAds).flat().length;
+            return loadedAdSets > 0 ? (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-[6px] bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-700 text-[9px] text-zinc-400 font-mono flex-shrink-0">
+                <span>{campaigns.length}c</span>
+                <span className="text-zinc-200 dark:text-zinc-700">·</span>
+                <span>{loadedAdSets}ca</span>
+                {loadedAds > 0 && <><span className="text-zinc-200 dark:text-zinc-700">·</span><span>{loadedAds}an</span></>}
+              </div>
+            ) : null;
+          })()}
+
+          {/* ANALIZAR TODO — primary CTA */}
+          <button onClick={analyzeAll} disabled={isAnalyzingAll || !hasData || isAnalyzingAI}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-bold transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            {isAnalyzingAll ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>{analyzeAllProgress || 'Analizando...'}</span></> : <><BrainCircuit className="w-3.5 h-3.5" /><span>Analizar Todo</span></>}
+          </button>
+
+          {/* Chat toggle */}
+          <button onClick={() => setChatOpen(o => !o)} title={chatOpen ? 'Cerrar chat' : 'Abrir chat'}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded-[7px] text-[11px] font-medium transition-all border ${chatOpen ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400' : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-white/[0.04]'}`}>
+            {chatOpen ? <PanelRightClose className="w-3 h-3" /> : <PanelRightOpen className="w-3 h-3" />}
+          </button>
+
           <button onClick={() => { loadAccounts(); }} disabled={loadingAccounts}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all disabled:opacity-40">
             <RefreshCw className={`w-3 h-3 ${loadingAccounts ? 'animate-spin' : ''}`} />
@@ -935,9 +1912,11 @@ INICIO: ${planStartDate}
         {/* Tabs */}
         <div className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b border-black/[0.06] dark:border-white/[0.05] px-4 flex items-center">
           {([
-            { id: 'REPORTES',    label: '📈 Reportes' },
+            { id: 'REPORTES',    label: '📈 Datos' },
             { id: 'ANALISIS',    label: '📊 Análisis' },
-            { id: 'CREATIVIDAD', label: '🎨 Creatividad' },
+            { id: 'CREATIVOS',   label: '🖼️ Creativos' },
+            { id: 'CLIENTE',     label: '📄 Reporte Cliente' },
+            { id: 'CREATIVIDAD', label: '🎨 Estrategia' },
             { id: 'PLAN',        label: '📋 Plan' },
           ] as const).map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -957,30 +1936,68 @@ INICIO: ${planStartDate}
 
             {/* ── REPORTES ─────────────────────────────────────────── */}
             {activeTab === 'REPORTES' && (
-              <div className="space-y-5">
-                {!hasData && !isLoading && (
+              <div className="space-y-5 pb-28">
+                {/* ── Account KPI Summary Strip ── */}
+              {accountInsights && !isFetchingData && (
+                <div className="flex-shrink-0 px-4 py-2.5 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-4 overflow-x-auto">
+                  {[
+                    { l: 'Gasto', v: `${accountOverview?.currency || ''} ${fmtNum(accountInsights.spend, 0)}`, color: 'text-zinc-800 dark:text-zinc-100' },
+                    { l: 'Alcance', v: parseInt(accountInsights.reach || '0').toLocaleString('es-AR'), color: 'text-zinc-800 dark:text-zinc-100' },
+                    { l: 'ROAS', v: accountInsights.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2)+'x' : '—', color: parseFloat(accountInsights.purchase_roas?.[0]?.value || '0') >= 2 ? 'text-emerald-600' : parseFloat(accountInsights.purchase_roas?.[0]?.value || '0') > 0 ? 'text-amber-500' : 'text-zinc-500' },
+                    { l: 'CTR', v: fmtNum(accountInsights.inline_link_click_ctr, 2)+'%', color: parseFloat(accountInsights.inline_link_click_ctr || '0') >= 1.5 ? 'text-emerald-600' : parseFloat(accountInsights.inline_link_click_ctr || '0') >= 1 ? 'text-amber-500' : 'text-red-500' },
+                    { l: 'CPM', v: fmtNum(accountInsights.cpm, 0), color: 'text-zinc-800 dark:text-zinc-100' },
+                    { l: 'Frecuencia', v: fmtNum(accountInsights.frequency, 2), color: parseFloat(accountInsights.frequency || '0') > 3.5 ? 'text-red-500' : parseFloat(accountInsights.frequency || '0') > 2.5 ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-100' },
+                    { l: 'Impresiones', v: parseInt(accountInsights.impressions || '0').toLocaleString('es-AR'), color: 'text-zinc-600 dark:text-zinc-400' },
+                  ].map(k => (
+                    <div key={k.l} className="flex items-center gap-1.5 flex-shrink-0 pr-4 border-r border-zinc-100 dark:border-zinc-800 last:border-0 last:pr-0">
+                      <span className="text-[9px] text-zinc-400 uppercase tracking-wider font-semibold">{k.l}</span>
+                      <span className={`text-[12px] font-bold ${k.color}`}>{k.v}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!hasData && !isLoading && (
                   <div className="flex flex-col items-center justify-center py-24 gap-3">
                     <div className="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center">
                       <TrendingUp className="w-7 h-7 text-violet-400" />
                     </div>
                     <p className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-400">
-                      {accounts.length > 0 ? 'Cargando datos de la cuenta...' : 'Cargando cuentas...'}
+                      {loadingAccounts ? 'Cargando cuentas...' : accounts.length === 0 ? 'No hay cuentas activas' : 'Seleccioná una cuenta'}
                     </p>
-                    <p className="text-[12px] text-zinc-400 dark:text-zinc-600">Los datos se cargan automáticamente al entrar</p>
+                    <p className="text-[12px] text-zinc-400 dark:text-zinc-600">
+                      {loadingAccounts ? 'Obteniendo cuentas de Meta Ads...' : accounts.length === 0 ? 'Verificá el token de acceso o actualizá las cuentas' : 'Los datos se cargan automáticamente al seleccionar'}
+                    </p>
                   </div>
                 )}
 
                 {hasData && (
                   <>
                     {/* Account header */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-[18px] font-bold text-zinc-900 dark:text-white tracking-tight">{accountOverview?.name || selectedAccountId}</h2>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <h2 className="text-[18px] font-bold text-zinc-900 dark:text-white tracking-tight truncate">{accountOverview?.name || selectedAccountId}</h2>
                         <p className="text-[12px] text-zinc-400 mt-0.5">
                           {accountOverview?.currency} · Período: {dateMode === 'custom' ? `${since} → ${until}` : DATE_PRESETS.find(p => p.value === preset)?.label}
                           {isAnalyzingAI && <span className="ml-2 text-violet-500 font-medium">· Analizando con IA...</span>}
                         </p>
                       </div>
+                      {accountInsights && (() => {
+                        const score = calcPerfScore(accountInsights, accountOverview?.currency || 'ARS');
+                        const color = score >= 70 ? { ring: 'border-emerald-400', text: 'text-emerald-600', label: 'Saludable', bg: 'bg-emerald-50 dark:bg-emerald-900/20' } : score >= 45 ? { ring: 'border-amber-400', text: 'text-amber-600', label: 'Regular', bg: 'bg-amber-50 dark:bg-amber-900/20' } : { ring: 'border-red-400', text: 'text-red-500', label: 'Critico', bg: 'bg-red-50 dark:bg-red-900/20' };
+                        return (
+                          <div className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border-2 ${color.ring} ${color.bg} flex-shrink-0`}>
+                            <div className="text-center">
+                              <div className={`text-[28px] font-black leading-none ${color.text}`}>{score}</div>
+                              <div className={`text-[9px] font-bold uppercase tracking-wide mt-0.5 ${color.text}`}>{color.label}</div>
+                            </div>
+                            <div className="text-[9px] text-zinc-400 leading-tight">
+                              <div>Health</div>
+                              <div>Score</div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* KPI Cards */}
@@ -1015,7 +2032,7 @@ INICIO: ${planStartDate}
                           />
                           {(() => {
                             const cpmVal = parseFloat(accountInsights?.cpm || 0);
-                            const cpmThreshold = curr === 'ARS' ? 10000 : 15;
+                            const cpmThreshold = getCpmThreshold(curr);
                             const cpmOk = currencyKnown ? cpmVal <= cpmThreshold : true;
                             return (
                               <KpiCard
@@ -1057,6 +2074,59 @@ INICIO: ${planStartDate}
                       );
                     })()}
 
+                    {/* Smart Alerts */}
+                    {hasData && campaigns.length > 0 && (() => {
+                      const curr = accountOverview?.currency || 'ARS';
+                      const cpmThreshold = getCpmThreshold(curr);
+                      type AlertItem = { level: 'error' | 'warn'; camp: string; msg: string };
+                      const alerts: AlertItem[] = [];
+                      campaigns.forEach((c: any) => {
+                        const ins = campaignInsights[c.id];
+                        if (!ins || parseFloat(ins.spend || '0') <= 0) return;
+                        const freq = parseFloat(ins.frequency || 0);
+                        const ctr = parseFloat(ins.inline_link_click_ctr || 0);
+                        const cpm = parseFloat(ins.cpm || 0);
+                        const roas = ins.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : 0;
+                        const metric = getPrimaryMetric(c.objective || '', ins);
+                        if (freq > 3.5) alerts.push({ level: 'error', camp: c.name, msg: `Frecuencia ${fmtNum(freq,1)} — fatiga creativa grave` });
+                        else if (freq > 2.5) alerts.push({ level: 'warn', camp: c.name, msg: `Frecuencia ${fmtNum(freq,1)} — monitorear` });
+                        if (ctr > 0 && ctr < 0.5) alerts.push({ level: 'error', camp: c.name, msg: `CTR ${fmtNum(ctr,2)}% — creativos no enganchan` });
+                        else if (ctr >= 0.5 && ctr < 1) alerts.push({ level: 'warn', camp: c.name, msg: `CTR ${fmtNum(ctr,2)}% — bajo benchmark de 1.5%` });
+                        if (cpm > cpmThreshold * 1.5) alerts.push({ level: 'error', camp: c.name, msg: `CPM ${fmtNum(cpm,0)} ${curr} — muy elevado` });
+                        if (roas > 0 && roas < 1) alerts.push({ level: 'error', camp: c.name, msg: `ROAS ${fmtNum(roas,2)} — gastando mas de lo que genera` });
+                        if (metric.value === '0' && parseFloat(ins.spend||'0') > 500) alerts.push({ level: 'warn', camp: c.name, msg: `Sin resultados con ${fmtNum(ins.spend,0)} ${curr} invertidos` });
+                      });
+                      if (!alerts.length) return (
+                        <div className="rounded-2xl border border-emerald-100 dark:border-emerald-900/30 bg-emerald-50/40 dark:bg-emerald-900/5 px-4 py-3 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span className="text-[12px] font-semibold text-emerald-700 dark:text-emerald-400">Sin alertas — todo dentro de los parametros normales</span>
+                        </div>
+                      );
+                      const errAlerts = alerts.filter(a => a.level === 'error');
+                      const warnAlerts = alerts.filter(a => a.level === 'warn');
+                      return (
+                        <div className="rounded-2xl border border-amber-100 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/5 overflow-hidden">
+                          <div className="px-4 py-2.5 flex items-center gap-2 border-b border-amber-100 dark:border-amber-800/20">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                            <span className="text-[12px] font-bold text-zinc-800 dark:text-zinc-100">Alertas automaticas</span>
+                            {errAlerts.length > 0 && <span className="px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full">{errAlerts.length} criticas</span>}
+                            {warnAlerts.length > 0 && <span className="px-1.5 py-0.5 bg-amber-400 text-white text-[9px] font-bold rounded-full">{warnAlerts.length} advertencias</span>}
+                          </div>
+                          <div className="px-4 py-3 grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                            {alerts.map((a, i) => (
+                              <div key={i} className={`flex items-start gap-2 px-2.5 py-1.5 rounded-lg ${a.level === 'error' ? 'bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/20' : 'bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/20'}`}>
+                                <span className={`flex-shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${a.level === 'error' ? 'bg-red-500' : 'bg-amber-400'}`} />
+                                <div className="min-w-0">
+                                  <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate block">{a.camp}</span>
+                                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400">{a.msg}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Campaign table */}
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
                         {(() => {
@@ -1064,15 +2134,23 @@ INICIO: ${planStartDate}
                           const acctCurr = accountOverview?.currency || '';
                           const cpmThreshold = acctCurr === 'ARS' ? 10000 : 15;
                           return (<>
-                        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                        <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
                           <h3 className="text-[13px] font-bold text-zinc-900 dark:text-white">Campañas activas ({campsWithSpend.length})</h3>
-                          {isAnalyzingAI && <span className="text-[10px] text-violet-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Analizando...</span>}
+                          <div className="flex items-center gap-2 ml-auto">
+                            {expandedCampaigns.size > 0 && (
+                              <button onClick={() => { setExpandedCampaigns(new Set()); setExpandedAdSets(new Set()); }} className="text-[10px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                                <ChevronRight className="w-3 h-3 rotate-90" />Colapsar todo
+                              </button>
+                            )}
+                            {isAnalyzingAI && <span className="text-[10px] text-violet-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Analizando...</span>}
+                          </div>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-[10px] min-w-[900px]">
+                          <table className="w-full text-[11px] min-w-[900px]">
                             <thead>
-                              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[9px] uppercase tracking-wide">
+                              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wide">
                                 <th className="text-left px-3 py-2.5 font-semibold sticky left-0 bg-zinc-50 dark:bg-zinc-800/50 z-10 min-w-[160px]">Campaña</th>
+                                <th className="text-center px-2 py-2.5 font-semibold min-w-[52px]">Score</th>
                                 <th className="text-left px-2 py-2.5 font-semibold min-w-[80px]">Obj.</th>
                                 <th className="text-right px-2 py-2.5 font-semibold">Gasto</th>
                                 <th className="text-right px-2 py-2.5 font-semibold">Resultados</th>
@@ -1104,21 +2182,46 @@ INICIO: ${planStartDate}
                                   'lead', 'offsite_conversion.fb_pixel_lead',
                                   'onsite_conversion.messaging_conversation_started_7d',
                                 ) || getMetaVal(actionVals, ...(actionVals.map((a: any) => a.action_type)));
+                                const isExpanded = expandedCampaigns.has(c.id);
+                                const campAdSetsList = campaignAdSets[c.id] || [];
+                                const visibleAdSets = campAdSetsList.filter((a: any) => {
+                                  const ins = adSetInsights[a.id];
+                                  return !ins || parseFloat(ins.spend || '0') > 0;
+                                });
                                 return (
-                                  <tr key={c.id} className={`border-t border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors ${idx % 2 !== 0 ? 'bg-zinc-50/30 dark:bg-zinc-800/10' : ''}`}>
-                                    <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200 sticky left-0 bg-white dark:bg-zinc-900 z-10 max-w-[200px]" title={c.name}>
+                                  <React.Fragment key={c.id}>
+                                  <tr className={`border-t border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors cursor-pointer select-none ${idx % 2 !== 0 ? 'bg-zinc-50/30 dark:bg-zinc-800/10' : ''}`} onClick={() => toggleCampaign(c.id)}>
+                                    <td className="px-3 py-2.5 font-medium text-zinc-800 dark:text-zinc-200 sticky left-0 bg-white dark:bg-zinc-900 z-10 max-w-[200px]" title={c.name}>
                                       <div className="flex items-center gap-1.5 min-w-0">
+                                        <ChevronRight className={`w-3 h-3 flex-shrink-0 text-zinc-400 transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`} />
                                         <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${c.status === 'ACTIVE' ? 'bg-emerald-400' : c.status === 'PAUSED' ? 'bg-amber-400' : 'bg-zinc-300'}`} />
                                         <span className="truncate">{c.name}</span>
                                       </div>
                                     </td>
+                                    <td className="px-2 py-2 text-center">
+                                      {ins ? (() => {
+                                        const score = calcPerfScore(ins, acctCurr);
+                                        const ringColor = score >= 70 ? 'border-emerald-400 text-emerald-600' : score >= 45 ? 'border-amber-400 text-amber-600' : 'border-red-400 text-red-500';
+                                        return <div className={`inline-flex items-center justify-center w-9 h-9 rounded-full border-2 bg-white dark:bg-zinc-900 ${ringColor}`}><span className="text-[10px] font-bold">{score}</span></div>;
+                                      })() : <span className="text-zinc-300 dark:text-zinc-700">—</span>}
+                                    </td>
                                     <td className="px-2 py-2 text-zinc-400 dark:text-zinc-500 text-[9px]">{(c.objective || '').replace('OUTCOME_', '')}</td>
-                                    <td className="px-2 py-2 text-right font-mono text-zinc-800 dark:text-zinc-200 font-bold">{ins ? fmtNum(ins.spend, 0) : '—'}</td>
+                                    <td className="px-2 py-2 text-right min-w-[80px]">
+                                      <div className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-[11px]">{ins ? fmtNum(ins.spend, 0) : '—'}</div>
+                                      {ins && c.daily_budget && (() => {
+                                        const budget = parseFloat(c.daily_budget);
+                                        const spent = parseFloat(ins.spend || 0);
+                                        const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
+                                        const barColor = pct > 85 ? 'bg-emerald-400' : pct > 40 ? 'bg-violet-400' : 'bg-zinc-300 dark:bg-zinc-600';
+                                        return budget > 0 ? <div className="mt-1 h-1 bg-zinc-100 dark:bg-zinc-700 rounded-full overflow-hidden"><div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} /></div> : null;
+                                      })()}
+                                    </td>
                                     <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
                                       {metric ? <span title={metric.label} className="cursor-help">{metric.value}</span> : '—'}
                                     </td>
-                                    <td className={`px-2 py-2 text-right font-mono font-bold ${roasVal >= 3 ? 'text-emerald-600' : roasVal >= 1.5 ? 'text-amber-500' : roasVal > 0 ? 'text-red-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
-                                      {roasVal > 0 ? fmtNum(roasVal, 2) : '—'}
+                                    <td className={`px-2 py-2 text-right font-mono font-bold ${roasVal >= 3 ? 'text-emerald-600' : roasVal >= 1.5 ? 'text-amber-500' : roasVal > 0 ? 'text-red-500' : 'text-zinc-400 dark:text-zinc-600'}`}
+                                      title={roasVal === 0 ? 'Sin datos de compras — aplica a campañas de ecommerce' : undefined}>
+                                      {roasVal > 0 ? fmtNum(roasVal, 2) : <span className="cursor-help">—</span>}
                                     </td>
                                     <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">{metric?.cost ?? '—'}</td>
                                     <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
@@ -1159,8 +2262,149 @@ INICIO: ${planStartDate}
                                       )}
                                     </td>
                                   </tr>
+                                  {/* ── Ad Sets ── */}
+                                  {isExpanded && (loadingAdSets[c.id] ? (
+                                    <tr key={`${c.id}-loading`}><td colSpan={14} className="px-8 py-2.5 bg-zinc-50/60 dark:bg-zinc-800/20">
+                                      <div className="flex items-center gap-2 text-zinc-400 text-[11px]"><Loader2 className="w-3 h-3 animate-spin" /><span>Cargando conjuntos...</span></div>
+                                    </td></tr>
+                                  ) : visibleAdSets.length === 0 ? (
+                                    <tr key={`${c.id}-empty`}><td colSpan={14} className="px-8 py-2 text-[11px] text-zinc-400 italic bg-zinc-50/30 dark:bg-zinc-800/10">Sin conjuntos con gasto en el período</td></tr>
+                                  ) : visibleAdSets.map((adset: any) => {
+                                    const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal);
+                                    const adsetFStyle = FUNNEL_STYLES[adsetFunnel];
+                                    const adsetIns = adSetInsights[adset.id];
+                                    const adsetMetric = adsetIns ? getPrimaryMetric(c.objective || '', adsetIns) : null;
+                                    const adsetRoas = adsetIns?.purchase_roas?.[0]?.value ? parseFloat(adsetIns.purchase_roas[0].value) : 0;
+                                    const adsetCtr = parseFloat(adsetIns?.inline_link_click_ctr || 0);
+                                    const adsetFreq = parseFloat(adsetIns?.frequency || 0);
+                                    const adsetExpanded = expandedAdSets.has(adset.id);
+                                    const adsetAdsList = adSetAds[adset.id] || [];
+                                    const visibleAds = adsetAdsList.filter((ad: any) => {
+                                      const ins = adInsights[ad.id];
+                                      return !ins || parseFloat(ins.spend || '0') > 0;
+                                    });
+                                    return (
+                                      <React.Fragment key={adset.id}>
+                                        <tr className={`border-t border-zinc-50/80 dark:border-zinc-800/30 hover:brightness-95 cursor-pointer select-none ${adsetFStyle.row}`} onClick={e => { e.stopPropagation(); toggleAdSet(adset.id); }}>
+                                          <td className={`px-2 py-1.5 sticky left-0 z-10 ${adsetFStyle.row}`} title={adset.name}>
+                                            <div className="flex items-center gap-1.5 pl-7 min-w-0">
+                                              <ChevronRight className={`w-2.5 h-2.5 flex-shrink-0 text-zinc-400 transition-transform duration-150 ${adsetExpanded ? 'rotate-90' : ''}`} />
+                                              <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate">{adset.name}</span>
+                                            </div>
+                                          </td>
+                                          <td className="px-2 py-1.5 text-center">
+                                            {adsetIns ? (() => {
+                                              const s = calcPerfScore(adsetIns, acctCurr);
+                                              const rc = s >= 70 ? 'border-emerald-400 text-emerald-600' : s >= 45 ? 'border-amber-400 text-amber-600' : 'border-red-400 text-red-500';
+                                              return <div className={`inline-flex items-center justify-center w-7 h-7 rounded-full border-2 ${adsetFStyle.row} ${rc}`}><span className="text-[9px] font-bold">{s}</span></div>;
+                                            })() : null}
+                                          </td>
+                                          <td className="px-2 py-1.5 text-zinc-400 text-[9px]">{(adset.optimization_goal || '—').replace('OUTCOME_', '')}</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] font-bold text-zinc-700 dark:text-zinc-300">{adsetIns ? fmtNum(adsetIns.spend, 0) : '—'}</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700 dark:text-zinc-300">{adsetMetric?.value ?? '—'}</td>
+                                          <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adsetRoas >= 3 ? 'text-emerald-600' : adsetRoas >= 1.5 ? 'text-amber-500' : adsetRoas > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{adsetRoas > 0 ? fmtNum(adsetRoas, 2) : '—'}</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adsetMetric?.cost ?? '—'}</td>
+                                          <td className="px-2 py-1.5 text-right text-zinc-400 text-[10px]">—</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adsetIns?.reach ? parseInt(adsetIns.reach).toLocaleString('es-AR') : '—'}</td>
+                                          <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adsetCtr >= 1.5 ? 'text-emerald-600' : adsetCtr >= 1 ? 'text-amber-500' : adsetCtr > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{adsetIns ? fmtNum(adsetCtr, 2) : '—'}</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adsetIns ? fmtNum(adsetIns.cpm, 0) : '—'}</td>
+                                          <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adsetFreq > 3.5 ? 'text-red-500' : adsetFreq > 2.5 ? 'text-amber-500' : 'text-zinc-700'}`}>{adsetIns ? fmtNum(adsetFreq, 1) : '—'}</td>
+                                          <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adsetIns?.cpc && parseFloat(adsetIns.cpc) > 0 ? fmtNum(adsetIns.cpc, 0) : '—'}</td>
+                                          <td className="px-2 py-1.5 text-center">{loadingAds[adset.id] && <Loader2 className="w-2.5 h-2.5 animate-spin text-zinc-400 mx-auto" />}</td>
+                                        </tr>
+                                        {/* ── Ads ── */}
+                                        {adsetExpanded && (loadingAds[adset.id] ? (
+                                          <tr key={`${adset.id}-loading`}><td colSpan={14} className="px-12 py-2 bg-zinc-50/40 dark:bg-zinc-800/10">
+                                            <div className="flex items-center gap-2 text-zinc-400 text-[11px]"><Loader2 className="w-3 h-3 animate-spin" /><span>Cargando anuncios...</span></div>
+                                          </td></tr>
+                                        ) : visibleAds.length === 0 ? (
+                                          <tr key={`${adset.id}-empty`}><td colSpan={14} className="px-14 py-2 text-[11px] text-zinc-400 italic bg-zinc-50/20">Sin anuncios con gasto en el período</td></tr>
+                                        ) : visibleAds.map((ad: any) => {
+                                          const adIns = adInsights[ad.id];
+                                          const adFunnelInfo = getFunnelInfo(c.objective || '', adset.optimization_goal);
+                                          const adFunnel = adFunnelInfo.stage;
+                                          const adFStyle = FUNNEL_STYLES[adFunnel];
+                                          const adCtr = parseFloat(adIns?.inline_link_click_ctr || 0);
+                                          const adFreq = parseFloat(adIns?.frequency || 0);
+                                          const adRoas = adIns?.purchase_roas?.[0]?.value ? parseFloat(adIns.purchase_roas[0].value) : 0;
+                                          const adIssues = funnelBadPerf(adFunnel, adIns);
+                                          const thumb = ad.creative?.thumbnail_url || ad.creative?.image_url;
+                                          return (
+                                            <tr key={ad.id} className={`border-t border-zinc-50/40 dark:border-zinc-800/20 ${adIssues.length > 0 ? 'bg-red-50/10 dark:bg-red-900/5' : adFStyle.row}`}>
+                                              <td className={`px-2 py-1.5 sticky left-0 z-10 max-w-[220px] overflow-hidden ${adIssues.length > 0 ? 'bg-red-50/10 dark:bg-red-900/5' : adFStyle.row}`}>
+                                                <div className="flex items-center gap-2 pl-14 min-w-0 overflow-hidden">
+                                                  {thumb ? <img src={thumb} alt="" className="w-8 h-8 rounded-md object-cover flex-shrink-0 border border-zinc-200 dark:border-zinc-700" /> : <div className={`w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center ${adFStyle.row} border border-current/10`}><span className={`text-[7px] font-bold ${adFStyle.badge.split(' ')[1]}`}>{adFunnel[0]}</span></div>}
+                                                  <div className="min-w-0">
+                                                    <div className="flex items-center gap-1 mb-0.5">
+                                                      <FunnelBadge stage={adFunnel} info={adFunnelInfo} ins={adIns} currency={acctCurr} size="xs" />
+                                                      <span className={`w-1 h-1 rounded-full flex-shrink-0 ${ad.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-zinc-300'}`} />
+                                                    </div>
+                                                    <p className="text-[10px] font-medium text-zinc-700 dark:text-zinc-300 truncate">{ad.name}</p>
+                                                    {adIssues.length > 0 && <p className="text-[9px] text-red-500 font-medium truncate">⚠ {adIssues.join(' · ')}</p>}
+                                                  </div>
+                                                </div>
+                                              </td>
+                                              <td className="px-2 py-1.5 text-center">
+                                                {adIns ? (() => {
+                                                  const s = calcPerfScore(adIns, acctCurr);
+                                                  const rc = s >= 70 ? 'border-emerald-400 text-emerald-600' : s >= 45 ? 'border-amber-400 text-amber-600' : 'border-red-400 text-red-500';
+                                                  return <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 bg-white/80 dark:bg-zinc-900/80 ${rc}`}><span className="text-[8px] font-bold">{s}</span></div>;
+                                                })() : null}
+                                              </td>
+                                              <td className="px-2 py-1.5 text-zinc-400 text-[9px]">{ad.status === 'ACTIVE' ? '●' : '○'}</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] font-bold text-zinc-700">{adIns ? fmtNum(adIns.spend, 0) : '—'}</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adIns ? getPrimaryMetric(c.objective || '', adIns).value : '—'}</td>
+                                              <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adRoas >= 3 ? 'text-emerald-600' : adRoas >= 1.5 ? 'text-amber-500' : adRoas > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{adRoas > 0 ? fmtNum(adRoas, 2) : '—'}</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-600">{adIns ? getPrimaryMetric(c.objective || '', adIns).cost : '—'}</td>
+                                              <td className="px-2 py-1.5 text-right text-zinc-400 text-[10px]">—</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adIns?.reach ? parseInt(adIns.reach).toLocaleString('es-AR') : '—'}</td>
+                                              <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adCtr >= 1.5 ? 'text-emerald-600' : adCtr >= 1 ? 'text-amber-500' : adCtr > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{adIns ? fmtNum(adCtr, 2) : '—'}</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adIns ? fmtNum(adIns.cpm, 0) : '—'}</td>
+                                              <td className={`px-2 py-1.5 text-right font-mono text-[10px] font-bold ${adFreq > 3.5 ? 'text-red-500' : adFreq > 2.5 ? 'text-amber-500' : 'text-zinc-700'}`}>{adIns ? fmtNum(adFreq, 1) : '—'}</td>
+                                              <td className="px-2 py-1.5 text-right font-mono text-[10px] text-zinc-700">{adIns?.cpc && parseFloat(adIns.cpc) > 0 ? fmtNum(adIns.cpc, 0) : '—'}</td>
+                                              <td className="px-2 py-1.5" />
+                                            </tr>
+                                          );
+                                        }))}
+                                      </React.Fragment>
+                                    );
+                                  }))}
+                                  </React.Fragment>
                                 );
                               })}
+                              {/* Totals row */}
+                              {campsWithSpend.length > 0 && (() => {
+                                const totalSpendSum = campsWithSpend.reduce((acc: number, c: any) => acc + parseFloat(campaignInsights[c.id]?.spend || 0), 0);
+                                const totalReachSum = campsWithSpend.reduce((acc: number, c: any) => acc + parseInt(campaignInsights[c.id]?.reach || 0), 0);
+                                const totalImpressions = campsWithSpend.reduce((acc: number, c: any) => acc + parseInt(campaignInsights[c.id]?.impressions || 0), 0);
+                                const weightedCtr = totalImpressions > 0
+                                  ? campsWithSpend.reduce((acc: number, c: any) => acc + parseFloat(campaignInsights[c.id]?.inline_link_click_ctr || 0) * parseInt(campaignInsights[c.id]?.impressions || 0), 0) / totalImpressions
+                                  : 0;
+                                const roasCamps = campsWithSpend.filter((c: any) => campaignInsights[c.id]?.purchase_roas?.[0]?.value);
+                                const avgRoas = roasCamps.length > 0 ? roasCamps.reduce((acc: number, c: any) => acc + parseFloat(campaignInsights[c.id].purchase_roas[0].value), 0) / roasCamps.length : 0;
+                                return (
+                                  <tr className="border-t-2 border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40">
+                                    <td className="px-3 py-2.5 sticky left-0 bg-zinc-50 dark:bg-zinc-800/40 z-10">
+                                      <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">TOTAL {campsWithSpend.length} campanas</span>
+                                    </td>
+                                    <td />
+                                    <td className="px-2 py-2.5 text-center text-zinc-300">—</td>
+                                    <td className="px-2 py-2.5 text-right">
+                                      <div className="font-mono font-bold text-[12px] text-zinc-900 dark:text-white">{fmtNum(totalSpendSum, 0)}</div>
+                                    </td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300 dark:text-zinc-600">—</td>
+                                    <td className={`px-2 py-2.5 text-right font-mono font-bold text-[11px] ${avgRoas >= 3 ? 'text-emerald-600' : avgRoas >= 1.5 ? 'text-amber-500' : avgRoas > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{avgRoas > 0 ? fmtNum(avgRoas, 2) : '—'}</td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300">—</td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300">—</td>
+                                    <td className="px-2 py-2.5 text-right font-mono font-bold text-[11px] text-zinc-700 dark:text-zinc-300">{totalReachSum > 0 ? totalReachSum.toLocaleString('es-AR') : '—'}</td>
+                                    <td className={`px-2 py-2.5 text-right font-mono font-bold text-[11px] ${weightedCtr >= 1.5 ? 'text-emerald-600' : weightedCtr >= 1 ? 'text-amber-500' : weightedCtr > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{weightedCtr > 0 ? fmtNum(weightedCtr, 2) : '—'}</td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300">—</td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300">—</td>
+                                    <td className="px-2 py-2.5 text-right text-zinc-300">—</td>
+                                    <td />
+                                  </tr>
+                                );
+                              })()}
                             </tbody>
                           </table>
                         </div>
@@ -1168,23 +2412,161 @@ INICIO: ${planStartDate}
                       </div>
 
 
-                    {/* Benchmarks */}
-                    <div className="flex items-center gap-4 text-[10px] text-zinc-400 dark:text-zinc-600 flex-wrap pb-4">
+                    {/* Benchmarks & Legend */}
+                    <div className="flex items-center gap-3 text-[10px] text-zinc-400 dark:text-zinc-600 flex-wrap pb-4">
+                      <span className="font-semibold text-zinc-500 dark:text-zinc-500">Benchmarks:</span>
                       <span><span className="text-emerald-500 font-bold">●</span> CTR ≥ 1.5%</span>
-                      <span><span className="text-emerald-500 font-bold">●</span> Frecuencia ≤ 2.5</span>
-                      <span><span className="text-emerald-500 font-bold">●</span> CPM ≤ {accountOverview?.currency === 'ARS' ? '10.000 ARS' : '$15 USD'}</span>
-                      <span className="text-zinc-300 dark:text-zinc-700">|</span>
-                      <span><span className="text-amber-500 font-bold">●</span> Puede mejorar</span>
-                      <span><span className="text-red-500 font-bold">●</span> Problema</span>
+                      <span><span className="text-emerald-500 font-bold">●</span> Frec. ≤ 2.5</span>
+                      <span><span className="text-emerald-500 font-bold">●</span> CPM ≤ {accountOverview?.currency === 'ARS' ? '10k ARS' : '$15 USD'}</span>
+                      <span className="text-zinc-200 dark:text-zinc-700">|</span>
+                      <span className="font-semibold text-zinc-500 dark:text-zinc-500">Score:</span>
+                      <span><span className="font-bold text-emerald-600">70+</span> Bueno</span>
+                      <span><span className="font-bold text-amber-500">45-70</span> Regular</span>
+                      <span><span className="font-bold text-red-500">0-45</span> Critico</span>
+                      <span className="text-zinc-200 dark:text-zinc-700">|</span>
+                      <span className="text-blue-500 font-bold">TOFU</span> <span className="text-amber-500 font-bold">MOFU</span> <span className="text-emerald-500 font-bold">BOFU</span>
+                      <button onClick={analyzeAll} disabled={isAnalyzingAll || isAnalyzingAI || !hasData} className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500 text-white text-[11px] font-bold disabled:opacity-40 hover:bg-violet-600 transition-colors shadow-sm">
+                        {isAnalyzingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <BrainCircuit className="w-3 h-3" />}
+                        {isAnalyzingAll ? `${analyzeAllProgress || 'Analizando...'}` : 'Analizar Todo'}
+                      </button>
                     </div>
                   </>
                 )}
               </div>
             )}
 
+            {/* ── CREATIVOS ─────────────────────────────────────────── */}
+            {activeTab === 'CREATIVOS' && (
+              <div className="p-4 space-y-4 overflow-y-auto pb-28">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-[15px] font-bold text-zinc-900 dark:text-white">Creativos por Rol en el Funnel</h2>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">Expandí campañas en Reportes → click en conjuntos → los creativos aparecen acá con su etapa del funnel.</p>
+                  </div>
+                  <button onClick={analyzeCreatives} disabled={isAnalyzingCreatives}
+                    className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[12px] font-semibold rounded-xl transition-colors shadow-sm">
+                    {isAnalyzingCreatives ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Analizando...</span></> : <><BrainCircuit className="w-3.5 h-3.5" /><span>Analizar con IA</span></>}
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(['TOFU', 'MOFU', 'BOFU'] as const).map(stage => {
+                    const s = FUNNEL_STYLES[stage];
+                    return (
+                      <div key={stage} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${s.row}`}>
+                        <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                        <span className={`text-[10px] font-bold ${s.badge.split(' ')[1]}`}>{stage}</span>
+                        <span className="text-[10px] text-zinc-500">{s.desc}</span>
+                      </div>
+                    );
+                  })}
+                  <span className="text-[10px] text-zinc-400 ml-2">⚠ = bajo rendimiento para su rol</span>
+                </div>
+                {Object.keys(campaignAdSets).length > 0 ? (
+                  <div className="space-y-3">
+                    {Object.entries(campaignAdSets).map(([campId, adsets]) => {
+                      const camp = campaigns.find((c: any) => c.id === campId);
+                      const campFunnel = classifyFunnel(camp?.objective || '');
+                      const campFStyle = FUNNEL_STYLES[campFunnel];
+                      return (
+                        <div key={campId} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
+                          <div className={`px-4 py-2.5 flex items-center gap-2 border-b border-zinc-100 dark:border-zinc-800 ${campFStyle.row}`}>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${campFStyle.badge}`}>{campFunnel}</span>
+                            <span className="text-[12px] font-bold text-zinc-800 dark:text-zinc-100 truncate">{camp?.name || campId}</span>
+                          </div>
+                          {(adsets as any[]).map((adset: any) => {
+                            const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal);
+                            const adsetFStyle = FUNNEL_STYLES[adsetFunnel];
+                            const adsList = adSetAds[adset.id] || [];
+                            const adsetIns = adSetInsights[adset.id];
+                            return (
+                              <div key={adset.id} className="border-b border-zinc-50 dark:border-zinc-800/50 last:border-0">
+                                <div className={`px-4 py-2 flex items-center gap-2 ${adsetFStyle.row}`}>
+                                  <span className={`text-[8px] font-bold px-1 py-0.5 rounded ${adsetFStyle.badge}`}>{adsetFunnel}</span>
+                                  <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 truncate flex-1">{adset.name}</span>
+                                  {adsetIns && <span className="text-[9px] text-zinc-400 flex-shrink-0">CTR: {fmtNum(adsetIns.inline_link_click_ctr, 2)}% · Frec: {fmtNum(adsetIns.frequency, 1)} · Gasto: {fmtNum(adsetIns.spend, 0)}</span>}
+                                </div>
+                                {adsList.length === 0 ? (
+                                  <div className="px-8 py-2 text-[10px] text-zinc-400 italic">
+                                    {loadingAds[adset.id] ? <span className="flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin inline" /> Cargando...</span> : 'Expandí este conjunto en Reportes para ver los anuncios'}
+                                  </div>
+                                ) : (
+                                  <div className="px-4 pb-3 pt-1 grid grid-cols-1 gap-2">
+                                    {[...adsList].sort((a: any, b: any) => parseFloat(adInsights[b.id]?.inline_link_click_ctr || 0) - parseFloat(adInsights[a.id]?.inline_link_click_ctr || 0)).map((ad: any, adRank: number) => {
+                                      const adIns = adInsights[ad.id];
+                                      const adFunnelInfo2 = getFunnelInfo(camp?.objective || '', adset.optimization_goal);
+                                      const adFunnel = adFunnelInfo2.stage;
+                                      const adFStyle = FUNNEL_STYLES[adFunnel];
+                                      const adCtr = parseFloat(adIns?.inline_link_click_ctr || 0);
+                                      const adFreq = parseFloat(adIns?.frequency || 0);
+                                      const adRoas = adIns?.purchase_roas?.[0]?.value ? parseFloat(adIns.purchase_roas[0].value) : 0;
+                                      const adSpend = parseFloat(adIns?.spend || 0);
+                                      const adScore = calcPerfScore(adIns, accountOverview?.currency || 'ARS');
+                                      const issues = funnelBadPerf(adFunnel, adIns);
+                                      const thumb = ad.creative?.thumbnail_url || ad.creative?.image_url;
+                                      const hasProblem = issues.length > 0;
+                                      const isWinner = adRank === 0 && adSpend > 0 && adCtr > 0;
+                                      return (
+                                        <div key={ad.id} className={`rounded-xl border flex items-start gap-3 p-3 ${hasProblem ? 'border-red-200 dark:border-red-800/40 bg-red-50/40 dark:bg-red-900/5' : isWinner ? 'border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/30 dark:bg-emerald-900/5' : 'border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800/20'}`}>
+                                          <div className="relative flex-shrink-0">
+                                            {thumb ? <img src={thumb} alt="" className="w-14 h-14 rounded-xl object-cover border border-zinc-200 dark:border-zinc-700" /> : <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${adFStyle.row} border`}><span className={`text-[10px] font-bold ${adFStyle.badge.split(' ')[1]}`}>{adFunnel}</span></div>}
+                                            {isWinner && <span className="absolute -top-1 -left-1 text-[12px]">🏆</span>}
+                                            <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[7px] font-bold bg-white dark:bg-zinc-900 ${adScore >= 70 ? 'border-emerald-400 text-emerald-600' : adScore >= 45 ? 'border-amber-400 text-amber-600' : 'border-red-400 text-red-500'}`}>{adScore}</div>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 mb-0.5 overflow-hidden">
+                                              <FunnelBadge stage={adFunnel} info={adFunnelInfo2} ins={adIns} currency={accountOverview?.currency || 'ARS'} size="xs" />
+                                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ad.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-zinc-300'}`} />
+                                              <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-100 truncate min-w-0">{ad.name}</p>
+                                            </div>
+                                            {hasProblem && <p className="text-[9px] text-red-500 font-semibold mb-0.5">⚠ {issues.join(' · ')}</p>}
+                                            <div className="flex items-center gap-2.5 flex-wrap text-[9px] text-zinc-500">
+                                              {adSpend > 0 && <span>Gasto: <strong className="text-zinc-700 dark:text-zinc-300">{fmtNum(adSpend, 0)}</strong></span>}
+                                              {adCtr > 0 && <span className={adCtr >= 1.5 ? 'text-emerald-600' : adCtr >= 1 ? 'text-amber-500' : 'text-red-500'}>CTR: <strong>{fmtNum(adCtr, 2)}%</strong></span>}
+                                              {adFreq > 0 && <span className={adFreq > 3.5 ? 'text-red-500' : ''}>Frec: <strong>{fmtNum(adFreq, 2)}</strong></span>}
+                                              {adIns?.reach && <span>Alcance: <strong>{parseInt(adIns.reach).toLocaleString('es-AR')}</strong></span>}
+                                              {adRoas > 0 && <span className={adRoas >= 2 ? 'text-emerald-600' : 'text-red-500'}>ROAS: <strong>{fmtNum(adRoas, 2)}</strong></span>}
+                                              {!adIns && <span className="italic text-zinc-400">Sin métricas — expandí en Reportes</span>}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center">
+                      <Palette className="w-7 h-7 text-violet-400" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-semibold text-zinc-700 dark:text-zinc-300">Sin creativos cargados</p>
+                      <p className="text-[12px] text-zinc-400 mt-1">Andá a Reportes → hacé click en una campaña → luego en un conjunto para cargar los anuncios</p>
+                    </div>
+                  </div>
+                )}
+                {(creativeAnalysisText || isAnalyzingCreatives) && (
+                  <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm px-5 py-4">
+                    <h3 className="text-[13px] font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-2"><BrainCircuit className="w-4 h-4 text-violet-500" />Análisis IA de Creativos</h3>
+                    {isAnalyzingCreatives && !creativeAnalysisText ? (
+                      <div className="flex items-center gap-3 py-8 justify-center"><Loader2 className="w-6 h-6 text-violet-500 animate-spin" /><span className="text-[13px] text-zinc-500">Analizando rol de cada creativo en el funnel...</span></div>
+                    ) : (
+                      <div className="text-[12px] leading-relaxed">{renderMarkdown(creativeAnalysisText)}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── ANÁLISIS ─────────────────────────────────────────── */}
             {activeTab === 'ANALISIS' && (
-              <div>
+              <div className="pb-28">
                 {isAnalyzingAI && !analysisText && (
                   <div className="flex flex-col items-center justify-center py-24 gap-4">
                     <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
@@ -1197,7 +2579,7 @@ INICIO: ${planStartDate}
                       <BarChart2 className="w-7 h-7 text-violet-400" />
                     </div>
                     <p className="text-[14px] font-semibold text-zinc-500 dark:text-zinc-400">
-                      {analysisError ? 'Configurá la API key de Claude para ver el análisis IA' : 'El análisis aparece acá después de analizar'}
+                      {analysisError ? analysisError : 'El análisis aparece acá después de analizar'}
                     </p>
                   </div>
                 )}
@@ -1213,6 +2595,7 @@ INICIO: ${planStartDate}
                             <thead>
                               <tr className="bg-zinc-50 dark:bg-zinc-800/50">
                                 <th className="text-left px-3 py-2 font-semibold text-zinc-500">Nombre</th>
+                                <th className="text-center px-3 py-2 font-semibold text-zinc-500">Score</th>
                                 <th className="text-right px-3 py-2 font-semibold text-zinc-500">Gasto</th>
                                 <th className="text-right px-3 py-2 font-semibold text-zinc-500">ROAS</th>
                                 <th className="text-right px-3 py-2 font-semibold text-zinc-500">Resultado</th>
@@ -1226,9 +2609,13 @@ INICIO: ${planStartDate}
                                 const ins = campaignInsights[c.id];
                                 const action = adActions[c.id];
                                 const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
+                                const score = ins ? calcPerfScore(ins, accountOverview?.currency || 'ARS') : 0;
                                 return (
                                   <tr key={c.id} className={`border-t border-zinc-50 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors ${idx % 2 !== 0 ? 'bg-zinc-50/50 dark:bg-zinc-800/20' : ''}`}>
                                     <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200 max-w-[220px] truncate" title={c.name}>{c.name}</td>
+                                    <td className="px-3 py-2 text-center">
+                                      {ins ? <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full border-2 text-[10px] font-bold ${score >= 70 ? 'border-emerald-400 text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : score >= 45 ? 'border-amber-400 text-amber-600 bg-amber-50 dark:bg-amber-900/20' : 'border-red-400 text-red-500 bg-red-50 dark:bg-red-900/20'}`}>{score}</div> : <span className="text-zinc-300">—</span>}
+                                    </td>
                                     <td className="px-3 py-2 text-right font-mono text-zinc-700 dark:text-zinc-300">{ins ? fmtNum(ins.spend, 0) : '—'}</td>
                                     <td className="px-3 py-2 text-right font-mono text-zinc-700 dark:text-zinc-300">{ins?.purchase_roas?.[0]?.value ? fmtNum(ins.purchase_roas[0].value, 2) : '—'}</td>
                                     <td className="px-3 py-2 text-right font-mono text-zinc-700 dark:text-zinc-300">
@@ -1268,7 +2655,166 @@ INICIO: ${planStartDate}
               </div>
             )}
 
-            {/* ── CREATIVIDAD ───────────────────────────────────────── */}
+            {/* ── REPORTE CLIENTE ─────────────────────────────────────── */}
+            {activeTab === 'CLIENTE' && (
+              <div className="p-4 space-y-4 overflow-y-auto pb-28">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-[15px] font-bold text-zinc-900 dark:text-white">Reporte para Cliente</h2>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">Análisis objetivo del período, en lenguaje simple. Listo para enviar.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={handleClientReportPDF} disabled={!clientReportText && !hasData}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all disabled:opacity-40">
+                      <FileDown className="w-3.5 h-3.5" />Exportar PDF
+                    </button>
+                    <button onClick={async () => {
+                        setIsGeneratingClientReport(true);
+                        setClientReportText('');
+                        try {
+                          const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+                          const period = `${range.since} al ${range.until}`;
+                          const currency = accountOverview?.currency || 'ARS';
+                          const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
+                          // Fetch previous period account insights for comparison
+                          const prevRange = getPrevPeriod(range.since, range.until);
+                          const prevPeriod = `${prevRange.since} al ${prevRange.until}`;
+                          let prevInsights: any = null;
+                          try {
+                            prevInsights = await metaAds.getInsights(selectedAccountId, INSIGHT_FIELDS, undefined, prevRange);
+                          } catch (e) { /* comparison optional */ }
+                          const resp = await ai.chat([
+                            { role: 'system', content: buildMetaAnalystSystem(activeChannels) },
+                            { role: 'user', content: buildClientReportPrompt(campaigns, campaignInsights, accountOverview?.name || selectedAccountId, period, currency, accountInsights, prevInsights || undefined, prevInsights ? prevPeriod : undefined) }
+                          ]);
+                          setClientReportText(resp);
+                        } catch (e: any) {
+                          setClientReportText('Error: ' + e.message);
+                        } finally { setIsGeneratingClientReport(false); }
+                      }} disabled={isGeneratingClientReport || !hasData}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-semibold transition-all disabled:opacity-40">
+                      {isGeneratingClientReport ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generando...</span></> : <><BrainCircuit className="w-3.5 h-3.5" /><span>Generar Reporte</span></>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Summary for client */}
+                {accountInsights && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Inversión total', value: `${accountOverview?.currency || ''} ${fmtNum(accountInsights.spend, 0)}`, sub: 'en el período' },
+                      { label: 'Personas alcanzadas', value: parseInt(accountInsights.reach || '0').toLocaleString('es-AR'), sub: 'alcance único' },
+                      { label: 'ROAS', value: accountInsights.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2) + 'x' : '—', sub: 'retorno sobre inversión' },
+                      { label: 'Costo por clic', value: accountInsights.cpc && parseFloat(accountInsights.cpc) > 0 ? `${accountOverview?.currency || ''} ${fmtNum(accountInsights.cpc, 0)}` : '—', sub: 'promedio' },
+                    ].map(k => (
+                      <div key={k.label} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 px-4 py-3 shadow-sm">
+                        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">{k.label}</p>
+                        <p className="text-[20px] font-bold text-zinc-900 dark:text-white leading-none">{k.value}</p>
+                        <p className="text-[9px] text-zinc-400 mt-1">{k.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Campaign quick table */}
+                {campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
+                    <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                      <h3 className="text-[12px] font-bold text-zinc-800 dark:text-zinc-100">Resultados por campaña</h3>
+                      <span className="text-[10px] text-zinc-400">{campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).length} campañas activas</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[11px]">
+                        <thead>
+                          <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500">
+                            <th className="text-left px-3 py-2.5 font-semibold">Campaña</th>
+                            <th className="text-right px-3 py-2.5 font-semibold">Inversión</th>
+                            <th className="text-right px-3 py-2.5 font-semibold">Alcance</th>
+                            <th className="text-right px-3 py-2.5 font-semibold">Resultado</th>
+                            <th className="text-right px-3 py-2.5 font-semibold">Costo/R</th>
+                            <th className="text-right px-3 py-2.5 font-semibold">CTR</th>
+                            <th className="text-center px-3 py-2.5 font-semibold">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).map((c: any, idx: number) => {
+                            const ins = campaignInsights[c.id];
+                            const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
+                            const ctr = parseFloat(ins?.inline_link_click_ctr || 0);
+                            const roas = parseFloat(ins?.purchase_roas?.[0]?.value || 0);
+                            const freq = parseFloat(ins?.frequency || 0);
+                            // Health score: green/yellow/red
+                            let health = 'neutral';
+                            if (ctr >= 1.5 && freq <= 2.5) health = 'good';
+                            else if (ctr < 0.8 || freq > 3.5) health = 'bad';
+                            else health = 'ok';
+                            const healthBadge = health === 'good'
+                              ? <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" title="Buen rendimiento" />
+                              : health === 'bad'
+                              ? <span className="inline-block w-2 h-2 rounded-full bg-red-400" title="Bajo rendimiento" />
+                              : <span className="inline-block w-2 h-2 rounded-full bg-amber-400" title="Rendimiento medio" />;
+                            return (
+                              <tr key={c.id} className={`border-t border-zinc-50 dark:border-zinc-800/50 ${idx % 2 !== 0 ? 'bg-zinc-50/30 dark:bg-zinc-800/10' : ''}`}>
+                                <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200 max-w-[200px]">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${c.status === 'ACTIVE' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                                    <span className="truncate">{c.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">{fmtNum(ins?.spend, 0)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">{ins?.reach ? parseInt(ins.reach).toLocaleString('es-AR') : '—'}</td>
+                                <td className="px-3 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                  {metric ? <span title={metric.label}>{metric.value}</span> : '—'}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">{metric?.cost ?? '—'}</td>
+                                <td className={`px-3 py-2 text-right font-mono font-bold ${ctr >= 1.5 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : ctr > 0 ? 'text-red-500' : 'text-zinc-400'}`}>{ins ? fmtNum(ctr, 2) + '%' : '—'}</td>
+                                <td className="px-3 py-2 text-center">{healthBadge}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Report */}
+                {isGeneratingClientReport && !clientReportText && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <Loader2 className="w-7 h-7 text-violet-500 animate-spin" />
+                    <p className="text-[13px] text-zinc-500">Generando reporte para el cliente...</p>
+                  </div>
+                )}
+                {!clientReportText && !isGeneratingClientReport && hasData && (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                    <FileDown className="w-8 h-8 text-zinc-300" />
+                    <p className="text-[12px] text-zinc-500">Hacé click en "Generar Reporte" para crear el informe para tu cliente</p>
+                    <p className="text-[11px] text-zinc-400">O usá "Analizar Todo" en la barra superior para generar todo de una vez</p>
+                  </div>
+                )}
+                {clientReportText && (
+                  <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm px-6 py-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+                          <FileDown className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-bold text-zinc-900 dark:text-white">{accountOverview?.name || 'Reporte'}</p>
+                          <p className="text-[10px] text-zinc-400">{dateMode === 'preset' ? preset : `${since} — ${until}`}</p>
+                        </div>
+                      </div>
+                      <button onClick={handleClientReportPDF} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-semibold transition-colors">
+                        <FileDown className="w-3 h-3" />Exportar PDF
+                      </button>
+                    </div>
+                    <div className="text-[12px] leading-relaxed border-t border-zinc-100 dark:border-zinc-800 pt-4">{renderMarkdown(clientReportText)}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── CREATIVIDAD ─────────────────────────────────────────── */}
             {activeTab === 'CREATIVIDAD' && (
               <div>
                 {isAnalyzingAI && !creativityText ? (
@@ -1357,9 +2903,9 @@ INICIO: ${planStartDate}
             )}
           </div>
 
-          {/* ── CHAT PANEL — only for non-Reportes tabs ──────────── */}
-          {activeTab !== 'REPORTES' && (
-            <div className="flex-[1] min-w-0 border-l border-zinc-100 dark:border-zinc-800 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden" style={{ maxWidth: '320px' }}>
+          {/* ── CHAT PANEL — toggleable ──────────── */}
+          {chatOpen && (
+            <div className="flex-[1] min-w-0 border-l border-zinc-100 dark:border-zinc-800 flex flex-col bg-white dark:bg-zinc-900 overflow-hidden" style={{ maxWidth: '300px' }}>
               <div className="flex-shrink-0 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">

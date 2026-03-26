@@ -19,7 +19,7 @@ const sections = [
     items: [
       { path: '/',                   icon: Home,             label: 'Inicio' },
       { path: '/projects',           icon: Briefcase,        label: 'Clientes' },
-      { path: '/meta-ads',           icon: Target,           label: 'Meta Ads' },
+      { path: '/ai-analyst',         icon: BrainCircuit,     label: 'Meta Ads' },
       { path: '/payments',           icon: CalendarDays,     label: 'Pagos' },
       { path: '/tasks',              icon: CheckSquare,      label: 'Tareas' },
       { path: '/content-ideas',      icon: FileText,         label: 'Contenido' },
@@ -38,7 +38,6 @@ const sections = [
     title: 'Estrategia',
     items: [
       { path: '/ai-studio',          icon: Sparkles,         label: 'AI Studio',  ai: true },
-      { path: '/ai-analyst',         icon: BrainCircuit,     label: 'AI Analyst', ai: true },
       { path: '/sales-copilot',      icon: MessageSquareMore,label: 'Copiloto IA' },
       { path: '/lab',                icon: Rocket,           label: 'The Lab' },
       { path: '/playbooks',          icon: Book,             label: 'Playbooks' },

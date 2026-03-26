@@ -30,7 +30,6 @@ import ContentIdeasPage from '../../pages/ContentIdeasPage';
 import ContentIdeaDetailPage from '../../pages/ContentIdeaDetailPage';
 import MarketingProposalPage from '../../pages/MarketingProposalPage';
 import NewClientPage from '../../pages/NewClientPage';
-import MetaAdsPage from '../../pages/MetaAdsPage';
 import AIStudioPage from '../../pages/AIStudioPage';
 import AIAnalystPage from '../../pages/AIAnalystPage';
 
@@ -113,7 +112,7 @@ export const MainLayout = () => {
             <Route path="/portal/:token"        element={<ClientPortalPage />} />
             <Route path="/audit"                element={<AuditPage />} />
             <Route path="/marketing-proposal"   element={<MarketingProposalPage />} />
-            <Route path="/meta-ads"             element={<MetaAdsPage />} />
+            <Route path="/meta-ads"             element={<AIAnalystPage />} />
             <Route path="/ai-studio"            element={<AIStudioPage />} />
             <Route path="/ai-analyst"           element={<AIAnalystPage />} />
           </Routes>

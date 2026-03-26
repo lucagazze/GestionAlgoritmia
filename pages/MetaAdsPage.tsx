@@ -10,7 +10,9 @@ import {
   RefreshCw, Target, Loader2, ChevronDown, ChevronUp, ExternalLink,
   Search, Activity, ArrowLeft, Building2, Instagram, Calendar,
   AlertCircle, AlertTriangle, CheckCircle, XCircle, ImageIcon, Play, Pause, Sparkles,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
+import AIAnalystPage from './AIAnalystPage';
 
 // ── Types ──────────────────────────────────────────────────────────────
 type DateMode = 'preset' | 'custom';
@@ -745,43 +747,216 @@ const InstagramCard = ({ igId, username }: { igId: string; username: string }) =
   );
 };
 
-// ── Date Filter Bar ────────────────────────────────────────────────────
+// ── Date Filter Bar (Meta-style) ──────────────────────────
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DAYS_ES   = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function getFirstDayOfWeek(year: number, month: number) {
+  const d = new Date(year, month, 1).getDay();
+  return d === 0 ? 6 : d - 1;
+}
+function isoDate(y: number, m: number, d: number) {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+const MiniCal = ({ year, month, since, until, hovering, onDay, onHover }: {
+  year: number; month: number; since: string; until: string; hovering: string;
+  onDay: (d: string) => void; onHover: (d: string) => void;
+}) => {
+  const days = getDaysInMonth(year, month);
+  const offset = getFirstDayOfWeek(year, month);
+  const cells: (number|null)[] = [...Array(offset).fill(null), ...Array.from({length:days},(_,i)=>i+1)];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="select-none">
+      <p className="text-[13px] font-semibold text-zinc-800 dark:text-zinc-100 text-center mb-3">
+        {MONTHS_ES[month]} {year}
+      </p>
+      <div className="grid grid-cols-7 mb-1">
+        {DAYS_ES.map(d => (
+          <div key={d} className="text-center text-[11px] font-semibold text-zinc-400 pb-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const iso = isoDate(year, month, day);
+          const isStart  = iso === since;
+          const isEnd    = iso === until;
+          const inRange  = since && until && iso > since && iso < until;
+          const inHover  = hovering && since && !until && iso > since && iso <= hovering;
+          const isToday  = iso === today();
+          return (
+            <button key={i} onClick={() => onDay(iso)} onMouseEnter={() => onHover(iso)}
+              className={[
+                'h-8 w-full text-[12px] font-medium transition-all relative',
+                isStart || isEnd ? 'bg-blue-600 text-white rounded-md z-10' :
+                (inRange || inHover) ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200' :
+                'hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-md',
+              ].join(' ')}>
+              {day}
+              {isToday && !isStart && !isEnd && (
+                <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const DateFilterBar = ({ mode, preset, since, until, onMode, onPreset, onSince, onUntil }: {
   mode: DateMode; preset: DatePreset; since: string; until: string;
   onMode: (m: DateMode) => void; onPreset: (p: DatePreset) => void;
   onSince: (s: string) => void; onUntil: (u: string) => void;
-}) => (
-  <div className="flex flex-wrap items-center gap-2">
-    <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5">
-      {DATE_PRESETS.map(p => (
-        <button key={p.value}
-          onClick={() => { onMode('preset'); onPreset(p.value); }}
-          className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
-            mode === 'preset' && preset === p.value
-              ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
-              : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-          }`}>{p.label}</button>
-      ))}
-      <button onClick={() => onMode('custom')}
-        className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all duration-150 flex items-center gap-1.5 ${
-          mode === 'custom'
-            ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
-            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-        }`}>
-        <Calendar className="w-3.5 h-3.5" /> Rango
+}) => {
+  const [open, setOpen] = useState(false);
+  const [selSince, setSelSince] = useState(since);
+  const [selUntil, setSelUntil] = useState(until);
+  const [selPreset, setSelPreset] = useState<DatePreset>(preset);
+  const [selMode, setSelMode] = useState<DateMode>(mode);
+  const [hovering, setHovering] = useState('');
+  const nowD = new Date();
+  const [calYear, setCalYear]   = useState(nowD.getFullYear());
+  const [calMonth, setCalMonth] = useState(nowD.getMonth());
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const rightMonth = calMonth === 11 ? 0 : calMonth + 1;
+  const rightYear  = calMonth === 11 ? calYear + 1 : calYear;
+
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleOpen = () => {
+    setSelSince(since); setSelUntil(until);
+    setSelPreset(preset); setSelMode(mode); setHovering('');
+    if (since) {
+      const d = new Date(since);
+      setCalYear(d.getFullYear()); setCalMonth(d.getMonth());
+    }
+    setOpen(true);
+  };
+
+  const applyPreset = (p: DatePreset) => {
+    setSelMode('preset'); setSelPreset(p);
+    const r = presetToRange(p);
+    setSelSince(r.since); setSelUntil(r.until); setHovering('');
+  };
+
+  const handleDay = (iso: string) => {
+    if (!selSince || (selSince && selUntil)) {
+      setSelSince(iso); setSelUntil(''); setSelMode('custom');
+    } else if (iso < selSince) {
+      setSelSince(iso); setSelUntil('');
+    } else {
+      setSelUntil(iso);
+    }
+    setHovering('');
+  };
+
+  const apply = () => {
+    onMode(selMode); onPreset(selPreset);
+    onSince(selSince); onUntil(selUntil || selSince);
+    setOpen(false);
+  };
+
+  const fmtLabel = (iso: string) => {
+    if (!iso) return '';
+    return new Date(iso + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: '2-digit' });
+  };
+
+  const currentLabel = mode === 'preset'
+    ? DATE_PRESETS.find(p => p.value === preset)?.label || preset
+    : `${fmtLabel(since)} - ${fmtLabel(until)}`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={handleOpen}
+        className="flex items-center gap-2 px-3.5 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[10px] text-[13px] font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all shadow-sm">
+        <Calendar className="w-3.5 h-3.5 text-zinc-400" />
+        {currentLabel}
+        <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
       </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-50 bg-white dark:bg-zinc-900 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.18)] border border-zinc-200 dark:border-zinc-700 overflow-hidden flex"
+          style={{minWidth: 640}}>
+
+          {/* Presets */}
+          <div className="w-52 border-r border-zinc-100 dark:border-zinc-800 py-3 flex-shrink-0 overflow-y-auto">
+            <p className="px-4 pb-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Usados recientemente</p>
+            {DATE_PRESETS.map(p => (
+              <button key={p.value} onClick={() => applyPreset(p.value)}
+                className={`w-full text-left px-4 py-2.5 text-[13px] flex items-center gap-2.5 transition-colors ${
+                  selMode === 'preset' && selPreset === p.value
+                    ? 'text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-500/10'
+                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                }`}>
+                <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                  selMode === 'preset' && selPreset === p.value ? 'border-blue-600 dark:border-blue-400' : 'border-zinc-300 dark:border-zinc-600'
+                }`}>
+                  {selMode === 'preset' && selPreset === p.value && <span className="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400" />}
+                </span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Calendar + footer */}
+          <div className="flex-1 flex flex-col p-5">
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={() => { const d = new Date(calYear, calMonth - 1); setCalYear(d.getFullYear()); setCalMonth(d.getMonth()); }}
+                className="p-1.5 rounded-[8px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all">
+                <ChevronLeft className="w-4 h-4 text-zinc-500" />
+              </button>
+              <button onClick={() => { const d = new Date(calYear, calMonth + 1); setCalYear(d.getFullYear()); setCalMonth(d.getMonth()); }}
+                className="p-1.5 rounded-[8px] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all">
+                <ChevronRight className="w-4 h-4 text-zinc-500" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6" onMouseLeave={() => setHovering('')}>
+              <MiniCal year={calYear} month={calMonth} since={selSince} until={selUntil} hovering={hovering} onDay={handleDay} onHover={setHovering} />
+              <MiniCal year={rightYear} month={rightMonth} since={selSince} until={selUntil} hovering={hovering} onDay={handleDay} onHover={setHovering} />
+            </div>
+
+            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+              <input type="date" value={selSince} onChange={e => { setSelSince(e.target.value); setSelMode('custom'); }}
+                className="flex-1 px-2.5 py-1.5 text-[12px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[8px] text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <span className="text-zinc-400 text-[12px]">—</span>
+              <input type="date" value={selUntil} min={selSince} onChange={e => { setSelUntil(e.target.value); setSelMode('custom'); }}
+                className="flex-1 px-2.5 py-1.5 text-[12px] bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-[8px] text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+
+            <p className="text-[11px] text-zinc-400 mt-2">Las fechas se muestran en la Hora de Buenos Aires</p>
+
+            <div className="flex items-center justify-end gap-2 mt-3">
+              <button onClick={() => setOpen(false)}
+                className="px-4 py-1.5 rounded-[8px] text-[13px] font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all border border-zinc-200 dark:border-zinc-700">
+                Cancelar
+              </button>
+              <button onClick={apply} disabled={!selSince}
+                className="px-4 py-1.5 rounded-[8px] text-[13px] font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-all">
+                Actualizar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-    {mode === 'custom' && (
-      <div className="flex items-center gap-2">
-        <input type="date" value={since} max={until} onChange={e => onSince(e.target.value)}
-          className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[8px] text-[13px] font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
-        <span className="text-[13px] text-zinc-400">→</span>
-        <input type="date" value={until} min={since} max={today()} onChange={e => onUntil(e.target.value)}
-          className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[8px] text-[13px] font-medium text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
-      </div>
-    )}
-  </div>
-);
+  );
+};
+
 
 // ── Main Page ──────────────────────────────────────────────────────────
 type Tab = 'CAMPAIGNS' | 'INSTAGRAM' | 'AI';
@@ -944,34 +1119,24 @@ export default function MetaAdsPage() {
   const dateLabel = dateMode === 'custom' ? `${since} → ${until}` : DATE_PRESETS.find(p => p.value === datePreset)?.label;
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="flex flex-col gap-5 pb-10">
 
-      {/* ── Header ──────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
-          {tab === 'ACCOUNT' && selectedAccount && (
-            <button onClick={() => { setTab('OVERVIEW'); setSelectedAccount(null); }}
-              className="p-2 rounded-[10px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-500 transition-all active:scale-95">
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div>
-            <h1 className="text-[22px] font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm flex-shrink-0">
-                <Target className="w-[18px] h-[18px] text-white" />
-              </div>
-              {tab === 'ACCOUNT' && selectedAccount ? selectedAccount.name : 'Meta Ads'}
-            </h1>
-            <p className="text-[13px] text-zinc-400 mt-0.5 ml-0.5 font-medium">
-              {tab === 'OVERVIEW'  && `${accounts.length} cuenta${accounts.length !== 1 ? 's' : ''} publicitaria${accounts.length !== 1 ? 's' : ''}`}
-              {tab === 'ACCOUNT'   && `${selectedAccount?.currency} · Solo lectura`}
-              {tab === 'INSTAGRAM' && `${ALL_IG.length} cuentas vinculadas`}
-              {lastUpdated && <span className="opacity-50"> · {lastUpdated.toLocaleTimeString()}</span>}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-[22px] font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-[10px] bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-sm flex-shrink-0">
+              <Target className="w-[18px] h-[18px] text-white" />
+            </div>
+            Meta Ads
+          </h1>
+          <p className="text-[13px] text-zinc-400 mt-0.5 ml-0.5 font-medium">
+            {accounts.length} cuenta{accounts.length !== 1 ? 's' : ''} publicitaria{accounts.length !== 1 ? 's' : ''}
+            {lastUpdated && <span className="opacity-50"> · {lastUpdated.toLocaleTimeString()}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {tab === 'ACCOUNT' && selectedAccount && (
+          {selectedAccount && (
             <a href={metaUrl(selectedAccount.id)} target="_blank" rel="noreferrer"
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-[10px] text-[13px] font-semibold transition-all shadow-sm active:scale-95">
               <ExternalLink className="w-3.5 h-3.5" /> Abrir en Meta
@@ -985,215 +1150,230 @@ export default function MetaAdsPage() {
         </div>
       </div>
 
-      {/* ── Tab Bar ─────────────────────────────────────────── */}
-      <div className="flex gap-0.5 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[12px] w-fit">
-        {[
-          { id: 'OVERVIEW',  label: 'Cuentas',   icon: Building2 },
-          { id: 'INSTAGRAM', label: 'Instagram',  icon: Activity },
-        ].map(t => {
-          const Icon = t.icon;
-          const isActive = tab === t.id || (t.id === 'OVERVIEW' && tab === 'ACCOUNT');
-          return (
-            <button key={t.id}
-              onClick={() => {
-                if (t.id === 'OVERVIEW') { setTab('OVERVIEW'); setSelectedAccount(null); }
-                else setTab(t.id as Tab);
-              }}
-              className={`flex items-center gap-2 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all duration-150 ${
-                isActive
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-              }`}>
-              <Icon className="w-[15px] h-[15px]" />
-              {t.label}
-              {t.id === 'OVERVIEW' && tab === 'ACCOUNT' && selectedAccount && (
-                <span className="text-zinc-400 font-normal text-[12px] truncate max-w-[120px]">· {selectedAccount.name}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* Body: Sidebar + Content */}
+      <div className="flex gap-4 items-start">
 
-      {/* ── OVERVIEW ────────────────────────────────────────── */}
-      {tab === 'OVERVIEW' && (
-        <div>
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="bg-white dark:bg-zinc-900 border border-black/[0.04] rounded-2xl p-5 animate-pulse shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-zinc-100 dark:bg-zinc-800 rounded-[10px]" />
-                    <div className="h-3 w-12 bg-zinc-100 dark:bg-zinc-800 rounded-full" />
+        {/* Left Sidebar: Accounts */}
+        <div className="w-[272px] flex-shrink-0 flex flex-col gap-3">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5">
+            {([
+              { id: 'ALL',    label: 'Todas' },
+              { id: 'ACTIVE', label: 'Activas' },
+              { id: 'PAUSED', label: 'Sin gasto' },
+            ] as const).map(f => (
+              <button key={f.id} onClick={() => setAccountFilter(f.id)}
+                className={`flex-1 px-2 py-1.5 rounded-[8px] text-[12px] font-medium transition-all duration-150 ${
+                  accountFilter === f.id
+                    ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}>{f.label}</button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {loading ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800 animate-pulse">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3.5 bg-zinc-100 dark:bg-zinc-800 rounded-full w-3/4" />
+                      <div className="h-2.5 bg-zinc-50 dark:bg-zinc-800 rounded-full w-1/3" />
+                    </div>
                   </div>
-                  <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full w-3/4 mb-1.5" />
-                  <div className="h-3 bg-zinc-50 dark:bg-zinc-800 rounded-full w-1/4 mb-5" />
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="h-[68px] bg-zinc-50 dark:bg-zinc-800 rounded-[10px]" />
-                    <div className="h-[68px] bg-zinc-50 dark:bg-zinc-800 rounded-[10px]" />
+                    <div className="h-[56px] bg-zinc-50 dark:bg-zinc-800 rounded-xl" />
+                    <div className="h-[56px] bg-zinc-50 dark:bg-zinc-800 rounded-xl" />
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : accounts.length === 0 ? (
-            <div className="flex flex-col items-center py-24 gap-3">
-              <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-zinc-400" />
-              </div>
-              <p className="text-[15px] font-medium text-zinc-500">No se pudo cargar la cuenta publicitaria</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* AI Summary */}
-              {(analyzingAI || aiSummary) && (
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-violet-100 dark:border-violet-500/20 shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-violet-50 dark:border-violet-500/10 flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-violet-500" />
-                    <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider">Análisis IA · Resumen de cuentas</span>
-                  </div>
-                  <div className="px-5 py-4">
-                    {analyzingAI ? (
-                      <div className="flex items-center gap-2 text-[13px] text-zinc-400">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-400" />
-                        Analizando cuentas...
+              ))
+            ) : accounts
+              .filter(a => accountFilter === 'ALL' || (accountFilter === 'ACTIVE' ? a.spend15d > 0 : a.spend15d === 0))
+              .map(a => (
+                <button key={a.id}
+                  onClick={() => { selectAccount(a); setTab('CAMPAIGNS'); }}
+                  className={`w-full text-left rounded-2xl p-4 border transition-all duration-200 ${
+                    selectedAccount?.id === a.id
+                      ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30 shadow-[0_2px_8px_rgba(59,130,246,0.12)]'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 hover:shadow-[0_2px_6px_rgba(0,0,0,0.06)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+                      selectedAccount?.id === a.id ? 'bg-blue-500' : 'bg-gradient-to-br from-blue-500 to-blue-700'
+                    }`}>
+                      <Building2 className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[14px] font-bold truncate leading-tight ${
+                        selectedAccount?.id === a.id ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-white'
+                      }`}>{a.name}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-[11px] font-semibold text-zinc-400">{a.currency}</span>
+                        {a.spend15d > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
                       </div>
-                    ) : (
-                      <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
-                    )}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5">
-                  {([
-                    { id: 'ALL',    label: `Todas · ${accounts.length}` },
-                    { id: 'ACTIVE', label: `Activas · ${accounts.filter(a => a.spend15d > 0).length}` },
-                    { id: 'PAUSED', label: `Sin gasto · ${accounts.filter(a => a.spend15d === 0).length}` },
-                  ] as const).map(f => (
-                    <button key={f.id} onClick={() => setAccountFilter(f.id)}
-                      className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
-                        accountFilter === f.id
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
-                          : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-                      }`}>{f.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {accounts
-                  .filter(a => accountFilter === 'ALL' || (accountFilter === 'ACTIVE' ? a.spend15d > 0 : a.spend15d === 0))
-                  .map(a => (
-                    <AccountCard key={a.id} account={a} spend15d={a.spend15d} activeCamps={a.activeCamps} onSelect={() => selectAccount(a)} />
-                  ))}
-              </div>
-            </div>
-          )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className={`rounded-xl p-3 ${selectedAccount?.id === a.id ? 'bg-blue-100/50 dark:bg-blue-500/20' : 'bg-zinc-50 dark:bg-zinc-800/60'}`}>
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Gasto 15d</p>
+                      <p className={`text-[22px] font-bold tracking-tight leading-none ${
+                        selectedAccount?.id === a.id ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-white'
+                      }`}>{fmtShort(a.spend15d)}</p>
+                    </div>
+                    <div className={`rounded-xl p-3 ${selectedAccount?.id === a.id ? 'bg-blue-100/50 dark:bg-blue-500/20' : 'bg-zinc-50 dark:bg-zinc-800/60'}`}>
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Activas</p>
+                      <p className={`text-[22px] font-bold tracking-tight leading-none ${
+                        a.activeCamps > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-300 dark:text-zinc-600'
+                      }`}>{a.activeCamps}</p>
+                    </div>
+                  </div>
+                </button>
+              ))
+            }
+          </div>
         </div>
-      )}
 
-      {/* ── ACCOUNT DETAIL ──────────────────────────────────── */}
-      {tab === 'ACCOUNT' && selectedAccount && (
-        <div className="space-y-5">
+        {/* Right Content */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4">
 
-          <DateFilterBar mode={dateMode} preset={datePreset} since={since} until={until}
-            onMode={setDateMode} onPreset={setDatePreset} onSince={setSince} onUntil={setUntil} />
+          {/* Tab bar */}
+          <div className="flex gap-0.5 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[12px] w-fit">
+            {([
+              { id: 'CAMPAIGNS', label: 'Campañas', icon: Target },
+              { id: 'INSTAGRAM', label: 'Instagram',   icon: Activity },
+              { id: 'AI',        label: 'IA Analyst',  icon: Sparkles },
+            ] as const).map(t => {
+              const Icon = t.icon;
+              return (
+                <button key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all duration-150 ${
+                    tab === t.id
+                      ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
+                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  }`}>
+                  <Icon className="w-[15px] h-[15px]" />
+                  {t.label}
+                  {t.id === 'CAMPAIGNS' && selectedAccount && (
+                    <span className="text-zinc-400 font-normal text-[12px] truncate max-w-[100px]">· {selectedAccount.name}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-          {loadingCampaigns ? (
-            <div className="flex flex-col items-center py-24 gap-3">
-              <Loader2 className="animate-spin text-blue-500 w-7 h-7" />
-              <p className="text-[13px] text-zinc-400 font-medium">Cargando campañas...</p>
-            </div>
-          ) : (
-            <>
-              {/* Account stats bar */}
-              {accountIns ? (
-                <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
-                  <div className="px-5 pt-4 pb-2">
-                    <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Resumen de cuenta · {dateLabel}</p>
+          {/* CAMPAIGNS TAB */}
+          {tab === 'CAMPAIGNS' && (
+            <div className="space-y-5">
+              {!selectedAccount ? (
+                <div className="flex flex-col items-center justify-center py-24 gap-3">
+                  <div className="w-14 h-14 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-zinc-400" />
                   </div>
-                  <div className="px-5 pb-5 pt-3 border-t border-zinc-50 dark:border-zinc-800/60 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-5 gap-y-4">
-                    <BS label="Gasto"       value={fmt(accountIns.spend)} />
-                    <BS label="Impresiones" value={fmtK(accountIns.impressions)} sub={`CPM ${fmt(accountIns.cpm)}`} />
-                    <BS label="Alcance"     value={fmtK(accountIns.reach)} sub={`Freq ${parseFloat(accountIns.frequency || 0).toFixed(1)}x`} />
-                    <BS label="CTR enlace"  value={pct(accountIns.inline_link_click_ctr)} sub={`CPC ${fmt(accountIns.cpc)}`} />
-                    {parseInt(leads) > 0 && <BS label="Leads"   value={leads} accent="text-emerald-600 dark:text-emerald-400" />}
-                    {parseInt(purchases) > 0 && <BS label="Compras" value={purchases} accent="text-emerald-600 dark:text-emerald-400" />}
-                    {roasAcc && <BS label="ROAS" value={x2(roasAcc)} accent={sig('roas', parseFloat(roasAcc), 'sales') === 'good' ? 'text-emerald-600 dark:text-emerald-400' : sig('roas', parseFloat(roasAcc), 'sales') === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'} />}
-                    <BS label="Campañas" value={`${activeCampaigns}`} sub={`${pausedCampaigns} pausadas`} accent={activeCampaigns > 0 ? 'text-emerald-600 dark:text-emerald-400' : undefined} />
-                  </div>
+                  <p className="text-[15px] font-medium text-zinc-500">Selecci\u00f3n una cuenta de la izquierda</p>
                 </div>
               ) : (
-                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-2xl p-4 text-[13px] font-medium text-amber-700 dark:text-amber-400">
-                  Sin datos de métricas para el período seleccionado.
-                </div>
-              )}
+                <>
+                  <DateFilterBar mode={dateMode} preset={datePreset} since={since} until={until}
+                    onMode={setDateMode} onPreset={setDatePreset} onSince={setSince} onUntil={setUntil} />
 
-              {/* Auto-analysis panel */}
-              {!loadingInsights && Object.keys(insightsMap).length > 0 && (
-                <AlertsPanel campaigns={campaigns} map={insightsMap} />
-              )}
-              {loadingInsights && (
-                <div className="flex items-center gap-2 text-[12px] text-zinc-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Analizando {campaigns.length} campañas...
-                </div>
-              )}
+                  {loadingCampaigns ? (
+                    <div className="flex flex-col items-center py-24 gap-3">
+                      <Loader2 className="animate-spin text-blue-500 w-7 h-7" />
+                      <p className="text-[13px] text-zinc-400 font-medium">Cargando campa\u00f1as...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {accountIns ? (
+                        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-black/[0.04] dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.06)] overflow-hidden">
+                          <div className="px-5 pt-4 pb-2">
+                            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Resumen de cuenta · {dateLabel}</p>
+                          </div>
+                          <div className="px-5 pb-5 pt-3 border-t border-zinc-50 dark:border-zinc-800/60 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-5 gap-y-4">
+                            <BS label="Gasto"       value={fmt(accountIns.spend)} />
+                            <BS label="Impresiones" value={fmtK(accountIns.impressions)} sub={`CPM ${fmt(accountIns.cpm)}`} />
+                            <BS label="Alcance"     value={fmtK(accountIns.reach)} sub={`Freq ${parseFloat(accountIns.frequency || 0).toFixed(1)}x`} />
+                            <BS label="CTR enlace"  value={pct(accountIns.inline_link_click_ctr)} sub={`CPC ${fmt(accountIns.cpc)}`} />
+                            {parseInt(leads) > 0 && <BS label="Leads"   value={leads} accent="text-emerald-600 dark:text-emerald-400" />}
+                            {parseInt(purchases) > 0 && <BS label="Compras" value={purchases} accent="text-emerald-600 dark:text-emerald-400" />}
+                            {roasAcc && <BS label="ROAS" value={x2(roasAcc)} accent={sig('roas', parseFloat(roasAcc), 'sales') === 'good' ? 'text-emerald-600 dark:text-emerald-400' : sig('roas', parseFloat(roasAcc), 'sales') === 'warn' ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'} />}
+                            <BS label="Campa\u00f1as" value={`${activeCampaigns}`} sub={`${pausedCampaigns} pausadas`} accent={activeCampaigns > 0 ? 'text-emerald-600 dark:text-emerald-400' : undefined} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/30 rounded-2xl p-4 text-[13px] font-medium text-amber-700 dark:text-amber-400">
+                          Sin datos de m\u00e9tricas para el per\u00edodo seleccionado.
+                        </div>
+                      )}
 
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-2.5">
-                <div className="relative flex-1 max-w-xs">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
-                  <input type="text" placeholder="Buscar campaña..."
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[10px] text-[13px] text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
-                </div>
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5 w-fit">
-                  {(['ALL', 'ACTIVE', 'PAUSED'] as const).map(f => (
-                    <button key={f} onClick={() => setCampaignFilter(f)}
-                      className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
-                        campaignFilter === f
-                          ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
-                          : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-                      }`}>
-                      {f === 'ALL' ? `Todas · ${campaigns.length}` : f === 'ACTIVE' ? `Activas · ${activeCampaigns}` : `Pausadas · ${pausedCampaigns}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                      {!loadingInsights && Object.keys(insightsMap).length > 0 && (
+                        <AlertsPanel campaigns={campaigns} map={insightsMap} />
+                      )}
+                      {loadingInsights && (
+                        <div className="flex items-center gap-2 text-[12px] text-zinc-400">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Analizando {campaigns.length} campa\u00f1as...
+                        </div>
+                      )}
 
-              {/* Campaigns list */}
-              <div className="space-y-2">
-                {filteredCampaigns.length === 0 ? (
-                  <div className="text-center py-20">
-                    <p className="text-[13px] text-zinc-400 font-medium">No hay campañas que coincidan</p>
-                  </div>
-                ) : filteredCampaigns.map(c => (
-                  <CampaignRow
-                    key={c.id} campaign={c} accountId={selectedAccount.id}
-                    pair={insightsMap[c.id]}
-                    dateMode={dateMode} preset={datePreset} since={since} until={until}
-                  />
-                ))}
-              </div>
+                      <div className="flex flex-col sm:flex-row gap-2.5">
+                        <div className="relative flex-1 max-w-xs">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+                          <input type="text" placeholder="Buscar campa\u00f1a..."
+                            value={search} onChange={e => setSearch(e.target.value)}
+                            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-[10px] text-[13px] text-zinc-700 dark:text-zinc-300 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+                        </div>
+                        <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[10px] gap-0.5 w-fit">
+                          {(['ALL', 'ACTIVE', 'PAUSED'] as const).map(f => (
+                            <button key={f} onClick={() => setCampaignFilter(f)}
+                              className={`px-3 py-1.5 rounded-[8px] text-[13px] font-medium transition-all duration-150 ${
+                                campaignFilter === f
+                                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-[0_1px_3px_rgba(0,0,0,0.1)]'
+                                  : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                              }`}>
+                              {f === 'ALL' ? `Todas · ${campaigns.length}` : f === 'ACTIVE' ? `Activas · ${activeCampaigns}` : `Pausadas · ${pausedCampaigns}`}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-              {filteredCampaigns.length > 0 && (
-                <p className="text-[12px] text-zinc-400 text-center pt-1 font-medium">
-                  Solo lectura · <ExternalLink className="w-3 h-3 inline-block" /> abre en Meta Ads Manager
-                </p>
+                      <div className="space-y-2">
+                        {filteredCampaigns.length === 0 ? (
+                          <div className="text-center py-20">
+                            <p className="text-[13px] text-zinc-400 font-medium">No hay campa\u00f1as que coincidan</p>
+                          </div>
+                        ) : filteredCampaigns.map(c => (
+                          <CampaignRow
+                            key={c.id} campaign={c} accountId={selectedAccount.id}
+                            pair={insightsMap[c.id]}
+                            dateMode={dateMode} preset={datePreset} since={since} until={until}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
               )}
-            </>
+            </div>
           )}
-        </div>
-      )}
 
-      {/* ── INSTAGRAM ────────────────────────────────────────── */}
-      {tab === 'INSTAGRAM' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {ALL_IG.map(ig => (
-            <InstagramCard key={ig.igId} igId={ig.igId} username={ig.username} />
-          ))}
+          {/* INSTAGRAM TAB */}
+          {tab === 'INSTAGRAM' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Object.values(INSTAGRAM_ACCOUNTS).map(ig => (
+                <InstagramCard key={ig.igId} igId={ig.igId} username={ig.username} />
+              ))}
+            </div>
+          )}
+
+          {/* AI ANALYST TAB */}
+          {tab === 'AI' && (
+            <AIAnalystPage />
+          )}
+
         </div>
-      )}
+      </div>
     </div>
   );
 }
