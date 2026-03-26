@@ -784,7 +784,7 @@ const DateFilterBar = ({ mode, preset, since, until, onMode, onPreset, onSince, 
 );
 
 // ── Main Page ──────────────────────────────────────────────────────────
-type Tab = 'OVERVIEW' | 'ACCOUNT' | 'INSTAGRAM';
+type Tab = 'CAMPAIGNS' | 'INSTAGRAM' | 'AI';
 
 export default function MetaAdsPage() {
   const [tab, setTab]                         = useState<Tab>('OVERVIEW');
@@ -898,7 +898,7 @@ export default function MetaAdsPage() {
   // Select account → load campaigns (insights fetched by refreshForDate effect)
   const selectAccount = async (account: any) => {
     setSelectedAccount(account);
-    setTab('ACCOUNT');
+    setTab('CAMPAIGNS');
     setCampaigns([]);
     setInsightsMap({});
     setAccountIns(null);
@@ -918,7 +918,7 @@ export default function MetaAdsPage() {
 
   // Refresh when date changes
   const refreshForDate = useCallback(async () => {
-    if (tab !== 'ACCOUNT' || !selectedAccount || campaigns.length === 0) return;
+    if (tab !== 'CAMPAIGNS' || !selectedAccount || campaigns.length === 0) return;
     const [dp, tr] = buildArgs(dateMode, datePreset, since, until);
     const ins = await metaAds.getInsights(selectedAccount.id, INSIGHT_FIELDS, dp, tr);
     setAccountIns(ins);

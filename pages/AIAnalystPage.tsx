@@ -13,7 +13,7 @@ import {
   BrainCircuit, Settings, Upload, FileDown, Loader2, Send,
   X, Plus, Trash2, BarChart2, Palette, ClipboardList,
   ToggleLeft, ToggleRight, RefreshCw, Zap, TrendingUp, DollarSign,
-  Activity, AlertCircle, CheckCircle2,
+  Activity, AlertCircle, CheckCircle2, ExternalLink,
 } from 'lucide-react';
 
 // ── Default YT channels ─────────────────────────────────────────────────────
@@ -36,7 +36,12 @@ const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: 'last_month',   label: 'Mes anterior' },
 ];
 
-const META_ANALYST_SYSTEM = `Sos el analista senior de Meta Ads de Algoritmia. Aplicás la metodología Andromeda de Charley T (Disrupter School) como marco principal de análisis. Cada diagnóstico se basa en sus principios, no en criterios genéricos.
+const buildMetaAnalystSystem = (activeChannels: string[]) => {
+  const extraExperts = activeChannels.length > 0
+    ? `\n\n### EXPERTOS EXTRA (SKILLS ACTIVOS)\nAdemás de la base de Andromeda, ADAPTÁ y ENRIQUECÉ tus recomendaciones integrando fuertemente las metodologías, filosofías y tácticas particulares de los siguientes referentes de Meta Ads: **${activeChannels.join(', ')}**. Si aplica, mencioná cómo lo abordaría alguno de ellos o justificá tus consejos nombrando sus conceptos.`
+    : '';
+
+  return `Sos el analista senior de Meta Ads de Algoritmia. Aplicás la metodología Andromeda de Charley T (Disrupter School) como marco principal de análisis. Cada diagnóstico se basa en sus principios, no en criterios genéricos.${extraExperts}
 
 ---
 
@@ -108,8 +113,9 @@ const META_ANALYST_SYSTEM = `Sos el analista senior de Meta Ads de Algoritmia. A
 - NO uses frases vacías como "excelente pregunta" o "es importante mencionar"
 - Nombrá cada campaña exactamente como aparece en los datos
 - Cuantificá siempre: no "el CTR es bajo" → "el CTR es 0.75% cuando el benchmark es ≥1.5%"
-- Evaluá estructura vs Andromeda: ¿usa CBO? ¿tiene Control + Testeo? ¿hay intereses/Lookalikes? ¿usa exclusiones?
+- NUNCA inventes datos. Si no podés confirmar al 100% que están usando CBO, ABO, exclusiones o Broad basándote SÓLO en la tabla, no lo asumas. Evaluá estrictamente lo que ves (Nombres, Gasto, ROAS, Costo).
 - Para cada campaña: MANTENER / ESCALAR / EVALUAR / PAUSAR / DESACTIVAR con razón concreta`;
+};
 
 const ACTION_STYLES: Record<string, string> = {
   MANTENER:   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -136,65 +142,85 @@ const fmtNum = (v: any, decimals = 0): string => {
   return n.toFixed(decimals);
 };
 
-// Returns the primary KPI for a campaign based on its objective
+// Returns the primary result matching Meta Ads Manager — strictly objective-based
 function getPrimaryMetric(objective: string, ins: any): { label: string; value: string; cost: string } {
   const obj = (objective || '').toLowerCase();
   const actions = ins?.actions || [];
   const spend = parseFloat(ins?.spend || 0);
   const costPer = (val: string) => {
     const n = parseFloat(val);
-    return spend > 0 && n > 0 ? `$${(spend / n).toFixed(0)}` : '—';
+    return spend > 0 && n > 0 ? '$' + (spend / n).toFixed(0) : '—';
   };
+  const first = (v: string | null) => v || '0';
 
-  // Messages / WhatsApp
-  const msgVal = getMetaVal(actions,
-    'onsite_conversion.messaging_conversation_started_7d',
-    'onsite_conversion.messaging_first_reply',
-    'onsite_conversion.send_message',
-    'contact',
-  );
-  if (msgVal && parseFloat(msgVal) > 0) {
-    return { label: 'Mensajes', value: msgVal, cost: costPer(msgVal) };
+  // SALES / CONVERSIONS
+  if (obj.includes('sales') || obj.includes('conversion')) {
+    const v = first(getMetaVal(actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase'));
+    return { label: 'Compras', value: v, cost: costPer(v) };
   }
 
-  // Leads
+  // LEADS
   if (obj.includes('lead')) {
-    const v = getMetaVal(actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0';
+    const v = first(getMetaVal(actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped'));
     return { label: 'Leads', value: v, cost: costPer(v) };
   }
 
-  // Traffic
+  // TRAFFIC
   if (obj.includes('traffic') || obj.includes('link_click')) {
-    const v = ins?.inline_link_clicks || '0';
-    return { label: 'Clics', value: v, cost: costPer(v) };
+    const profileVisit = getMetaVal(actions, 'instagram_profile_visit');
+    const landingView  = getMetaVal(actions, 'landing_page_view');
+    const linkClicks   = ins?.inline_link_clicks || '0';
+    const candidates = [
+      { v: profileVisit || '0', label: 'Visitas perfil' },
+      { v: landingView  || '0', label: 'Visitas landing' },
+      { v: linkClicks,          label: 'Clics' },
+    ].sort((a, b) => parseFloat(b.v) - parseFloat(a.v));
+    return { label: candidates[0].label, value: candidates[0].v, cost: costPer(candidates[0].v) };
   }
 
-  // Awareness / Reach
+  // AWARENESS / REACH
   if (obj.includes('awareness') || obj.includes('reach')) {
-    return { label: 'Alcance', value: parseInt(ins?.reach || 0).toLocaleString('es-AR'), cost: '—' };
+    const v = String(parseInt(ins?.reach || 0));
+    return { label: 'Alcance', value: v, cost: '—' };
   }
 
-  // Video views
+  // VIDEO VIEWS
   if (obj.includes('video')) {
-    const v = ins?.video_thruplay_watched_actions?.[0]?.value || '0';
+    const v = first(ins?.video_thruplay_watched_actions?.[0]?.value);
     return { label: 'ThruPlays', value: v, cost: costPer(v) };
   }
 
-  // App installs
+  // APP PROMOTION
   if (obj.includes('app')) {
-    const v = getMetaVal(actions, 'mobile_app_install', 'app_install') || '0';
+    const v = first(getMetaVal(actions, 'mobile_app_install', 'app_install'));
     return { label: 'Instalaciones', value: v, cost: costPer(v) };
   }
 
-  // Engagement (interactions — fallback for OUTCOME_ENGAGEMENT without messages)
+  // ENGAGEMENT — post engagement first, messages only if clearly higher
   if (obj.includes('engagement')) {
-    const v = getMetaVal(actions, 'post_engagement', 'page_engagement') || '0';
-    return { label: 'Interacciones', value: v, cost: costPer(v) };
+    const postEng = getMetaVal(actions, 'post_engagement', 'page_engagement');
+    const msgs    = getMetaVal(actions,
+      'onsite_conversion.messaging_conversation_started_7d',
+      'onsite_conversion.messaging_first_reply',
+    );
+    const postN = parseFloat(postEng || '0');
+    const msgN  = parseFloat(msgs   || '0');
+    if (postN >= msgN && postN > 0) {
+      return { label: 'Interacciones', value: String(postN), cost: costPer(String(postN)) };
+    }
+    if (msgN > 0) {
+      return { label: 'Mensajes', value: String(msgN), cost: costPer(String(msgN)) };
+    }
+    return { label: 'Interacciones', value: '0', cost: '—' };
   }
 
-  // Default: Sales / Conversions
-  const v = getMetaVal(actions, 'offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase') || '0';
-  return { label: 'Compras', value: v, cost: costPer(v) };
+  // Fallback: primera accion disponible
+  if (actions.length > 0) {
+    const v = actions[0]?.value || '0';
+    return { label: 'Resultado', value: v, cost: costPer(v) };
+  }
+
+  return { label: '—', value: '—', cost: '—' };
 }
 
 function buildCampDataString(camps: any[], insights: Record<string, any>): string {
@@ -204,7 +230,8 @@ function buildCampDataString(camps: any[], insights: Record<string, any>): strin
     const metric = getPrimaryMetric(c.objective || '', ins);
     const roas = ins.purchase_roas?.[0]?.value ? fmtNum(ins.purchase_roas[0].value, 2) : '—';
     const atc = getMetaVal(ins.actions || [], 'offsite_conversion.fb_pixel_add_to_cart', 'add_to_cart') || '0';
-    return `${c.name} [${c.status}|${c.objective||'—'}] | Gasto: $${fmtNum(ins.spend)} | Resultado principal: ${metric.label}=${metric.value} (costo por resultado: ${metric.cost}) | ROAS: ${roas} | ATC: ${atc} | CTR: ${fmtNum(ins.inline_link_click_ctr, 2)}% | CPM: $${fmtNum(ins.cpm, 2)} | Frecuencia: ${fmtNum(ins.frequency, 2)} | Impresiones: ${ins.impressions || '0'}`;
+    const valorRes = getMetaVal(ins.action_values || [], 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase', 'lead', 'offsite_conversion.fb_pixel_lead') || '—';
+    return `${c.name} [${c.status}|${c.objective||'—'}] | Gasto: ${fmtNum(ins.spend, 0)} | Resultado: ${metric.label}=${metric.value} | Costo/R: ${metric.cost} | Valor conversiones: ${valorRes} | ROAS: ${roas} | Alcance: ${ins.reach || '0'} | CTR: ${fmtNum(ins.inline_link_click_ctr, 2)}% | CPM: ${fmtNum(ins.cpm, 0)} | CPC: ${fmtNum(ins.cpc, 0)} | Frecuencia: ${fmtNum(ins.frequency, 2)} | Impresiones: ${ins.impressions || '0'}`;
   }).join('\n');
 }
 
@@ -239,10 +266,15 @@ function parseActionsFromAnalysis(text: string, camps: any[]): Record<string, { 
 
 function buildAnalysisPrompt(accountId: string, period: string, campData: string, accountName: string, currency = 'USD'): string {
   const isUSD = currency === 'USD';
-  return `Analizá esta cuenta de Meta Ads aplicando el método Andromeda de Charley T como marco principal.
+  return `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera en ${currency}.
+Es OBLIGATORIO que todo tu análisis, referencias de costos, rentabilidad y benchmarks estén calibrados 100% en ${currency}.
+${!isUSD ? `Al ser ${currency}, NO uses parámetros ni benchmarks de USD. Un CPM o CPA que parece altísimo en USD puede ser excelente o muy barato en ${currency}. Procesá los números de forma relativa a la moneda local.` : 'Al ser USD, utilizá los benchmarks estándar.'}
+Primero verificá que estás razonando en ${currency}, y RECIÉN AHÍ hacé el análisis de los datos.
+
+Analizá esta cuenta de Meta Ads aplicando el método Andromeda de Charley T como marco principal.
 
 CUENTA: ${accountName} (${accountId})
-MONEDA DE LA CUENTA: ${currency}${!isUSD ? ` ← IMPORTANTE: los valores monetarios (CPM, CPC, CPA, gasto) están en ${currency}. NO los compares contra benchmarks en USD. Evaluá CPM/CPC de forma relativa (coherencia entre gasto, alcance, resultado) sin decir que son "caros" por ser números altos en moneda local.` : ''}
+MONEDA PRINCIPAL PARA EL ANÁLISIS: ${currency}
 PERÍODO: ${period}
 
 DATOS DE CAMPAÑAS:
@@ -253,15 +285,13 @@ Generá el análisis con estas secciones (usá los números de las campañas rea
 ## DIAGNÓSTICO GENERAL
 Estado de la cuenta: inversión total, ROAS blended estimado, métricas clave con benchmark. Una frase de diagnóstico general.
 
-## ESTRUCTURA VS ANDROMEDA
-Evaluá punto por punto:
-- ¿Usa CBO o ABO? (CBO = correcto)
-- ¿Tiene Conjunto Control con Post IDs de ganadores?
-- ¿Tiene Conjunto Testeo con DCT 3:2:2?
-- ¿Usa segmentación Broad o intereses/Lookalikes? (Broad = correcto)
-- ¿Usa exclusiones de audiencia? (Sin exclusiones = correcto)
-- ¿Usa Advantage+ para ubicaciones? (Sí = correcto)
-- Veredicto: ¿la estructura está alineada con Andromeda? ¿Qué cambiar?
+## ANÁLISIS DE RENDIMIENTO Y ESTRUCTURA (Basado estrictamente en datos reales)
+Analizá SÓLO la información numérica y de nomenclatura de la tabla:
+- ¿Hay demasiada fragmentación de presupuesto en múltiples campañas pequeñas, o está consolidado?
+- ¿La nomenclatura revela segmentaciones erróneas que perjudican al algoritmo (ej: intereses en vez de Broad)?
+- Costos de Negocio: ROAS y CPA comparados con la inversión. ¿Son rentables?
+- Atención algorítmica: Frecuencia (fatiga), CTR (atención) y CPM.
+- IMPORTANTE: No intentes adivinar si usa CBO, ABO, DCT, o exclusiones internamente si los datos no lo dicen 100%. Sé analítico con los KPIs tangibles de esta cuenta.
 
 ## ANÁLISIS POR CAMPAÑA
 Para cada campaña activa con datos, evaluala según su objetivo real (Mensajes, Leads, Clics, Compras, Interacciones, etc. — lo que figura como "Resultado principal" en los datos). NO evalúes todas por compras si su objetivo es otro.
@@ -279,8 +309,11 @@ Una sola acción prioritaria. Concisa, accionable, sin vaguedades.
 Sé específico: usá números reales de los datos, nombrá campañas exactamente, comparalos siempre contra benchmarks.`;
 }
 
-function buildCreativityPrompt(campData: string, accountName: string, period: string): string {
-  return `Analizá la estrategia creativa de la cuenta ${accountName} (${period}) aplicando el framework de Charley T.
+function buildCreativityPrompt(campData: string, accountName: string, period: string, currency = 'USD'): string {
+  return `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera en ${currency}.
+Ajustá cualquier comentario sobre costos creativos, inversión o rentabilidad a esta moneda. No asumas USD si la moneda es otra.
+
+Analizá la estrategia creativa de la cuenta ${accountName} (${period}) aplicando el framework de Charley T.
 
 DATOS:
 ${campData}
@@ -519,22 +552,11 @@ export default function AIAnalystPage() {
   });
   const [newChannelName, setNewChannelName] = useState('');
 
-  const hasAutoRun = useRef(false);
-
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [analysisChat, planChat]);
   useEffect(() => { localStorage.setItem('analyst_yt_channels', JSON.stringify(ytChannels)); }, [ytChannels]);
 
   // AUTO-LOAD accounts on mount
   useEffect(() => { loadAccounts(); }, []);
-
-  // AUTO-ANALYZE when first account selected
-  useEffect(() => {
-    if (selectedAccountId && !hasAutoRun.current) {
-      hasAutoRun.current = true;
-      handleFullAnalysis(selectedAccountId);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId]);
 
   // ── Load accounts ──────────────────────────────────────────────────────────
   const loadAccounts = async () => {
@@ -563,23 +585,22 @@ export default function AIAnalystPage() {
     }
   };
 
-  // ── Full analysis: fetch Meta data + AI ───────────────────────────────────
-  const handleFullAnalysis = async (accountId?: string) => {
+  // ── Fetch Meta data only ──────────────────────────────────────────────────
+  const fetchMetaData = async (accountId?: string) => {
     const accId = accountId || selectedAccountId;
     if (!accId) return;
 
     setIsFetchingData(true);
-    setIsAnalyzingAI(false);
     setAnalysisError(null);
-    setAnalysisText('');
+    setAnalysisText(''); // Clear previous AI analysis since data changed
     setCreativityText('');
     setAdActions({});
+    setPlanText('');
     setAnalysisChat([]);
 
     const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
 
     try {
-      // 1. Fetch account info + campaigns + account-level insights in parallel
       setAnalysisProgress('Cargando cuenta...');
       const [acct, campRes, acctIns] = await Promise.all([
         metaAds.getAccount(accId),
@@ -592,7 +613,6 @@ export default function AIAnalystPage() {
       const camps = (campRes.data || []).slice(0, 25);
       setAnalysisProgress(`Cargando insights de ${camps.length} campañas...`);
 
-      // 2. Fetch campaign insights in parallel
       const insights: Record<string, any> = {};
       await Promise.all(camps.map(async (c: any) => {
         const ins = await metaAds.getInsights(c.id, INSIGHT_FIELDS, undefined, range);
@@ -600,27 +620,50 @@ export default function AIAnalystPage() {
       }));
       setCampaigns(camps);
       setCampaignInsights(insights);
+
+      if (activeTab !== 'REPORTES') setActiveTab('REPORTES');
+    } catch (err: any) {
+      setAnalysisError(`Error al cargar datos: ${err.message}`);
+    } finally {
       setIsFetchingData(false);
+      setAnalysisProgress('');
+    }
+  };
 
-      // Switch to Reportes — data is ready
-      setActiveTab('REPORTES');
+  // AUTO-FETCH data when account or date filter changes
+  useEffect(() => {
+    if (selectedAccountId) {
+      fetchMetaData(selectedAccountId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId, dateMode, preset, since, until]);
 
-      // 3. AI Analysis (optional, gracefully handle missing key)
-      setAnalysisProgress('Generando diagnóstico con IA...');
-      setIsAnalyzingAI(true);
+  // ── Run AI Analysis manually ──────────────────────────────────────────────
+  const handleRunAIAnalysis = async () => {
+    const accId = selectedAccountId;
+    if (!accId || campaigns.length === 0) return;
 
-      const campData = buildCampDataString(camps, insights);
-      const period = `${range.since} al ${range.until}`;
+    setIsAnalyzingAI(true);
+    setAnalysisError(null);
+    setAnalysisProgress('Generando diagnóstico con IA...');
 
-      const currency = acct?.currency || 'USD';
+    const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+    const period = `${range.since} al ${range.until}`;
+    const campData = buildCampDataString(campaigns, campaignInsights);
+    const currency = accountOverview?.currency || 'USD';
+
+    try {
+      const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
+      const systemPrompt = buildMetaAnalystSystem(activeChannels);
+      
       const [analysisResult, creativityResult] = await Promise.allSettled([
-        ai.chat([{ role: 'system', content: META_ANALYST_SYSTEM }, { role: 'user', content: buildAnalysisPrompt(accId, period, campData, acct?.name || accId, currency) }]),
-        ai.chat([{ role: 'system', content: META_ANALYST_SYSTEM }, { role: 'user', content: buildCreativityPrompt(campData, acct?.name || accId, period) }]),
+        ai.chat([{ role: 'system', content: systemPrompt }, { role: 'user', content: buildAnalysisPrompt(accId, period, campData, accountOverview?.name || accId, currency) }]),
+        ai.chat([{ role: 'system', content: systemPrompt }, { role: 'user', content: buildCreativityPrompt(campData, accountOverview?.name || accId, period, currency) }]),
       ]);
 
       if (analysisResult.status === 'fulfilled') {
         setAnalysisText(analysisResult.value as string);
-        setAdActions(parseActionsFromAnalysis(analysisResult.value as string, camps));
+        setAdActions(parseActionsFromAnalysis(analysisResult.value as string, campaigns));
       } else {
         const msg = (analysisResult.reason as any)?.message || '';
         setAnalysisError(`Error en análisis IA: ${msg}`);
@@ -629,15 +672,12 @@ export default function AIAnalystPage() {
       if (creativityResult.status === 'fulfilled') {
         setCreativityText(creativityResult.value);
       }
-
-      setAnalysisProgress('');
-
     } catch (err: any) {
-      setAnalysisError(`Error al cargar datos: ${err.message}`);
-      setAnalysisProgress('');
+      setAnalysisError(`Error en IA: ${err.message}`);
     } finally {
-      setIsFetchingData(false);
       setIsAnalyzingAI(false);
+      setAnalysisProgress('');
+      setActiveTab('ANALISIS');
     }
   };
 
@@ -648,14 +688,18 @@ export default function AIAnalystPage() {
     setPlanChat([]);
     try {
       const campData = buildCampDataString(campaigns, campaignInsights);
-      const prompt = `Generá un plan estratégico completo de Meta Ads.
+      const currency = accountOverview?.currency || 'USD';
+      const prompt = `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera en ${currency}.
+Ajustá TODO el plan, sugerencias de presupuesto, estimaciones de costos (CPA, CPM) y KPIs a ${currency}. No uses benchmarks de USD si la moneda es otra.
+
+Generá un plan estratégico completo de Meta Ads.
 CUENTA: ${accountOverview?.name || selectedAccountId}
+MONEDA: ${currency}
 ANÁLISIS: ${analysisText || campData || 'Sin análisis previo.'}
 OBJETIVO: ${planObjective}
 PLAZO: ${planDeadline}
 PRESUPUESTO: ${planBudget || 'No definido'}
 INICIO: ${planStartDate}
-
 # PLAN ESTRATÉGICO META ADS
 ## OBJETIVO Y KPIs CLAVE
 ## ESTRUCTURA DE CAMPAÑAS RECOMENDADA
@@ -666,7 +710,8 @@ INICIO: ${planStartDate}
 ## PRESUPUESTO Y DISTRIBUCIÓN
 ## MÉTRICAS DE SEGUIMIENTO SEMANAL
 ## ACCIONES PRIORITARIAS PRIMERAS 2 SEMANAS`;
-      const resp = await ai.chat([{ role: 'system', content: META_ANALYST_SYSTEM }, { role: 'user', content: prompt }]);
+      const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
+      const resp = await ai.chat([{ role: 'system', content: buildMetaAnalystSystem(activeChannels) }, { role: 'user', content: prompt }]);
       setPlanText(resp);
     } catch (err: any) {
       setPlanText(`Error: ${err.message}`);
@@ -689,8 +734,9 @@ INICIO: ${planStartDate}
     setChat(prev => [...prev, newMsg]);
 
     try {
+      const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
       const resp = await ai.chat([
-        { role: 'system', content: `${META_ANALYST_SYSTEM}\n\nContexto del análisis:\n${context}` },
+        { role: 'system', content: `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Recordá que esta cuenta opera en ${accountOverview?.currency || 'USD'}. Ajustá tus respuestas, sugerencias y análisis a esta moneda.\n\n${buildMetaAnalystSystem(activeChannels)}\n\nContexto del análisis:\n${context}` },
         ...chatHistory,
         newMsg,
       ]);
@@ -768,82 +814,43 @@ INICIO: ${planStartDate}
 
   return (
     <div className="flex h-[calc(100vh-60px)] overflow-hidden bg-[#f5f5f7] dark:bg-[#0a0a0a]">
-
-      {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
-      <aside className="w-52 flex-shrink-0 bg-white dark:bg-zinc-900 border-r border-black/[0.06] dark:border-white/[0.05] flex flex-col overflow-hidden">
-        <div className="px-4 pt-5 pb-3 border-b border-black/[0.05] dark:border-white/[0.04]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-              <BrainCircuit className="w-3.5 h-3.5 text-white" />
-            </div>
-            <span className="text-[13px] font-bold text-zinc-900 dark:text-white tracking-tight">Algoritmia</span>
-          </div>
-          <p className="text-[10px] text-violet-500 dark:text-violet-400 font-semibold tracking-wider uppercase ml-8">Meta Ads Analyst</p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          <p className="text-[9px] font-semibold text-zinc-400 dark:text-zinc-600 uppercase tracking-[0.08em] px-1 mb-1.5">Cuentas</p>
-          {loadingAccounts && (
-            <div className="flex items-center gap-1.5 px-1 py-1">
-              <Loader2 className="w-3 h-3 animate-spin text-violet-500" />
-              <span className="text-[10px] text-zinc-400">Cargando...</span>
-            </div>
-          )}
-          {!loadingAccounts && accounts.length === 0 && (
-            <p className="text-[11px] text-zinc-400 dark:text-zinc-600 px-1 italic">Sin cuentas</p>
-          )}
-          <div className="space-y-0.5">
-            {accounts.map((acct: any) => (
-              <button
-                key={acct.id}
-                onClick={() => {
-                  setSelectedAccountId(acct.id);
-                  hasAutoRun.current = true;
-                  handleFullAnalysis(acct.id);
-                }}
-                className={`w-full text-left px-2 py-1.5 rounded-[6px] text-[11px] font-medium transition-all ${
-                  selectedAccountId === acct.id
-                    ? 'bg-violet-600 text-white'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/[0.06]'
-                }`}
-              >
-                <span className="truncate block">{acct.name || acct.id}</span>
-                {acct.currency && (
-                  <span className={`text-[9px] ${selectedAccountId === acct.id ? 'text-violet-200' : 'text-zinc-400 dark:text-zinc-600'}`}>
-                    {acct.currency}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-3 pb-4 space-y-2 flex-shrink-0">
-          <button
-            onClick={() => { hasAutoRun.current = false; loadAccounts(); }}
-            disabled={loadingAccounts}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[8px] bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-[11px] font-bold tracking-wide hover:opacity-90 disabled:opacity-50 transition-all"
-          >
-            {loadingAccounts ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            ACTUALIZAR
-          </button>
-          <button
-            onClick={() => setSkillsOpen(true)}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-[8px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all"
-          >
-            <Settings className="w-3 h-3" />
-            Skills
-          </button>
-        </div>
-      </aside>
-
       {/* ── MAIN CONTENT ───────────────────────────────────────────────── */}
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
 
         {/* Top bar */}
         <div className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b border-black/[0.06] dark:border-white/[0.05] px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-md">
-            <span className="font-mono truncate max-w-[160px]">{accountOverview?.name || selectedAccountId || 'Sin cuenta'}</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 mr-1 shadow-sm border border-black/10">
+              <BrainCircuit className="w-3.5 h-3.5 text-white" />
+            </div>
+            
+            <div className="flex items-center gap-1.5 text-[11px] bg-zinc-100 dark:bg-zinc-800 rounded-md border border-zinc-200 dark:border-zinc-700 hover:border-violet-300 dark:hover:border-violet-600 transition-colors">
+              <select
+                value={selectedAccountId}
+                onChange={e => setSelectedAccountId(e.target.value)}
+                className="bg-transparent border-0 text-zinc-800 dark:text-zinc-200 font-semibold text-[11px] px-2.5 py-1.5 pr-6 cursor-pointer focus:outline-none focus:ring-0 max-w-[280px] truncate"
+              >
+                {accounts.length === 0 && <option value="">Sin cuentas</option>}
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id}>{a.name || a.id} {a.currency ? `(${a.currency})` : ''}</option>
+                ))}
+              </select>
+            </div>
+            
+            {loadingAccounts && <Loader2 className="w-3 h-3 animate-spin text-violet-500" />}
+
+            {selectedAccountId && (
+              <a
+                href={`https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${selectedAccountId.replace('act_', '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir en Meta Ads Manager"
+                className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#1877F2] text-[10px] font-bold transition-all ml-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Meta
+              </a>
+            )}
           </div>
 
           <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-[6px]">
@@ -885,8 +892,20 @@ INICIO: ${planStartDate}
             Exportar PDF
           </button>
 
+          <button onClick={() => { loadAccounts(); }} disabled={loadingAccounts}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all disabled:opacity-40">
+            <RefreshCw className={`w-3 h-3 ${loadingAccounts ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+
+          <button onClick={() => setSkillsOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[7px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all">
+            <BrainCircuit className="w-3 h-3 text-violet-500" />
+            Skills IA
+          </button>
+
           <button
-            onClick={() => { hasAutoRun.current = true; handleFullAnalysis(); }}
+            onClick={() => { handleRunAIAnalysis(); }}
             disabled={isLoading || !selectedAccountId}
             className="flex items-center gap-1.5 px-4 py-1.5 rounded-[7px] bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold tracking-wide disabled:opacity-50 transition-all shadow-sm">
             {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
@@ -1007,7 +1026,14 @@ INICIO: ${planStartDate}
                               />
                             );
                           })()}
-                          <KpiCard label="CPC" value={`${fmtNum(accountInsights?.cpc, 2)}${curr ? ` ${curr}` : ''}`} />
+                          <KpiCard label="CPC" value={`${fmtNum(accountInsights?.cpc, 0)}${curr ? ` ${curr}` : ''}`} />
+                          <KpiCard label="Alcance" value={parseInt(accountInsights?.reach || 0).toLocaleString('es-AR')} />
+                          <KpiCard
+                            label="Frecuencia"
+                            value={fmtNum(accountInsights?.frequency, 2)}
+                            sub={parseFloat(accountInsights?.frequency || 0) <= 2.5 ? '✓ OK' : parseFloat(accountInsights?.frequency || 0) <= 3.5 ? '⚠ Atención' : '✗ Fatiga'}
+                            color={parseFloat(accountInsights?.frequency || 0) > 3.5 ? 'text-red-500' : parseFloat(accountInsights?.frequency || 0) > 2.5 ? 'text-amber-500' : 'text-zinc-900 dark:text-white'}
+                          />
                           <KpiCard label="Impresiones" value={parseInt(accountInsights?.impressions || 0).toLocaleString('es-AR')} />
                         </div>
                       );
@@ -1031,54 +1057,34 @@ INICIO: ${planStartDate}
                       );
                     })()}
 
-                    {/* Pie chart + Campaign table */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      {pieData.length > 0 && (
-                        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm p-4">
-                          <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-[0.06em] mb-3">Gasto por Campaña</p>
-                          <ResponsiveContainer width="100%" height={180}>
-                            <PieChart>
-                              <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2} dataKey="value">
-                                {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                              </Pie>
-                              <ReTooltip formatter={(v: any) => [`$${v.toLocaleString('es-AR')}`, 'Gasto']} />
-                            </PieChart>
-                          </ResponsiveContainer>
-                          <div className="mt-2 space-y-1">
-                            {pieData.slice(0, 6).map((d, i) => (
-                              <div key={i} className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
-                                <span className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate flex-1">{d.name}</span>
-                                <span className="text-[9px] font-bold text-zinc-700 dark:text-zinc-300">${d.value.toLocaleString('es-AR')}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Full campaign table */}
-                      <div className={`bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden ${pieData.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
+                    {/* Campaign table */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
                         {(() => {
                           const campsWithSpend = campaigns.filter((c: any) => parseFloat(campaignInsights[c.id]?.spend || 0) > 0);
+                          const acctCurr = accountOverview?.currency || '';
+                          const cpmThreshold = acctCurr === 'ARS' ? 10000 : 15;
                           return (<>
                         <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-                          <h3 className="text-[13px] font-bold text-zinc-900 dark:text-white">KPIs por Campaña ({campsWithSpend.length})</h3>
-                          {isAnalyzingAI && <span className="text-[10px] text-violet-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Generando acciones IA...</span>}
+                          <h3 className="text-[13px] font-bold text-zinc-900 dark:text-white">Campañas activas ({campsWithSpend.length})</h3>
+                          {isAnalyzingAI && <span className="text-[10px] text-violet-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Analizando...</span>}
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-[10px]">
+                          <table className="w-full text-[10px] min-w-[900px]">
                             <thead>
-                              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[9px]">
-                                <th className="text-left px-3 py-2 font-semibold">Campaña</th>
-                                <th className="text-left px-2 py-2 font-semibold">Obj.</th>
-                                <th className="text-right px-2 py-2 font-semibold">Gasto</th>
-                                <th className="text-right px-2 py-2 font-semibold">ROAS</th>
-                                <th className="text-right px-2 py-2 font-semibold">Resultado</th>
-                                <th className="text-right px-2 py-2 font-semibold">Costo/R</th>
-                                <th className="text-right px-2 py-2 font-semibold">CTR%</th>
-                                <th className="text-right px-2 py-2 font-semibold">CPM</th>
-                                <th className="text-right px-2 py-2 font-semibold">Frec.</th>
-                                <th className="text-center px-2 py-2 font-semibold">IA</th>
+                              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[9px] uppercase tracking-wide">
+                                <th className="text-left px-3 py-2.5 font-semibold sticky left-0 bg-zinc-50 dark:bg-zinc-800/50 z-10 min-w-[160px]">Campaña</th>
+                                <th className="text-left px-2 py-2.5 font-semibold min-w-[80px]">Obj.</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Gasto</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Resultados</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">ROAS</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Costo/R</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Valor</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Alcance</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">CTR%</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">CPM</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">Frec.</th>
+                                <th className="text-right px-2 py-2.5 font-semibold">CPC</th>
+                                <th className="text-center px-2 py-2.5 font-semibold">IA</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1087,42 +1093,51 @@ INICIO: ${planStartDate}
                                 const action = adActions[c.id];
                                 const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
                                 const roasVal = ins?.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : 0;
-                                const isUSD = accountOverview?.currency === 'USD';
                                 const ctr = parseFloat(ins?.inline_link_click_ctr || 0);
                                 const freq = parseFloat(ins?.frequency || 0);
+                                const cpmVal = parseFloat(ins?.cpm || 0);
+                                const cpmBad = acctCurr && cpmVal > cpmThreshold;
+                                // Valor de resultados (action_values for primary conversion)
+                                const actionVals = ins?.action_values || [];
+                                const valorRes = getMetaVal(actionVals,
+                                  'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase',
+                                  'lead', 'offsite_conversion.fb_pixel_lead',
+                                  'onsite_conversion.messaging_conversation_started_7d',
+                                ) || getMetaVal(actionVals, ...(actionVals.map((a: any) => a.action_type)));
                                 return (
-                                  <tr key={c.id} className={`border-t border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors ${idx % 2 !== 0 ? 'bg-zinc-50/40 dark:bg-zinc-800/10' : ''}`}>
-                                    <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200 max-w-[160px] truncate" title={c.name}>
-                                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${c.status === 'ACTIVE' ? 'bg-emerald-400' : c.status === 'PAUSED' ? 'bg-amber-400' : 'bg-zinc-300'}`} />
-                                      {c.name}
+                                  <tr key={c.id} className={`border-t border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors ${idx % 2 !== 0 ? 'bg-zinc-50/30 dark:bg-zinc-800/10' : ''}`}>
+                                    <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200 sticky left-0 bg-white dark:bg-zinc-900 z-10 max-w-[200px]" title={c.name}>
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className={`flex-shrink-0 w-1.5 h-1.5 rounded-full ${c.status === 'ACTIVE' ? 'bg-emerald-400' : c.status === 'PAUSED' ? 'bg-amber-400' : 'bg-zinc-300'}`} />
+                                        <span className="truncate">{c.name}</span>
+                                      </div>
                                     </td>
-                                    <td className="px-2 py-2 text-zinc-500 dark:text-zinc-500 max-w-[70px] truncate">{(c.objective || '').replace('OUTCOME_', '')}</td>
-                                    <td className="px-2 py-2 text-right font-mono text-zinc-700 dark:text-zinc-300">{ins ? fmtNum(ins.spend, 0) : '—'}</td>
-                                    <td className={`px-2 py-2 text-right font-mono font-bold ${roasVal >= 3 ? 'text-emerald-600' : roasVal >= 1.5 ? 'text-amber-600' : roasVal > 0 ? 'text-red-500' : 'text-zinc-400'}`}>
+                                    <td className="px-2 py-2 text-zinc-400 dark:text-zinc-500 text-[9px]">{(c.objective || '').replace('OUTCOME_', '')}</td>
+                                    <td className="px-2 py-2 text-right font-mono text-zinc-800 dark:text-zinc-200 font-bold">{ins ? fmtNum(ins.spend, 0) : '—'}</td>
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                      {metric ? <span title={metric.label} className="cursor-help">{metric.value}</span> : '—'}
+                                    </td>
+                                    <td className={`px-2 py-2 text-right font-mono font-bold ${roasVal >= 3 ? 'text-emerald-600' : roasVal >= 1.5 ? 'text-amber-500' : roasVal > 0 ? 'text-red-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
                                       {roasVal > 0 ? fmtNum(roasVal, 2) : '—'}
                                     </td>
-                                    <td className="px-2 py-2 text-right font-mono text-zinc-700 dark:text-zinc-300">
-                                      {metric ? (
-                                        <span title={metric.label} className="cursor-help">{metric.value}</span>
-                                      ) : '—'}
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">{metric?.cost ?? '—'}</td>
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                      {valorRes && parseFloat(valorRes) > 0 ? fmtNum(valorRes, 0) : '—'}
                                     </td>
-                                    <td className="px-2 py-2 text-right font-mono text-zinc-600 dark:text-zinc-400">{metric?.cost ?? '—'}</td>
-                                    <td className={`px-2 py-2 text-right font-mono ${ctr >= 1.5 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : ctr > 0 ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                      {ins?.reach ? parseInt(ins.reach).toLocaleString('es-AR') : '—'}
+                                    </td>
+                                    <td className={`px-2 py-2 text-right font-mono font-bold ${ctr >= 1.5 ? 'text-emerald-600' : ctr >= 1 ? 'text-amber-500' : ctr > 0 ? 'text-red-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
                                       {ins ? fmtNum(ctr, 2) : '—'}
                                     </td>
-                                    {(() => {
-                                      const cpmVal = parseFloat(ins?.cpm || 0);
-                                      const acctCurr = accountOverview?.currency || '';
-                                      const cpmThreshold = acctCurr === 'ARS' ? 10000 : 15;
-                                      const cpmBad = acctCurr && cpmVal > cpmThreshold;
-                                      return (
-                                        <td className={`px-2 py-2 text-right font-mono ${cpmBad ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
-                                          {ins ? fmtNum(cpmVal, 0) : '—'}
-                                        </td>
-                                      );
-                                    })()}
-                                    <td className={`px-2 py-2 text-right font-mono ${freq > 3.5 ? 'text-red-500' : freq > 2.5 ? 'text-amber-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                    <td className={`px-2 py-2 text-right font-mono font-bold ${cpmBad ? 'text-red-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                                      {ins ? fmtNum(cpmVal, 0) : '—'}
+                                    </td>
+                                    <td className={`px-2 py-2 text-right font-mono font-bold ${freq > 3.5 ? 'text-red-500' : freq > 2.5 ? 'text-amber-500' : 'text-zinc-800 dark:text-zinc-200'}`}>
                                       {ins ? fmtNum(freq, 1) : '—'}
+                                    </td>
+                                    <td className="px-2 py-2 text-right font-mono font-bold text-zinc-800 dark:text-zinc-200">
+                                      {ins?.cpc && parseFloat(ins.cpc) > 0 ? fmtNum(ins.cpc, 0) : '—'}
                                     </td>
                                     <td className="px-2 py-2 text-center">
                                       {action ? (
@@ -1151,7 +1166,7 @@ INICIO: ${planStartDate}
                         </div>
                         </>);})()}
                       </div>
-                    </div>
+
 
                     {/* Benchmarks */}
                     <div className="flex items-center gap-4 text-[10px] text-zinc-400 dark:text-zinc-600 flex-wrap pb-4">
