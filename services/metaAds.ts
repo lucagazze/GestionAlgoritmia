@@ -219,7 +219,7 @@ export const metaAds = {
   // ── INSIGHTS WITH DEMOGRAPHIC BREAKDOWN ──────────────────
   getInsightsBreakdown: async (
     accountId: string,
-    breakdown: 'age' | 'gender' | 'region' | 'country' | 'publisher_platform' | 'platform_position',
+    breakdown: 'age' | 'gender' | 'region' | 'country' | 'publisher_platform' | 'platform_position' | 'publisher_platform,platform_position' | 'audience_segment',
     timeRange?: TimeRange,
     datePreset?: DatePreset
   ) => {
