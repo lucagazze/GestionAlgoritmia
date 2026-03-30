@@ -1936,16 +1936,16 @@ INICIO: ${planStartDate}
   .page{max-width:820px;margin:0 auto;padding:0 0 60px;}
   .header{background:#0d1b2a;color:white;padding:32px 40px;text-align:center;margin-bottom:36px;}
   .header h1{font-size:26px;font-weight:800;color:white;margin-bottom:6px;letter-spacing:-0.3px;}
-  .header .sub{color:#3db3c8;font-size:13px;font-weight:600;margin-bottom:4px;}
+  .header .sub{color:#B0C4D8;font-size:13px;font-weight:600;margin-bottom:4px;}
   .header .date{color:#8aa8be;font-size:11px;font-style:italic;}
   .kpi-section{padding:0 40px;margin-bottom:28px;}
   .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #e5e9ed;border-radius:10px;overflow:hidden;margin-bottom:12px;}
   .kpi{padding:18px 12px;text-align:center;border-right:1px solid #e5e9ed;background:#fafbfc;}
   .kpi:last-child{border-right:none;}
-  .kv{font-size:22px;font-weight:800;color:#14b8a6;line-height:1.1;margin-bottom:5px;}
+  .kv{font-size:22px;font-weight:800;color:#2196F3;line-height:1.1;margin-bottom:5px;}
   .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;}
   .content{padding:0 40px;}
-  h2{font-size:11px;font-weight:800;color:#14b8a6;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;}
+  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;}
   p{font-size:12.5px;color:#2d3748;line-height:1.7;margin-bottom:12px;}
   strong{font-weight:700;color:#0d1b2a;}
   .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;}
@@ -3096,7 +3096,7 @@ INICIO: ${planStartDate}
                         <div key={ri} className="grid grid-cols-4 gap-2">
                           {row.map(k => (
                             <div key={k.label} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 px-3 py-3 shadow-sm text-center">
-                              <p className="text-[17px] font-bold text-teal-500 leading-none mb-1">{k.value}</p>
+                              <p className="text-[17px] font-bold text-[#2196F3] leading-none mb-1">{k.value}</p>
                               <p className="text-[9px] text-zinc-400 uppercase tracking-wider">{k.label}</p>
                             </div>
                           ))}
