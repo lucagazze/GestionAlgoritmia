@@ -359,7 +359,8 @@ function getPrimaryMetric(objective: string, ins: any): { label: string; value: 
     return { label: 'Instalaciones', value: v, cost: costPer(v) };
   }
 
-  // ENGAGEMENT — post engagement first, messages only if clearly higher
+  // ENGAGEMENT — prioritize messaging conversations (WhatsApp/Click-to-Message campaigns
+  // use OUTCOME_ENGAGEMENT but optimize for conversations, not post_engagement)
   if (obj.includes('engagement')) {
     const postEng = getMetaVal(actions, 'post_engagement', 'page_engagement');
     const msgs    = getMetaVal(actions,
@@ -368,11 +369,12 @@ function getPrimaryMetric(objective: string, ins: any): { label: string; value: 
     );
     const postN = parseFloat(postEng || '0');
     const msgN  = parseFloat(msgs   || '0');
-    if (postN >= msgN && postN > 0) {
-      return { label: 'Interacciones', value: String(postN), cost: costPer(String(postN)) };
-    }
+    // If any messaging conversations exist, this is a WhatsApp campaign — use that metric
     if (msgN > 0) {
       return { label: 'Mensajes', value: String(msgN), cost: costPer(String(msgN)) };
+    }
+    if (postN > 0) {
+      return { label: 'Interacciones', value: String(postN), cost: costPer(String(postN)) };
     }
     return { label: 'Interacciones', value: '0', cost: '—' };
   }
@@ -587,13 +589,23 @@ function calcPerfScore(ins: any, currency: string): number {
 // ── Detect campaign objectives ────────────────────────────────────────────────
 type CampaignObjectiveType = 'sales' | 'leads' | 'traffic' | 'messages' | 'engagement' | 'awareness' | 'mixed';
 
-function classifyObjective(objective: string): Exclude<CampaignObjectiveType, 'mixed'> {
+function classifyObjective(objective: string, actions?: any[]): Exclude<CampaignObjectiveType, 'mixed'> {
   const obj = (objective || '').toUpperCase();
   if (obj.includes('SALES') || obj.includes('CONVERSION') || obj.includes('PRODUCT_CATALOG') || obj.includes('STORE_VISIT')) return 'sales';
   if (obj.includes('LEAD')) return 'leads';
   if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICK')) return 'traffic';
   if (obj.includes('MESSAGE')) return 'messages';
-  if (obj.includes('ENGAGEMENT') || obj.includes('POST_ENGAGEMENT') || obj.includes('PAGE_LIKE')) return 'engagement';
+  if (obj.includes('ENGAGEMENT') || obj.includes('POST_ENGAGEMENT') || obj.includes('PAGE_LIKE')) {
+    // Detect Click-to-WhatsApp campaigns: Meta uses OUTCOME_ENGAGEMENT objective
+    // but the real optimized metric is messaging conversations, not post_engagement
+    if (actions && actions.length > 0) {
+      const msgs = parseFloat(getMetaVal(actions,
+        'onsite_conversion.messaging_conversation_started_7d',
+        'onsite_conversion.messaging_first_reply') || '0');
+      if (msgs > 0) return 'messages';
+    }
+    return 'engagement';
+  }
   if (obj.includes('AWARENESS') || obj.includes('REACH') || obj.includes('BRAND') || obj.includes('VIDEO_VIEW')) return 'awareness';
   return 'sales'; // default
 }
@@ -605,7 +617,7 @@ function detectActiveObjectives(camps: any[], insights: Record<string, any>): Ex
     const ins = insights[c.id];
     const s = parseFloat(ins?.spend || '0');
     if (s <= 0) continue;
-    const type = classifyObjective(c.objective || '');
+    const type = classifyObjective(c.objective || '', ins?.actions || []);
     spend[type] = (spend[type] || 0) + s;
   }
   return (Object.entries(spend) as [Exclude<CampaignObjectiveType, 'mixed'>, number][])
@@ -623,7 +635,7 @@ function detectDominantObjective(camps: any[], insights: Record<string, any>): C
     const ins = insights[c.id];
     const s = parseFloat(ins?.spend || '0');
     if (s <= 0) continue;
-    const type = classifyObjective(c.objective || '');
+    const type = classifyObjective(c.objective || '', ins?.actions || []);
     spend[type] = (spend[type] || 0) + s;
   }
   const total = Object.values(spend).reduce((a, b) => a + b, 0);
