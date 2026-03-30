@@ -584,33 +584,53 @@ function calcPerfScore(ins: any, currency: string): number {
   return Math.max(0, Math.min(100, score));
 }
 
-// ── Detect dominant objective across campaigns (by spend weight) ──────────────
+// ── Detect campaign objectives ────────────────────────────────────────────────
 type CampaignObjectiveType = 'sales' | 'leads' | 'traffic' | 'messages' | 'engagement' | 'awareness' | 'mixed';
 
-function detectDominantObjective(camps: any[], insights: Record<string, any>): CampaignObjectiveType {
-  const spend: Record<CampaignObjectiveType, number> = { sales: 0, leads: 0, traffic: 0, messages: 0, engagement: 0, awareness: 0, mixed: 0 };
+function classifyObjective(objective: string): Exclude<CampaignObjectiveType, 'mixed'> {
+  const obj = (objective || '').toUpperCase();
+  if (obj.includes('SALES') || obj.includes('CONVERSION') || obj.includes('PRODUCT_CATALOG') || obj.includes('STORE_VISIT')) return 'sales';
+  if (obj.includes('LEAD')) return 'leads';
+  if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICK')) return 'traffic';
+  if (obj.includes('MESSAGE')) return 'messages';
+  if (obj.includes('ENGAGEMENT') || obj.includes('POST_ENGAGEMENT') || obj.includes('PAGE_LIKE')) return 'engagement';
+  if (obj.includes('AWARENESS') || obj.includes('REACH') || obj.includes('BRAND') || obj.includes('VIDEO_VIEW')) return 'awareness';
+  return 'sales'; // default
+}
+
+// Returns all active objective types sorted by spend descending (no 'mixed')
+function detectActiveObjectives(camps: any[], insights: Record<string, any>): Exclude<CampaignObjectiveType, 'mixed'>[] {
+  const spend: Record<string, number> = {};
   for (const c of camps) {
     const ins = insights[c.id];
     const s = parseFloat(ins?.spend || '0');
     if (s <= 0) continue;
-    const obj = (c.objective || '').toUpperCase();
-    if (obj.includes('SALES') || obj.includes('CONVERSION') || obj.includes('PRODUCT_CATALOG') || obj.includes('STORE_VISIT')) spend.sales += s;
-    else if (obj.includes('LEAD')) spend.leads += s;
-    else if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICK')) spend.traffic += s;
-    else if (obj.includes('MESSAGE')) spend.messages += s;
-    else if (obj.includes('ENGAGEMENT') || obj.includes('POST_ENGAGEMENT') || obj.includes('PAGE_LIKE')) spend.engagement += s;
-    else if (obj.includes('AWARENESS') || obj.includes('REACH') || obj.includes('BRAND') || obj.includes('VIDEO_VIEW')) spend.awareness += s;
+    const type = classifyObjective(c.objective || '');
+    spend[type] = (spend[type] || 0) + s;
   }
-  const entries = (Object.entries(spend) as [CampaignObjectiveType, number][])
-    .filter(([k]) => k !== 'mixed')
-    .sort((a, b) => b[1] - a[1]);
-  const top = entries[0];
-  const second = entries[1];
-  if (!top || top[1] === 0) return 'sales'; // default
-  // "mixed" if second objective has >30% of total spend
-  const total = entries.reduce((s, [, v]) => s + v, 0);
-  if (second && second[1] > 0 && second[1] / total > 0.30) return 'mixed';
-  return top[0];
+  return (Object.entries(spend) as [Exclude<CampaignObjectiveType, 'mixed'>, number][])
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => k);
+}
+
+function detectDominantObjective(camps: any[], insights: Record<string, any>): CampaignObjectiveType {
+  const active = detectActiveObjectives(camps, insights);
+  if (active.length === 0) return 'sales';
+  if (active.length === 1) return active[0];
+  // Check if second objective has >30% of total spend
+  const spend: Record<string, number> = {};
+  for (const c of camps) {
+    const ins = insights[c.id];
+    const s = parseFloat(ins?.spend || '0');
+    if (s <= 0) continue;
+    const type = classifyObjective(c.objective || '');
+    spend[type] = (spend[type] || 0) + s;
+  }
+  const total = Object.values(spend).reduce((a, b) => a + b, 0);
+  if (total === 0) return active[0];
+  const second = active[1];
+  if (second && (spend[second] || 0) / total > 0.30) return 'mixed';
+  return active[0];
 }
 
 function buildClientReportPrompt(camps: any[], insights: Record<string, any>, accountName: string, period: string, currency: string, accountInsights: any, prevInsights?: any, prevPeriod?: string): string {
@@ -744,17 +764,62 @@ En 2-3 oraciones: a cuántas personas distintas llegaron los anuncios, cuántas 
 En 1-2 oraciones: cuántos clics se generaron y cuál fue el CTR. Poné en **negrita** los números.`;
     conclusionHint = 'Indicá si fue una buena semana en términos de alcance y eficiencia del CPM. Mencioná qué campañas tuvieron mayor alcance.';
   } else {
-    // mixed
-    objectiveDataBlock = `- Compras: ${totalPurchases} (ROAS: ${blendedRoas}x)
-- Leads: ${totalLeads}
-- Conversaciones: ${totalMessages}
-- Clics al sitio: ${totalClicks}
-- CTR promedio: ${ctr}%`;
-    section2 = `## RESULTADOS POR TIPO DE CAMPAÑA
-Describí los resultados separando por tipo: las campañas de ventas (compras/ROAS), las de leads (clientes potenciales generados), y las de tráfico o mensajes (clics/conversaciones). Para cada tipo, mencioná cuánto se invirtió y qué resultados generó. Poné en **negrita** todos los números.`;
-    section3 = `## ALCANCE GENERAL
-En 1-2 oraciones: a cuántas personas en total llegaron todos los anuncios combinados y cuál fue el CTR promedio. Poné en **negrita** los números.`;
-    conclusionHint = 'Resumí los resultados de cada tipo de campaña. Indicá cuál tipo tuvo el mejor rendimiento relativo a la inversión.';
+    // mixed — build per-objective blocks and sections
+    const activeObjs = detectActiveObjectives(camps, insights);
+    const mixedDataParts: string[] = [];
+    const mixedSections: string[] = [];
+    const objSectionTitles: Record<string, string> = {
+      sales: 'RESULTADOS DE VENTAS',
+      leads: 'RESULTADOS DE LEADS (CLIENTES POTENCIALES)',
+      messages: 'RESULTADOS DE MENSAJES / WHATSAPP',
+      traffic: 'RESULTADOS DE TRÁFICO',
+      engagement: 'RESULTADOS DE INTERACCIÓN',
+      awareness: 'RESULTADOS DE ALCANCE',
+    };
+
+    // Which campaigns belong to each objective (for the prompt context)
+    const campsByObj: Record<string, string[]> = {};
+    for (const c of camps) {
+      const ins = insights[c.id];
+      if (!ins || parseFloat(ins.spend || '0') <= 0) continue;
+      const type = classifyObjective(c.objective || '');
+      if (!campsByObj[type]) campsByObj[type] = [];
+      campsByObj[type].push(c.name);
+    }
+
+    for (const obj of activeObjs) {
+      const campNames = (campsByObj[obj] || []).join(', ') || '—';
+      if (obj === 'sales') {
+        mixedDataParts.push(`VENTAS: Compras=${totalPurchases} | Valor ventas=${totalPurchaseValue} ${curr} | CPA=${costPerPurchase} ${curr} | ROAS=${blendedRoas}x | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.sales}
+Para las campañas de ventas (${campNames}): cuántas compras se generaron, cuál fue el valor total en ventas, el costo por compra, y el ROAS. Explicá el ROAS en términos simples. Poné en **negrita** todos los números.`);
+      } else if (obj === 'leads') {
+        mixedDataParts.push(`LEADS: Leads generados=${totalLeads} | Costo por lead=${costPerLead} ${curr} | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.leads}
+Para las campañas de clientes potenciales (${campNames}): cuántos leads se generaron y cuánto costó cada uno. Explicá en términos simples qué es un lead (persona que mostró interés y dejó sus datos o inició contacto). Poné en **negrita** todos los números.`);
+      } else if (obj === 'messages') {
+        mixedDataParts.push(`MENSAJES: Conversaciones iniciadas=${totalMessages} | Costo por conversación=${costPerMessage} ${curr} | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.messages}
+Para las campañas de mensajes/WhatsApp (${campNames}): cuántas conversaciones se iniciaron y cuánto costó cada una. Explicá en términos simples qué representa una conversación (persona que escribió o hizo clic en "Enviar mensaje"). Poné en **negrita** todos los números.`);
+      } else if (obj === 'traffic') {
+        mixedDataParts.push(`TRÁFICO: Clics=${totalClicks} | CTR=${ctr}% | CPC=${cpc} ${curr} | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.traffic}
+Para las campañas de tráfico (${campNames}): cuántos clics al sitio se generaron, cuál fue el CTR y el costo por clic. Poné en **negrita** todos los números.`);
+      } else if (obj === 'engagement') {
+        mixedDataParts.push(`INTERACCIÓN: Interacciones=${totalEngagements} | Costo/interacción=${costPerEngagement} ${curr} | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.engagement}
+Para las campañas de interacción (${campNames}): cuántas interacciones generaron los anuncios y cuánto costó cada una. Poné en **negrita** todos los números.`);
+      } else if (obj === 'awareness') {
+        mixedDataParts.push(`ALCANCE: Impresiones=${totalImpressions} | CPM=${cpm} ${curr} | Frecuencia=${freq} | Campañas: ${campNames}`);
+        mixedSections.push(`## ${objSectionTitles.awareness}
+Para las campañas de reconocimiento (${campNames}): a cuántas personas llegaron, cuántas impresiones tuvieron y cuál fue el CPM. Poné en **negrita** todos los números.`);
+      }
+    }
+
+    objectiveDataBlock = mixedDataParts.join('\n');
+    section2 = mixedSections[0] || '';
+    section3 = mixedSections.slice(1).join('\n\n') || `## CLICS Y ENGAGEMENT\nEn 1-2 oraciones: clics totales y CTR. Poné en **negrita** los números.`;
+    conclusionHint = `Esta cuenta tiene ${activeObjs.length} tipos de campaña activas. Resumí brevemente el resultado de cada tipo. Indicá cuál tuvo el mejor rendimiento relativo a la inversión.`;
   }
 
   return `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera EXCLUSIVAMENTE en ${curr}. TODOS los valores monetarios deben mostrarse en ${curr}. NUNCA uses USD ni el símbolo $ sin el código de moneda ${curr}.
@@ -1831,9 +1896,20 @@ INICIO: ${planStartDate}
       row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: impressionsVal, l: 'Impresiones' }, { v: cpmVal, l: 'CPM' }];
       row2 = [{ v: freqVal, l: 'Frecuencia' }, { v: ctrVal, l: 'CTR promedio' }, { v: clicksVal, l: 'Clics al sitio' }, { v: cpcVal, l: 'Costo por clic' }];
     } else {
-      // mixed
-      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: purchases, l: 'Compras' }, { v: roasStr, l: 'ROAS' }];
-      row2 = [{ v: leadsStr, l: 'Leads' }, { v: messagesStr, l: 'Mensajes' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal, l: 'CTR promedio' }];
+      // mixed — row1 always base metrics, row2 dynamically built from active objectives
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal, l: 'CTR promedio' }];
+      const activeObjs = detectActiveObjectives(campaigns, campaignInsights);
+      const objKpis: Record<string, KpiItem[]> = {
+        sales: [{ v: purchases, l: 'Compras' }, { v: roasStr, l: 'ROAS' }],
+        leads: [{ v: leadsStr, l: 'Leads generados' }, { v: cplStr, l: 'Costo por lead' }],
+        messages: [{ v: messagesStr, l: 'Conversaciones' }, { v: cpmsgStr, l: 'Costo x conv.' }],
+        traffic: [{ v: cpcVal, l: 'Costo por clic' }, { v: cpmVal, l: 'CPM' }],
+        engagement: [{ v: engStr, l: 'Interacciones' }, { v: cpeStr, l: 'Costo x interac.' }],
+        awareness: [{ v: impressionsVal, l: 'Impresiones' }, { v: freqVal, l: 'Frecuencia' }],
+      };
+      row2 = activeObjs.slice(0, 2).flatMap(obj => objKpis[obj] || []).slice(0, 4);
+      // Pad to 4 if needed
+      while (row2.length < 4) row2.push({ v: '—', l: '' });
     }
 
     const renderKpiRow = (items: KpiItem[]) =>
@@ -3000,8 +3076,19 @@ INICIO: ${planStartDate}
                     row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Impresiones', value: impr }, { label: 'CPM', value: cpm }];
                     row2 = [{ label: 'Frecuencia', value: freq }, { label: 'CTR promedio', value: ctr }, { label: 'Clics al sitio', value: clicks }, { label: 'Costo por clic', value: cpc }];
                   } else {
-                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Compras', value: purchasesN }, { label: 'ROAS', value: roas }];
-                    row2 = [{ label: 'Leads', value: leadsN }, { label: 'Mensajes', value: msgsN }, { label: 'Clics al sitio', value: clicks }, { label: 'CTR promedio', value: ctr }];
+                    // mixed — row1 base, row2 dynamically from active objectives
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Clics al sitio', value: clicks }, { label: 'CTR promedio', value: ctr }];
+                    const activeObjsUI = detectActiveObjectives(campaigns, campaignInsights);
+                    const objKpisUI: Record<string, K[]> = {
+                      sales: [{ label: 'Compras', value: purchasesN }, { label: 'ROAS', value: roas }],
+                      leads: [{ label: 'Leads generados', value: leadsN }, { label: 'Costo por lead', value: cpl }],
+                      messages: [{ label: 'Conversaciones', value: msgsN }, { label: 'Costo x conv.', value: cpmsg }],
+                      traffic: [{ label: 'Costo por clic', value: cpc }, { label: 'CPM', value: cpm }],
+                      engagement: [{ label: 'Interacciones', value: engN }, { label: 'Costo x interac.', value: cpe }],
+                      awareness: [{ label: 'Impresiones', value: impr }, { label: 'Frecuencia', value: freq }],
+                    };
+                    row2 = activeObjsUI.slice(0, 2).flatMap(obj => objKpisUI[obj] || []).slice(0, 4);
+                    while (row2.length < 4) row2.push({ label: '', value: '—' });
                   }
                   return (
                     <div className="space-y-2">
