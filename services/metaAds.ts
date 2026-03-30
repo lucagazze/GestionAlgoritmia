@@ -192,6 +192,24 @@ export const metaAds = {
     return (res.data || [])[0] || null;
   },
 
+  // ── INSIGHTS WITH DEMOGRAPHIC BREAKDOWN ──────────────────
+  getInsightsBreakdown: async (
+    accountId: string,
+    breakdown: 'age' | 'gender',
+    timeRange?: TimeRange,
+    datePreset?: DatePreset
+  ) => {
+    const fields = 'spend,impressions,reach,cpm,cpc,inline_link_clicks,inline_link_click_ctr,actions,action_values';
+    const params: Record<string, string> = { fields, breakdowns: breakdown, limit: '100' };
+    if (timeRange) {
+      params.time_range = JSON.stringify(timeRange);
+    } else {
+      params.date_preset = datePreset || 'last_28d';
+    }
+    const res = await apiGet(`${accountId}/insights`, params);
+    return res.data || [];
+  },
+
   // ── INSTAGRAM ─────────────────────────────────────────────
   getInstagramProfile: (igId: string) =>
     apiGet(igId, {

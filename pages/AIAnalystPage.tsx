@@ -1355,6 +1355,7 @@ export default function AIAnalystPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [clientReportText, setClientReportText] = useState('');
   const [isGeneratingClientReport, setIsGeneratingClientReport] = useState(false);
+  const [clientReportType, setClientReportType] = useState<'general' | 'demographic'>('general');
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [analyzeAllProgress, setAnalyzeAllProgress] = useState('');
 
@@ -1982,6 +1983,210 @@ INICIO: ${planStartDate}
 </body></html>`);
     pw.document.close();
     setTimeout(() => pw.print(), 600);
+  };
+
+  // ── Demographic Report PDF ────────────────────────────────────────────────
+  const handleDemographicReportPDF = async () => {
+    if (!selectedAccountId || !hasData) return;
+    setIsGeneratingClientReport(true);
+    try {
+      const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+      const [byAge, byGender] = await Promise.all([
+        metaAds.getInsightsBreakdown(selectedAccountId, 'age', range),
+        metaAds.getInsightsBreakdown(selectedAccountId, 'gender', range),
+      ]);
+
+      const pw = window.open('', '_blank');
+      if (!pw) { showToast('El navegador bloqueó el popup. Permitir popups para exportar PDF.', 'error'); return; }
+
+      const cur = accountOverview?.currency || 'ARS';
+      const clientName = accountOverview?.name || selectedAccountId;
+      const today = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const period = `${range.since} al ${range.until}`;
+      const objType = detectDominantObjective(campaigns, campaignInsights);
+
+      const totalSpend = byAge.reduce((s: number, r: any) => s + parseFloat(r.spend || '0'), 0);
+
+      // ── Gender helpers ──
+      const gLabel: Record<string, string> = { male: 'Masculino', female: 'Femenino', unknown: 'Desconocido' };
+      const gOrder = ['male', 'female', 'unknown'];
+      const gData: Record<string, any> = {};
+      for (const r of byGender) { gData[r.gender] = r; }
+
+      const gRow = (label: string, fn: (r: any) => string) =>
+        `<tr><td class="row-label">${label}</td>${gOrder.map(g => `<td>${gData[g] ? fn(gData[g]) : '—'}</td>`).join('')}</tr>`;
+
+      const objMetricRow = (r: any) => {
+        const spend = parseFloat(r.spend || '0');
+        const actions = r.actions || [];
+        if (objType === 'sales') {
+          const v = parseFloat(getMetaVal(actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0');
+          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
+          return { val: v > 0 ? String(v) : '—', cost };
+        }
+        if (objType === 'leads') {
+          const v = parseFloat(getMetaVal(actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0');
+          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
+          return { val: v > 0 ? String(v) : '—', cost };
+        }
+        if (objType === 'messages') {
+          const v = parseFloat(getMetaVal(actions, 'onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply') || '0');
+          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
+          return { val: v > 0 ? String(v) : '—', cost };
+        }
+        return { val: '—', cost: '—' };
+      };
+      const objLabel: Record<string, [string, string]> = {
+        sales: ['Compras', 'Costo por compra'],
+        leads: ['Leads', 'Costo por lead'],
+        messages: ['Conversaciones', 'Costo por conv.'],
+        traffic: ['Clics', 'CPC'],
+        engagement: ['Interacciones', 'Costo x interac.'],
+        awareness: ['Impresiones', 'CPM'],
+        mixed: ['Resultado', 'Costo/resultado'],
+      };
+      const [oLabel, oCostLabel] = objLabel[objType] || ['Resultado', 'Costo'];
+
+      // ── Bar HTML ──
+      const barHtml = (items: { label: string; pct: number; value: string }[]) =>
+        items.map(it => `
+          <div class="bar-row">
+            <span class="bar-label">${it.label}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${it.pct}%"></div></div>
+            <span class="bar-meta">${it.value} &nbsp;<span class="bar-pct">${it.pct.toFixed(1)}%</span></span>
+          </div>`).join('');
+
+      // Gender bars
+      const gBars = barHtml(gOrder.filter(g => gData[g]).map(g => {
+        const sp = parseFloat(gData[g]?.spend || '0');
+        return { label: gLabel[g], pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
+      }));
+
+      // Age sort & bars
+      const ageOrder = ['13-17','18-24','25-34','35-44','45-54','55-64','65+'];
+      const sortedAge = [...byAge].sort((a: any, b: any) => {
+        const ia = ageOrder.indexOf(a.age); const ib = ageOrder.indexOf(b.age);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+      const ageBars = barHtml(sortedAge.map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        return { label: r.age, pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
+      }));
+
+      // Age table rows
+      const ageRows = sortedAge.map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        const spPct = totalSpend > 0 ? ((sp / totalSpend) * 100).toFixed(1) + '%' : '—';
+        const reach = parseInt(r.reach || '0').toLocaleString('es-AR');
+        const ctr = fmtNum(r.inline_link_click_ctr, 2) + '%';
+        const cpm = `${cur} ${fmtNum(r.cpm, 0)}`;
+        const metric = objMetricRow(r);
+        return `<tr>
+          <td class="row-label"><strong>${r.age}</strong></td>
+          <td>${cur} ${fmtNum(sp, 0)}</td>
+          <td>${spPct}</td>
+          <td>${reach}</td>
+          <td>${ctr}</td>
+          <td>${cpm}</td>
+          <td>${metric.val}</td>
+          <td>${metric.cost}</td>
+        </tr>`;
+      }).join('');
+
+      pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Reporte Audiencia — ${clientName}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:13px;line-height:1.65;}
+  .page{max-width:860px;margin:0 auto;padding:0 0 60px;}
+  .header{background:#0d1b2a;color:white;padding:32px 40px;text-align:center;margin-bottom:36px;}
+  .header h1{font-size:26px;font-weight:800;color:white;margin-bottom:6px;letter-spacing:-0.3px;}
+  .header .sub{color:#B0C4D8;font-size:13px;font-weight:600;margin-bottom:4px;}
+  .header .date{color:#8aa8be;font-size:11px;font-style:italic;}
+  .section{padding:0 40px;margin-bottom:36px;}
+  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin-bottom:16px;}
+  .breakdown-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;}
+  .breakdown-table th{background:#0d1b2a;color:white;padding:9px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+  .breakdown-table th:first-child{text-align:left;}
+  .breakdown-table td{padding:8px 12px;text-align:center;border-bottom:1px solid #f0f2f5;}
+  .breakdown-table td.row-label{text-align:left;color:#4b5563;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:#fafbfc;}
+  .breakdown-table tr:last-child td{border-bottom:none;}
+  .breakdown-table tr:hover td{background:#f8faff;}
+  .breakdown-table .val-main{font-weight:800;color:#2196F3;font-size:14px;}
+  .bars{margin-top:4px;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .bar-label{width:110px;font-size:11px;color:#4b5563;font-weight:600;flex-shrink:0;}
+  .bar-track{flex:1;height:12px;background:#f0f2f5;border-radius:6px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,#1A3A5C,#2196F3);border-radius:6px;}
+  .bar-meta{width:160px;font-size:11px;color:#374151;text-align:right;flex-shrink:0;}
+  .bar-pct{font-weight:700;color:#2196F3;}
+  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}}
+</style>
+</head><body>
+<div class="page">
+  <div class="header">
+    <div class="sub">REPORTE DE AUDIENCIA</div>
+    <h1>${clientName}</h1>
+    <div class="date">Período: ${period} &nbsp;&middot;&nbsp; Generado: ${today}</div>
+  </div>
+
+  <div class="section">
+    <h2>Rendimiento por Género</h2>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th></th>
+          ${gOrder.map(g => `<th>${gLabel[g]}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${gRow('Inversión', r => `<span class="val-main">${cur} ${fmtNum(r.spend, 0)}</span>`)}
+        ${gRow('% del gasto', r => {
+          const sp = parseFloat(r.spend || '0');
+          return totalSpend > 0 ? ((sp / totalSpend) * 100).toFixed(1) + '%' : '—';
+        })}
+        ${gRow('Alcance', r => parseInt(r.reach || '0').toLocaleString('es-AR'))}
+        ${gRow('Impresiones', r => parseInt(r.impressions || '0').toLocaleString('es-AR'))}
+        ${gRow('CTR', r => fmtNum(r.inline_link_click_ctr, 2) + '%')}
+        ${gRow('CPM', r => `${cur} ${fmtNum(r.cpm, 0)}`)}
+        ${['sales','leads','messages','traffic'].includes(objType) ? gRow(oLabel, r => objMetricRow(r).val) : ''}
+        ${['sales','leads','messages','traffic'].includes(objType) ? gRow(oCostLabel, r => objMetricRow(r).cost) : ''}
+      </tbody>
+    </table>
+    <div class="bars">${gBars}</div>
+  </div>
+
+  <div class="section">
+    <h2>Rendimiento por Edad</h2>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th>Edad</th>
+          <th>Inversión</th>
+          <th>% Gasto</th>
+          <th>Alcance</th>
+          <th>CTR</th>
+          <th>CPM</th>
+          <th>${oLabel}</th>
+          <th>${oCostLabel}</th>
+        </tr>
+      </thead>
+      <tbody>${ageRows}</tbody>
+    </table>
+    <div class="bars">${ageBars}</div>
+  </div>
+
+  <div class="footer">Algoritmia &nbsp;&middot;&nbsp; ${today} &nbsp;&middot;&nbsp; Datos: Meta Ads</div>
+</div>
+</body></html>`);
+      pw.document.close();
+      setTimeout(() => pw.print(), 600);
+    } catch (e: any) {
+      showToast('Error al generar reporte de audiencia: ' + e.message, 'error');
+    } finally {
+      setIsGeneratingClientReport(false);
+    }
   };
 
   // ── Export PDF ─────────────────────────────────────────────────────────────
@@ -3004,11 +3209,17 @@ INICIO: ${planStartDate}
                     <p className="text-[11px] text-zinc-500 mt-0.5">Análisis objetivo del período, en lenguaje simple. Listo para enviar.</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={handleClientReportPDF} disabled={!clientReportText && !hasData}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all disabled:opacity-40">
-                      <FileDown className="w-3.5 h-3.5" />Exportar PDF
-                    </button>
+                    {clientReportType === 'general' && (
+                      <button onClick={handleClientReportPDF} disabled={!clientReportText && !hasData}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-[11px] font-medium hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-all disabled:opacity-40">
+                        <FileDown className="w-3.5 h-3.5" />Exportar PDF
+                      </button>
+                    )}
                     <button onClick={async () => {
+                        if (clientReportType === 'demographic') {
+                          await handleDemographicReportPDF();
+                          return;
+                        }
                         setIsGeneratingClientReport(true);
                         setClientReportText('');
                         try {
@@ -3016,7 +3227,6 @@ INICIO: ${planStartDate}
                           const period = `${range.since} al ${range.until}`;
                           const currency = accountOverview?.currency || 'ARS';
                           const activeChannels = ytChannels.filter(c => c.active).map(c => c.name);
-                          // Fetch previous period account insights for comparison
                           const prevRange = getPrevPeriod(range.since, range.until);
                           const prevPeriod = `${prevRange.since} al ${prevRange.until}`;
                           let prevInsights: any = null;
@@ -3033,9 +3243,24 @@ INICIO: ${planStartDate}
                         } finally { setIsGeneratingClientReport(false); }
                       }} disabled={isGeneratingClientReport || !hasData}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-semibold transition-all disabled:opacity-40">
-                      {isGeneratingClientReport ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generando...</span></> : <><BrainCircuit className="w-3.5 h-3.5" /><span>Generar Reporte</span></>}
+                      {isGeneratingClientReport
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generando...</span></>
+                        : clientReportType === 'demographic'
+                          ? <><FileDown className="w-3.5 h-3.5" /><span>Generar PDF Audiencia</span></>
+                          : <><BrainCircuit className="w-3.5 h-3.5" /><span>Generar Reporte</span></>}
                     </button>
                   </div>
+                </div>
+
+                {/* Report type selector */}
+                <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl px-3 py-2.5 border border-zinc-100 dark:border-zinc-700/50">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mr-1">Tipo:</span>
+                  {([['general', '📊 Reporte General'], ['demographic', '👥 Audiencia (Edad & Género)']] as const).map(([type, label]) => (
+                    <button key={type} onClick={() => setClientReportType(type)}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${clientReportType === type ? 'bg-[#0d1b2a] text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700/50'}`}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
                 {/* KPI Summary — 8 KPIs adaptive by objective */}
