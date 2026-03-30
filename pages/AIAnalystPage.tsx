@@ -2158,22 +2158,37 @@ INICIO: ${planStartDate}
         return { label: pName, pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
       }));
 
-      // ── Audience segments (TOFU/MOFU/BOFU) — from existing campaign data ──
+      // ── Audience segments (TOFU/MOFU/BOFU) — classified at adset level ──
       type SegKey = 'TOFU' | 'MOFU' | 'BOFU';
       const segAcc: Record<SegKey, { spend: number; reach: number; impressions: number; clicks: number; actions: any[] }> = {
         TOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
         MOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
         BOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
       };
-      for (const c of campaigns) {
-        const ins = campaignInsights[c.id];
-        if (!ins || parseFloat(ins.spend || '0') <= 0) continue;
-        const stage = classifyFunnel(c.objective || '', undefined, c.name).stage as SegKey;
+      const adsetInsightFields = 'adset_id,adset_name,campaign_id,spend,reach,impressions,inline_link_clicks,actions,action_values';
+      const [adsetInsightsRaw, adsetStructRaw] = await Promise.all([
+        metaAds.getInsightsAtAdsetLevel(selectedAccountId, adsetInsightFields, range).catch(() => []),
+        metaAds.getAccountAdsets(selectedAccountId).catch(() => ({ data: [] })),
+      ]);
+      // Build optimization_goal lookup: adset_id → optimization_goal
+      const optGoalMap: Record<string, string> = {};
+      for (const ads of (adsetStructRaw?.data || [])) {
+        optGoalMap[ads.id] = ads.optimization_goal || '';
+      }
+      // Build campaign objective lookup
+      const campObjMap: Record<string, string> = {};
+      for (const c of campaigns) campObjMap[c.id] = c.objective || '';
+
+      for (const ins of adsetInsightsRaw) {
+        if (parseFloat(ins.spend || '0') <= 0) continue;
+        const optGoal = optGoalMap[ins.adset_id] || '';
+        const obj = campObjMap[ins.campaign_id] || '';
+        const stage = classifyFunnel(obj, optGoal, ins.adset_name) as SegKey;
         const seg = segAcc[stage];
-        seg.spend      += parseFloat(ins.spend || '0');
-        seg.reach      += parseInt(ins.reach || '0');
+        seg.spend       += parseFloat(ins.spend || '0');
+        seg.reach       += parseInt(ins.reach || '0');
         seg.impressions += parseInt(ins.impressions || '0');
-        seg.clicks     += parseInt(ins.inline_link_clicks || '0');
+        seg.clicks      += parseInt(ins.inline_link_clicks || '0');
         for (const a of (ins.actions || [])) {
           const ex = seg.actions.find((x: any) => x.action_type === a.action_type);
           if (ex) ex.value = String(parseFloat(ex.value || '0') + parseFloat(a.value || '0'));

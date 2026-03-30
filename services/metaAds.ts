@@ -192,6 +192,30 @@ export const metaAds = {
     return (res.data || [])[0] || null;
   },
 
+  // ── INSIGHTS AT ADSET LEVEL (for segment classification) ──
+  getInsightsAtAdsetLevel: async (
+    accountId: string,
+    fields: string,
+    timeRange?: TimeRange,
+    datePreset?: DatePreset
+  ) => {
+    const params: Record<string, string> = { fields, level: 'adset', limit: '200' };
+    if (timeRange) {
+      params.time_range = JSON.stringify(timeRange);
+    } else {
+      params.date_preset = datePreset || 'last_28d';
+    }
+    const res = await apiGet(`${accountId}/insights`, params);
+    return res.data || [];
+  },
+
+  // ── ALL ADSETS FOR ACCOUNT (for optimization_goal lookup) ─
+  getAccountAdsets: (accountId: string) =>
+    apiGet(`${accountId}/adsets`, {
+      fields: 'id,name,campaign_id,optimization_goal,targeting',
+      limit: '200',
+    }),
+
   // ── INSIGHTS WITH DEMOGRAPHIC BREAKDOWN ──────────────────
   getInsightsBreakdown: async (
     accountId: string,
