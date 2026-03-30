@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  metaAds, INSIGHT_FIELDS, daysAgo, today as todayFn, presetToRange, getPrevPeriod,
+  metaAds, INSIGHT_FIELDS, AD_INSIGHT_FIELDS, daysAgo, today as todayFn, presetToRange, getPrevPeriod,
   type DatePreset, type TimeRange,
 } from '../services/metaAds';
 import { ai } from '../services/ai';
@@ -191,37 +191,71 @@ const FUNNEL_STYLES = {
 } as const;
 type FunnelStage = 'TOFU' | 'MOFU' | 'BOFU';
 
-function classifyFunnel(objective: string, optimizationGoal?: string): FunnelStage {
-  return getFunnelInfo(objective, optimizationGoal).stage;
+function classifyFunnel(objective: string, optimizationGoal?: string, name?: string): FunnelStage {
+  return getFunnelInfo(objective, optimizationGoal, name).stage;
 }
 
 interface FunnelInfo { stage: FunnelStage; reason: string; description: string; }
-function getFunnelInfo(objective: string, optimizationGoal?: string): FunnelInfo {
-  const obj = (objective || '').toUpperCase();
+function getFunnelInfo(objective: string, optimizationGoal?: string, name?: string): FunnelInfo {
+  const obj  = (objective || '').toUpperCase();
   const goal = (optimizationGoal || '').toUpperCase();
+  const n    = (name || '').toLowerCase();
+  const hasGoal = optimizationGoal && optimizationGoal.trim() !== '' && optimizationGoal.toUpperCase() !== 'NONE';
+  const reasonStr = `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`;
 
-  // — TOFU: alcance puro, awareness, impresiones
-  if (['REACH', 'IMPRESSIONS', 'BRAND_AWARENESS', 'AD_RECALL_LIFT', 'OUTCOME_AWARENESS'].some(k => goal.includes(k) || obj.includes(k)))
-    return { stage: 'TOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'TOFU = audiencia fría. El creativo busca generar conocimiento de marca. Benchmark: CTR >0.8%, Frecuencia <3.' };
+  // 0 — Hints por nombre del conjunto/campaña (override explícito)
+  if (/\btofu\b|prospect|frio|fría|awareness|brand|intro|cold/.test(n))
+    return { stage: 'TOFU', reason: `${reasonStr} | Nombre: TOFU`, description: 'TOFU detectado por nombre del conjunto. Audiencia fría — reconocimiento de marca. Benchmark: CTR >0.8%.' };
+  if (/\bmofu\b|tibi|conside|traffic|tráfico|visit|visit|remark|retarg.*mofu|engag/.test(n))
+    return { stage: 'MOFU', reason: `${reasonStr} | Nombre: MOFU`, description: 'MOFU detectado por nombre. Audiencia tibia — consideración. Benchmark: CTR >1%.' };
+  if (/\bbofu\b|hot|caliente|conver|retarget|remarketing|custom.?aud/.test(n))
+    return { stage: 'BOFU', reason: `${reasonStr} | Nombre: BOFU`, description: 'BOFU detectado por nombre. Audiencia caliente — conversión directa. Benchmark: CTR >1.5%.' };
 
-  // — MOFU: consideración, tráfico, engagement, video, mensajes, clics
-  if (['LINK_CLICKS', 'LANDING_PAGE_VIEWS', 'POST_ENGAGEMENT', 'VIDEO_VIEWS', 'PAGE_LIKES',
-       'CONVERSATIONS', 'THRUPLAY', 'MESSAGING_APPOINTMENT', 'MESSAGING_PURCHASE'].some(k => goal.includes(k)))
-    return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'MOFU = audiencia tibia. El creativo busca interacción y consideración. Benchmark: CTR >1%, Frecuencia <4.' };
-  if (['TRAFFIC', 'ENGAGEMENT', 'VIDEO_VIEWS', 'MESSAGES', 'OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT'].some(k => obj.includes(k) || goal.includes(k)))
-    return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'MOFU = audiencia tibia. El creativo busca interacción y consideración. Benchmark: CTR >1%, Frecuencia <4.' };
+  // 1 — TOFU: alcance puro, awareness, impresiones
+  const tofuGoals = ['REACH', 'IMPRESSIONS', 'BRAND_AWARENESS', 'AD_RECALL_LIFT'];
+  const tofuObjs  = ['OUTCOME_AWARENESS', 'OUTCOME_REACH', 'AWARENESS', 'REACH'];
+  if (tofuGoals.some(k => goal.includes(k)) || tofuObjs.some(k => obj.includes(k)))
+    return { stage: 'TOFU', reason: reasonStr, description: 'TOFU — optimización para alcance/awareness. Audiencia fría, sin conversión directa. Benchmark: CTR >0.8%, Frec <3.' };
 
-  // — BOFU: conversiones, leads, compras, valor
-  if (['OFFSITE_CONVERSIONS', 'VALUE', 'PURCHASE_ROAS', 'LEAD_GENERATION', 'QUALITY_LEAD',
-       'QUALIFIED_LEAD', 'CONVERTED_LEAD', 'STORE_VISITS'].some(k => goal.includes(k)))
-    return { stage: 'BOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'BOFU = audiencia caliente. El creativo busca cerrar una conversión directa. Benchmark: CTR >1.5%, ROAS >2, Frecuencia <3.5.' };
-  if (['SALES', 'CONVERSION', 'LEAD', 'APP', 'OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_APP'].some(k => obj.includes(k)))
-    return { stage: 'BOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'BOFU = audiencia caliente. El creativo busca cerrar una conversión directa. Benchmark: CTR >1.5%, ROAS >2, Frecuencia <3.5.' };
+  // 2 — MOFU: consideración, tráfico, engagement, video, mensajes, clics
+  const mofuGoals = [
+    'LINK_CLICKS', 'LINK_CLICK',            // tráfico
+    'LANDING_PAGE_VIEWS', 'LANDING_PAGE',   // vistas de página
+    'POST_ENGAGEMENT', 'PAGE_ENGAGEMENT',   // engagement
+    'VIDEO_VIEWS', 'THRUPLAY',              // video
+    'PAGE_LIKES',                           // likes de página
+    'CONVERSATIONS', 'REPLIES',             // mensajes
+    'MESSAGING_APPOINTMENT',                // citas por mensaje
+    'EVENT_RESPONSES',                      // eventos
+    'VISIT_INSTAGRAM_PROFILE',              // perfil IG
+  ];
+  const mofuObjs = ['OUTCOME_TRAFFIC', 'OUTCOME_ENGAGEMENT', 'TRAFFIC', 'ENGAGEMENT', 'VIDEO_VIEWS', 'MESSAGES'];
+  if (mofuGoals.some(k => goal.includes(k)) || mofuObjs.some(k => obj.includes(k) || goal.includes(k)))
+    return { stage: 'MOFU', reason: reasonStr, description: 'MOFU — optimización para consideración / tráfico. Audiencia tibia. Benchmark: CTR >1%, Frec <4.' };
 
-  if (['AWARENESS', 'REACH', 'OUTCOME_AWARENESS', 'OUTCOME_REACH'].some(k => obj.includes(k)))
-    return { stage: 'TOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'TOFU = audiencia fría. El creativo busca generar conocimiento de marca. Benchmark: CTR >0.8%.' };
+  // 3 — BOFU: conversiones directas, leads, compras, valor
+  const bofuGoals = [
+    'OFFSITE_CONVERSIONS', 'OFFSITE_CONVERSION',
+    'VALUE', 'PURCHASE_ROAS',
+    'LEAD_GENERATION', 'QUALITY_LEAD', 'QUALIFIED_LEAD', 'CONVERTED_LEAD',
+    'MESSAGING_PURCHASE',
+    'APP_INSTALLS', 'APP_INSTALL',
+    'IN_STORE_SALES', 'STORE_VISITS',
+    'CATALOG_SALES',
+  ];
+  if (bofuGoals.some(k => goal.includes(k)))
+    return { stage: 'BOFU', reason: reasonStr, description: 'BOFU — optimización directa para conversión/lead. Audiencia caliente. Benchmark: CTR >1.5%, Frec <3.5.' };
 
-  return { stage: 'MOFU', reason: `Obj: ${objective || '—'} | Opt: ${optimizationGoal || 'sin dato'}`, description: 'Clasificación por defecto — objetivo no reconocido. Se asume etapa de consideración.' };
+  // 4 — Fallback por objetivo de campaña (solo si NO hay optimization_goal válido)
+  //     Si hay goal pero no matcheó nada de BOFU → es MOFU por defecto, no BOFU
+  if (!hasGoal) {
+    const bofuObjKeys = ['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_APP', 'SALES', 'OUTCOME_CONVERSION'];
+    if (bofuObjKeys.some(k => obj.includes(k)))
+      return { stage: 'BOFU', reason: `${reasonStr} — inferido por objetivo (sin optimization_goal)`, description: 'BOFU inferido por objetivo de campaña (sin optimization_goal disponible). Benchmark: CTR >1.5%.' };
+  }
+
+  // 5 — Default: MOFU (no BOFU — mejor clasificación neutral)
+  return { stage: 'MOFU', reason: `${reasonStr} — sin dato suficiente`, description: 'Clasificación MOFU por defecto — optimization_goal no reconocido. Revisá la config del conjunto.' };
 }
 
 function funnelBadPerf(stage: FunnelStage, ins: any): string[] {
@@ -550,26 +584,82 @@ function calcPerfScore(ins: any, currency: string): number {
   return Math.max(0, Math.min(100, score));
 }
 
+// ── Detect dominant objective across campaigns (by spend weight) ──────────────
+type CampaignObjectiveType = 'sales' | 'leads' | 'traffic' | 'messages' | 'engagement' | 'awareness' | 'mixed';
+
+function detectDominantObjective(camps: any[], insights: Record<string, any>): CampaignObjectiveType {
+  const spend: Record<CampaignObjectiveType, number> = { sales: 0, leads: 0, traffic: 0, messages: 0, engagement: 0, awareness: 0, mixed: 0 };
+  for (const c of camps) {
+    const ins = insights[c.id];
+    const s = parseFloat(ins?.spend || '0');
+    if (s <= 0) continue;
+    const obj = (c.objective || '').toUpperCase();
+    if (obj.includes('SALES') || obj.includes('CONVERSION') || obj.includes('PRODUCT_CATALOG') || obj.includes('STORE_VISIT')) spend.sales += s;
+    else if (obj.includes('LEAD')) spend.leads += s;
+    else if (obj.includes('TRAFFIC') || obj.includes('LINK_CLICK')) spend.traffic += s;
+    else if (obj.includes('MESSAGE')) spend.messages += s;
+    else if (obj.includes('ENGAGEMENT') || obj.includes('POST_ENGAGEMENT') || obj.includes('PAGE_LIKE')) spend.engagement += s;
+    else if (obj.includes('AWARENESS') || obj.includes('REACH') || obj.includes('BRAND') || obj.includes('VIDEO_VIEW')) spend.awareness += s;
+  }
+  const entries = (Object.entries(spend) as [CampaignObjectiveType, number][])
+    .filter(([k]) => k !== 'mixed')
+    .sort((a, b) => b[1] - a[1]);
+  const top = entries[0];
+  const second = entries[1];
+  if (!top || top[1] === 0) return 'sales'; // default
+  // "mixed" if second objective has >30% of total spend
+  const total = entries.reduce((s, [, v]) => s + v, 0);
+  if (second && second[1] > 0 && second[1] / total > 0.30) return 'mixed';
+  return top[0];
+}
+
 function buildClientReportPrompt(camps: any[], insights: Record<string, any>, accountName: string, period: string, currency: string, accountInsights: any, prevInsights?: any, prevPeriod?: string): string {
   const campData = buildClientCampData(camps, insights);
   const curr = currency || 'ARS';
+  const objType = detectDominantObjective(camps, insights);
+
+  // ── Base metrics (always available) ──
   const totalSpend = accountInsights ? fmtNum(accountInsights.spend, 0) : '—';
   const totalReach = accountInsights?.reach ? parseInt(accountInsights.reach).toLocaleString('es-AR') : '—';
-  const blendedRoas = accountInsights?.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2) : '—';
-  const ctr = accountInsights ? fmtNum(accountInsights.inline_link_click_ctr, 2) : '—';
-  const cpm = accountInsights ? fmtNum(accountInsights.cpm, 0) : '—';
+  const totalImpressions = accountInsights?.impressions ? parseInt(accountInsights.impressions).toLocaleString('es-AR') : '—';
   const freq = accountInsights ? fmtNum(accountInsights.frequency, 2) : '—';
+  const ctr = accountInsights ? fmtNum(accountInsights.inline_link_click_ctr, 2) : '—';
+  const ctrVal = accountInsights ? parseFloat(accountInsights.inline_link_click_ctr || '0') : 0;
+  const cpm = accountInsights ? fmtNum(accountInsights.cpm, 0) : '—';
+  const totalClicks = accountInsights?.inline_link_clicks ? parseInt(accountInsights.inline_link_clicks).toLocaleString('es-AR') : '—';
+  const cpc = accountInsights ? fmtNum(accountInsights.cpc, 2) : '—';
 
+  // ── Objective-specific metrics ──
+  const totalPurchases = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+  const totalPurchaseValue = accountInsights?.action_values ? (getMetaVal(accountInsights.action_values, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+  const costPerPurchase = parseFloat(totalPurchases) > 0 && accountInsights?.spend
+    ? fmtNum(parseFloat(accountInsights.spend) / parseFloat(totalPurchases), 2) : '—';
+  const blendedRoas = accountInsights?.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2) : '—';
+  const roasVal = accountInsights?.purchase_roas?.[0]?.value ? parseFloat(accountInsights.purchase_roas[0].value) : 0;
+
+  const totalLeads = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0') : '0';
+  const costPerLead = parseFloat(totalLeads) > 0 && accountInsights?.spend
+    ? fmtNum(parseFloat(accountInsights.spend) / parseFloat(totalLeads), 2) : '—';
+
+  const totalMessages = accountInsights?.actions ? (getMetaVal(accountInsights.actions,
+    'onsite_conversion.messaging_conversation_started_7d',
+    'onsite_conversion.messaging_first_reply') || '0') : '0';
+  const costPerMessage = parseFloat(totalMessages) > 0 && accountInsights?.spend
+    ? fmtNum(parseFloat(accountInsights.spend) / parseFloat(totalMessages), 2) : '—';
+
+  const totalEngagements = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'post_engagement', 'page_engagement') || '0') : '0';
+  const costPerEngagement = parseFloat(totalEngagements) > 0 && accountInsights?.spend
+    ? fmtNum(parseFloat(accountInsights.spend) / parseFloat(totalEngagements), 2) : '—';
+
+  // ── Comparison block ──
   let comparisonBlock = '';
   let prevSpend = '';
   let prevReach = '';
-  let prevRoas = '';
-  let prevCtr = '';
   if (prevInsights && prevPeriod) {
     prevSpend = fmtNum(prevInsights.spend, 0);
     prevReach = prevInsights?.reach ? parseInt(prevInsights.reach).toLocaleString('es-AR') : '—';
-    prevRoas = prevInsights?.purchase_roas?.[0]?.value ? fmtNum(prevInsights.purchase_roas[0].value, 2) : '—';
-    prevCtr = fmtNum(prevInsights.inline_link_click_ctr, 2);
+    const prevRoas = prevInsights?.purchase_roas?.[0]?.value ? fmtNum(prevInsights.purchase_roas[0].value, 2) : '—';
+    const prevCtr = fmtNum(prevInsights.inline_link_click_ctr, 2);
     const spendDiff = prevInsights.spend && accountInsights?.spend ? ((parseFloat(accountInsights.spend) - parseFloat(prevInsights.spend)) / parseFloat(prevInsights.spend) * 100).toFixed(1) : null;
     const reachDiff = prevInsights.reach && accountInsights?.reach ? ((parseInt(accountInsights.reach) - parseInt(prevInsights.reach)) / parseInt(prevInsights.reach) * 100).toFixed(1) : null;
     comparisonBlock = `\nCOMPARACIÓN CON PERÍODO ANTERIOR (${prevPeriod}):
@@ -579,42 +669,133 @@ function buildClientReportPrompt(camps: any[], insights: Record<string, any>, ac
 - CTR anterior: ${prevCtr}%\n`;
   }
 
+  // ── Objective-specific data block & sections ──
+  const objLabels: Record<CampaignObjectiveType, string> = {
+    sales: 'VENTAS / CONVERSIONES',
+    leads: 'CLIENTES POTENCIALES (LEADS)',
+    traffic: 'TRÁFICO AL SITIO WEB',
+    messages: 'MENSAJES / CONVERSACIONES',
+    engagement: 'INTERACCIÓN',
+    awareness: 'RECONOCIMIENTO / ALCANCE',
+    mixed: 'MIXTO (múltiples objetivos)',
+  };
+
+  let objectiveDataBlock = '';
+  let section2 = '';
+  let section3 = '';
+  let conclusionHint = '';
+
+  if (objType === 'sales') {
+    objectiveDataBlock = `- Compras generadas: ${totalPurchases}
+- Valor total en ventas: ${totalPurchaseValue} ${curr}
+- Costo por compra: ${costPerPurchase} ${curr}
+- ROAS: ${blendedRoas}x`;
+    section2 = `## RESULTADOS DE VENTAS
+En 2-3 oraciones: cuántas compras se generaron, cuánto fue el valor total en ventas, cuál fue el costo promedio por compra, y cuál fue el ROAS. Explicá el ROAS en términos simples (por cada ${curr} 1 invertido, cuánto se recuperó en ventas). ${roasVal >= 3 ? 'El ROAS es alto — mencioná que es un buen retorno.' : roasVal > 0 && roasVal < 1 ? 'El ROAS está por debajo de 1 — mencioná que no se recuperó la inversión.' : ''} Poné en **negrita** todos los números.`;
+    section3 = `## CLICS Y ENGAGEMENT
+En 1-2 oraciones: cuántos clics al sitio se generaron y cuál fue el CTR. Explicá el CTR en términos simples (de cada 100 personas que vieron el anuncio, cuántas hicieron clic). ${ctrVal >= 1.5 ? 'El CTR supera el 1.5% — mencioná que es un buen resultado.' : ''} Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena o mala semana en términos de ROAS y ventas. Mencioná qué campañas tuvieron más compras o mejor ROAS. Si alguna campaña gastó sin generar compras, mencionarla.';
+  } else if (objType === 'leads') {
+    objectiveDataBlock = `- Leads (clientes potenciales) generados: ${totalLeads}
+- Costo por lead: ${costPerLead} ${curr}`;
+    section2 = `## RESULTADOS DE LEADS
+En 2-3 oraciones: cuántos clientes potenciales (leads) se generaron, cuál fue el costo promedio por lead, y qué campañas los generaron. Explicá en términos simples qué es un lead (una persona que mostró interés y dejó sus datos). Poné en **negrita** todos los números.`;
+    section3 = `## CLICS Y ALCANCE
+En 1-2 oraciones: cuántos clics al sitio se generaron, cuál fue el CTR, y cuántas impresiones tuvieron los anuncios. Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena semana en términos de generación de leads y costo por lead. Mencioná qué campañas trajeron más leads. Si alguna campaña gastó sin generar leads, mencionarla.';
+  } else if (objType === 'traffic') {
+    objectiveDataBlock = `- Clics al sitio: ${totalClicks}
+- CTR promedio: ${ctr}%
+- Costo por clic: ${cpc} ${curr}
+- CPM: ${cpm} ${curr}`;
+    section2 = `## RESULTADOS DE TRÁFICO
+En 2-3 oraciones: cuántos clics al sitio web se generaron, cuál fue el CTR (explicar en términos simples: de cada 100 personas que vieron el anuncio, cuántas hicieron clic), y cuánto costó cada clic en promedio. ${ctrVal >= 1.5 ? 'El CTR es bueno para el sector.' : ctrVal > 0 && ctrVal < 0.8 ? 'El CTR está por debajo de lo esperado para este tipo de campaña.' : ''} Poné en **negrita** todos los números.`;
+    section3 = `## ALCANCE E IMPRESIONES
+En 1-2 oraciones: a cuántas personas distintas llegaron los anuncios, cuántas impresiones totales tuvieron, y cuál fue la frecuencia (cuántas veces vio el anuncio cada persona). Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena semana en términos de tráfico y costo por clic. Mencioná qué campañas generaron más clics. Si alguna campaña tuvo CTR muy bajo, mencionarla.';
+  } else if (objType === 'messages') {
+    objectiveDataBlock = `- Conversaciones iniciadas: ${totalMessages}
+- Costo por conversación: ${costPerMessage} ${curr}
+- Clics al sitio: ${totalClicks}
+- CTR promedio: ${ctr}%`;
+    section2 = `## RESULTADOS DE MENSAJES
+En 2-3 oraciones: cuántas conversaciones se iniciaron en respuesta a los anuncios, cuánto costó cada conversación en promedio, y qué campañas generaron más mensajes. Explicá en términos simples qué representa cada conversación (una persona que hizo clic en "Enviar mensaje" o escribió al negocio). Poné en **negrita** todos los números.`;
+    section3 = `## CLICS Y ALCANCE
+En 1-2 oraciones: cuántos clics totales se generaron y cuál fue el CTR. Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena semana en términos de mensajes recibidos y costo por conversación. Mencioná qué campañas generaron más conversaciones.';
+  } else if (objType === 'engagement') {
+    objectiveDataBlock = `- Interacciones totales: ${totalEngagements}
+- Costo por interacción: ${costPerEngagement} ${curr}
+- Clics al sitio: ${totalClicks}
+- CTR promedio: ${ctr}%`;
+    section2 = `## RESULTADOS DE INTERACCIÓN
+En 2-3 oraciones: cuántas interacciones totales generaron los anuncios (me gusta, comentarios, compartidos, etc.), cuánto costó cada interacción, y qué campañas tuvieron más engagement. Poné en **negrita** todos los números.`;
+    section3 = `## ALCANCE E IMPRESIONES
+En 1-2 oraciones: a cuántas personas distintas llegaron los anuncios, cuántas impresiones totales tuvieron, y cuál fue la frecuencia. Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena semana en términos de interacción y costo por resultado. Mencioná qué campañas generaron más engagement.';
+  } else if (objType === 'awareness') {
+    objectiveDataBlock = `- Impresiones totales: ${totalImpressions}
+- Frecuencia: ${freq} veces por persona
+- CPM (costo por 1.000 impresiones): ${cpm} ${curr}
+- CTR: ${ctr}%`;
+    section2 = `## ALCANCE E IMPRESIONES
+En 2-3 oraciones: a cuántas personas distintas llegaron los anuncios, cuántas impresiones totales tuvieron, cuántas veces vio el anuncio cada persona en promedio (frecuencia), y cuánto costó llegar a 1.000 personas (CPM). Poné en **negrita** todos los números.`;
+    section3 = `## ENGAGEMENT
+En 1-2 oraciones: cuántos clics se generaron y cuál fue el CTR. Poné en **negrita** los números.`;
+    conclusionHint = 'Indicá si fue una buena semana en términos de alcance y eficiencia del CPM. Mencioná qué campañas tuvieron mayor alcance.';
+  } else {
+    // mixed
+    objectiveDataBlock = `- Compras: ${totalPurchases} (ROAS: ${blendedRoas}x)
+- Leads: ${totalLeads}
+- Conversaciones: ${totalMessages}
+- Clics al sitio: ${totalClicks}
+- CTR promedio: ${ctr}%`;
+    section2 = `## RESULTADOS POR TIPO DE CAMPAÑA
+Describí los resultados separando por tipo: las campañas de ventas (compras/ROAS), las de leads (clientes potenciales generados), y las de tráfico o mensajes (clics/conversaciones). Para cada tipo, mencioná cuánto se invirtió y qué resultados generó. Poné en **negrita** todos los números.`;
+    section3 = `## ALCANCE GENERAL
+En 1-2 oraciones: a cuántas personas en total llegaron todos los anuncios combinados y cuál fue el CTR promedio. Poné en **negrita** los números.`;
+    conclusionHint = 'Resumí los resultados de cada tipo de campaña. Indicá cuál tipo tuvo el mejor rendimiento relativo a la inversión.';
+  }
+
   return `🚨 INSTRUCCIÓN CRÍTICA DE MONEDA: Esta cuenta opera EXCLUSIVAMENTE en ${curr}. TODOS los valores monetarios deben mostrarse en ${curr}. NUNCA uses USD ni el símbolo $ sin el código de moneda ${curr}.
 
-INSTRUCCIÓN: Generá un reporte para el cliente final. El cliente no sabe de publicidad digital. Explicá todo en lenguaje simple, sin jerga técnica. Solo datos objetivos, SIN recomendaciones de estrategia, SIN proyecciones, SIN decir qué está "bien" o "mal" como juicio — solo describir qué pasó con los números.
+INSTRUCCIÓN: Generá un reporte semanal para el cliente final. El cliente no sabe de publicidad digital. Explicá todo en lenguaje simple y directo, sin jerga técnica. Describí lo que pasó con los números de forma objetiva — podés indicar si un resultado es bueno o malo en contexto, pero SIN recomendaciones de estrategia ni proyecciones futuras.
 
 CUENTA: ${accountName}
+OBJETIVO PRINCIPAL DE LAS CAMPAÑAS: ${objLabels[objType]}
 PERÍODO ACTUAL: ${period}
 MONEDA DE LA CUENTA: ${curr}
 
 DATOS GLOBALES DE LA CUENTA (período actual):
 - Inversión total: ${totalSpend} ${curr}
 - Personas alcanzadas: ${totalReach}
-- ROAS: ${blendedRoas}
+- Impresiones totales: ${totalImpressions}
+- Frecuencia (veces que vio el anuncio c/persona): ${freq}
+- Clics al sitio: ${totalClicks}
 - CTR promedio: ${ctr}%
 - CPM: ${cpm} ${curr}
-- Frecuencia: ${freq}
+${objectiveDataBlock}
 ${comparisonBlock}
 DATOS POR CAMPAÑA:
 ${campData}
 
-Generá el reporte con EXACTAMENTE estas secciones (en este orden):
+Generá el reporte con EXACTAMENTE estas secciones (en este orden, con exactamente estos títulos):
 
-## Resumen del período
-En 2-3 oraciones simples: cuánto se invirtió, a cuántas personas llegó, cuántos resultados se obtuvieron. Sin tecnicismos. Poné en **negrita** los números más importantes (inversión total, personas alcanzadas, resultados totales).${prevInsights ? '\nIncluí una oración comparando con el período anterior: qué subió o bajó y en qué porcentaje.' : ''}
+## RESUMEN DE LA SEMANA
+En 2-3 oraciones simples: cuánto se invirtió, a cuántas personas distintas llegó, cuántas impresiones totales, y la frecuencia promedio. Explicá qué significa la frecuencia. Poné en **negrita** los números clave.${prevInsights ? '\nIncluí una oración comparando con el período anterior: qué subió o bajó y en qué porcentaje.' : ''}
 
-## Resultados principales
-Una tabla simple. Columnas: Campaña | Inversión (${curr}) | Personas alcanzadas | Resultado principal | Costo por resultado (${curr}). Usá el nombre de la campaña tal como aparece. Omití campañas sin gasto. Los números en la tabla deben estar en **negrita**.${prevInsights ? `\nDebajo de la tabla, agregar una fila de comparación o una nota breve indicando la variación respecto al período anterior (${prevPeriod}): inversión ${prevSpend} ${curr} → ${totalSpend} ${curr}, alcance ${prevReach} → ${totalReach}.` : ''}
+${section2}
 
-## Desglose por campaña
-Para cada campaña con gasto, UN párrafo breve (2-3 oraciones) describiendo qué hizo esa campaña: cuánto se invirtió, a quién llegó (cuántas personas), y cuántos resultados generó. Poné en **negrita** los números clave de cada párrafo (inversión, personas, resultados). Sin análisis técnico, solo descripción de hechos.${prevInsights ? ' Si la campaña tuvo una variación notable respecto al período anterior, mencionarla en 1 frase.' : ''}
+${section3}
+
+## CONCLUSIÓN
+Un párrafo corto (3-4 oraciones). ${conclusionHint} Tono directo, sin tecnicismos.
 
 Notas de formato:
 - SIEMPRE usá el código de moneda ${curr} junto a los valores monetarios
-- Poné en **negrita** todos los números importantes: inversiones, personas alcanzadas, resultados, costos por resultado
-- No uses palabras como "excelente", "bajo", "alto" como juicio — solo describí el número
-- No uses "se recomienda", "deberías", "es importante" — solo describí lo que pasó
-- Tono: profesional, directo, claro para alguien sin conocimientos técnicos`;
+- Poné en **negrita** todos los números importantes
+- Tono: profesional, directo, claro para alguien sin conocimientos técnicos
+- NO uses tablas — solo texto narrativo en párrafos`;
 }
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
@@ -1182,7 +1363,7 @@ export default function AIAnalystPage() {
         const res = await metaAds.getAds(adsetId);
         const adsList: any[] = res.data || [];
         setAdSetAds(prev => ({ ...prev, [adsetId]: adsList }));
-        const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, undefined, dp, tr).catch(() => null)));
+        const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, AD_INSIGHT_FIELDS, dp, tr).catch(() => null)));
         const insMap: Record<string, any> = {};
         adsList.forEach((a, i) => { if (insResults[i]) insMap[a.id] = insResults[i]; });
         setAdInsights(prev => ({ ...prev, ...insMap }));
@@ -1212,11 +1393,11 @@ export default function AIAnalystPage() {
       const lines: string[] = [];
       for (const [campId, adsets] of Object.entries(campaignAdSets)) {
         const camp = campaigns.find((c: any) => c.id === campId);
-        const campFunnel = classifyFunnel(camp?.objective || '');
+        const campFunnel = classifyFunnel(camp?.objective || '', undefined, camp?.name);
         lines.push(`
 === CAMPAÑA: ${camp?.name || campId} [${campFunnel}] ===`);
         for (const adset of (adsets as any[])) {
-          const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal);
+          const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal, adset.name);
           const adsetIns = adSetInsights[adset.id];
           lines.push(`  CA: ${adset.name} [${adsetFunnel}|opt:${adset.optimization_goal || '—'}] | Gasto: ${fmtNum(adsetIns?.spend, 0)} | CTR: ${fmtNum(adsetIns?.inline_link_click_ctr, 2)}% | CPM: ${fmtNum(adsetIns?.cpm, 0)} | Frec: ${fmtNum(adsetIns?.frequency, 2)} | ROAS: ${adsetIns?.purchase_roas?.[0]?.value ? fmtNum(adsetIns.purchase_roas[0].value, 2) : '—'}`);
           const adsList = adSetAds[adset.id] || [];
@@ -1304,7 +1485,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
     for (const c of campaigns) {
       const ins = campaignInsights[c.id];
       if (!ins) continue;
-      const campFunnel = classifyFunnel(c.objective || '');
+      const campFunnel = classifyFunnel(c.objective || '', undefined, c.name);
       const metric = getPrimaryMetric(c.objective || '', ins);
       const roas = ins.purchase_roas?.[0]?.value ? fmtNum(ins.purchase_roas[0].value, 2) : '—';
       // Nombre limpio — sin metadata de estado/objetivo
@@ -1315,7 +1496,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
       const adsets = campAdSetsMap[c.id] || [];
       for (const adset of adsets) {
         const aIns = adSetInsMap[adset.id];
-        const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal);
+        const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal, adset.name);
         const aMetric = aIns ? getPrimaryMetric(c.objective || '', aIns) : null;
         lines.push(`  CONJUNTO "${adset.name}" [Funnel:${adsetFunnel}]`);
         lines.push(`    Configuración: Optimización=${adset.optimization_goal || '—'} | Presupuesto=${adset.daily_budget ? 'Diario:'+adset.daily_budget : adset.lifetime_budget ? 'Total:'+adset.lifetime_budget : '—'}`);
@@ -1384,7 +1565,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
             const adsList: any[] = res.data || [];
             freshAdSetAds[id] = adsList;
             setAdSetAds(prev => ({ ...prev, [id]: adsList }));
-            const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, undefined, dateMode === 'preset' ? preset : undefined, dateMode === 'custom' ? { since, until } : undefined).catch(() => null)));
+            const insResults = await Promise.all(adsList.map(a => metaAds.getInsights(a.id, AD_INSIGHT_FIELDS, dateMode === 'preset' ? preset : undefined, dateMode === 'custom' ? { since, until } : undefined).catch(() => null)));
             const insMap: Record<string, any> = {};
             adsList.forEach((a, i) => { if (insResults[i]) { insMap[a.id] = insResults[i]; freshAdIns[a.id] = insResults[i]; } });
             setAdInsights(prev => ({ ...prev, ...insMap }));
@@ -1433,14 +1614,17 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
     setExpandedCampaigns(new Set());
     setExpandedAdSets(new Set());
 
-    const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
+    // Para presets, pasar date_preset directamente (datos en tiempo real en Meta).
+    // Solo usar time_range para fechas custom.
+    const dp = dateMode === 'preset' ? preset : undefined;
+    const tr = dateMode === 'custom' ? { since, until } : undefined;
 
     try {
       setAnalysisProgress('Cargando cuenta...');
       const [acct, campRes, acctIns] = await Promise.all([
         metaAds.getAccount(accId),
         metaAds.getCampaigns(accId),
-        metaAds.getInsights(accId, INSIGHT_FIELDS, undefined, range),
+        metaAds.getInsights(accId, INSIGHT_FIELDS, dp, tr),
       ]);
       setAccountOverview(acct);
       setAccountInsights(acctIns);
@@ -1454,7 +1638,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
 
       const insights: Record<string, any> = {};
       await Promise.all(camps.map(async (c: any) => {
-        const ins = await metaAds.getInsights(c.id, INSIGHT_FIELDS, undefined, range);
+        const ins = await metaAds.getInsights(c.id, INSIGHT_FIELDS, dp, tr).catch(() => null);
         if (ins) insights[c.id] = ins;
       }));
       setCampaigns(camps);
@@ -1593,62 +1777,123 @@ INICIO: ${planStartDate}
     if (!pw) { showToast('El navegador bloqueó el popup. Permitir popups para exportar PDF.', 'error'); return; }
     const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
     const cur = accountOverview?.currency || '';
-    const campRows = campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).map(c => {
-      const ins = campaignInsights[c.id];
-      const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
-      const ctr = parseFloat(ins?.inline_link_click_ctr || 0);
-      const statusDot = c.status === 'ACTIVE' ? '#10b981' : '#f59e0b';
-      return `<tr><td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${statusDot};margin-right:6px;"></span>${c.name}</td><td>${cur} ${fmtNum(ins?.spend, 0)}</td><td>${ins?.reach ? parseInt(ins.reach).toLocaleString('es-AR') : '—'}</td><td>${metric ? metric.label+': '+metric.value : '—'}</td><td>${metric?.cost ?? '—'}</td><td style="color:${ctr>=1.5?'#059669':ctr>=1?'#d97706':'#dc2626'}">${fmtNum(ctr, 2)}%</td></tr>`;
-    }).join('');
-    const kpiBlock = accountInsights ? `
-      <div class="kpis">
-        <div class="kpi"><div class="kl">Inversión total</div><div class="kv">${cur} ${fmtNum(accountInsights.spend, 0)}</div></div>
-        <div class="kpi"><div class="kl">Personas alcanzadas</div><div class="kv">${parseInt(accountInsights.reach || '0').toLocaleString('es-AR')}</div></div>
-        <div class="kpi"><div class="kl">ROAS</div><div class="kv">${accountInsights.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2)+'x' : '—'}</div></div>
-        <div class="kpi"><div class="kl">CTR promedio</div><div class="kv">${fmtNum(accountInsights.inline_link_click_ctr, 2)}%</div></div>
-      </div>` : '';
-    const reportContent = clientReportText ? `<div class="ai-content">${clientReportText.replace(/## ([^\n]+)/g, '<h2>$1</h2>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')}</div>` : '';
-    pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte — ${accountOverview?.name || ''}</title>
-    <style>
-      *{box-sizing:border-box;margin:0;padding:0;}
-      body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#111;background:#fff;padding:0;font-size:12px;line-height:1.6;}
-      .page{max-width:860px;margin:0 auto;padding:40px 40px 60px;}
-      .header{background:linear-gradient(135deg,#1a1a3e,#312e81);color:white;padding:28px 32px;border-radius:12px;margin-bottom:28px;}
-      .header h1{font-size:22px;font-weight:800;color:white;margin-bottom:4px;}
-      .header .sub{color:#a5b4fc;font-size:12px;}
-      .header .date{color:#c7d2fe;font-size:11px;margin-top:8px;}
-      .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
-      .kpi{background:#f8f7ff;border:1px solid #e0e7ff;border-radius:10px;padding:14px;text-align:center;}
-      .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
-      .kv{font-size:22px;font-weight:800;color:#4f46e5;}
-      h2{font-size:13px;font-weight:700;color:#4f46e5;border-bottom:2px solid #e0e7ff;padding-bottom:5px;margin:20px 0 10px;}
-      table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px;}
-      th{background:#4f46e5;color:white;padding:8px 10px;text-align:left;font-weight:600;font-size:10px;letter-spacing:.04em;}
-      td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:middle;}
-      tr:nth-child(even) td{background:#fafafa;}
-      .ai-content{font-size:12px;line-height:1.7;margin-top:16px;}
-      .ai-content h2{font-size:13px;border-bottom:2px solid #e0e7ff;padding-bottom:4px;color:#4f46e5;margin:20px 0 8px;}
-      .footer{text-align:center;color:#9ca3af;font-size:9px;margin-top:40px;padding-top:16px;border-top:1px solid #f0f0f0;}
-      .footer strong{color:#6366f1;}
-      @media print{body{padding:0;}.page{padding:20px;}}
-    </style></head><body>
-    <div class="page">
-      <div class="header">
-        <h1>${accountOverview?.name || 'Reporte Meta Ads'}</h1>
-        <div class="sub">Reporte de rendimiento publicitario</div>
-        <div class="date">Período: ${range.since} al ${range.until} &nbsp;·&nbsp; Generado: ${new Date().toLocaleDateString('es-AR', {day:'numeric',month:'long',year:'numeric'})}</div>
-      </div>
-      ${kpiBlock}
-      <h2>Resultados por campaña</h2>
-      <table>
-        <thead><tr><th>Campaña</th><th>Inversión</th><th>Alcance</th><th>Resultados</th><th>Costo/R</th><th>CTR</th></tr></thead>
-        <tbody>${campRows}</tbody>
-      </table>
-      ${reportContent}
-      <div class="footer">Generado por <strong>Algoritmia</strong> · Meta Ads Analyst · ${new Date().toLocaleDateString('es-AR')}</div>
-    </div></body></html>`);
+    const today = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const objType = detectDominantObjective(campaigns, campaignInsights);
+
+    // ── Shared KPI values ──
+    const spendVal = accountInsights ? `${cur} ${fmtNum(accountInsights.spend, 0)}` : '—';
+    const reachVal = accountInsights?.reach ? parseInt(accountInsights.reach).toLocaleString('es-AR') : '—';
+    const clicksVal = accountInsights?.inline_link_clicks ? parseInt(accountInsights.inline_link_clicks).toLocaleString('es-AR') : '—';
+    const ctrVal = accountInsights ? fmtNum(accountInsights.inline_link_click_ctr, 2) + '%' : '—';
+    const cpmVal = accountInsights ? `${cur} ${fmtNum(accountInsights.cpm, 0)}` : '—';
+    const freqVal = accountInsights ? fmtNum(accountInsights.frequency, 2) : '—';
+    const impressionsVal = accountInsights?.impressions ? parseInt(accountInsights.impressions).toLocaleString('es-AR') : '—';
+    const cpcVal = accountInsights ? `${cur} ${fmtNum(accountInsights.cpc, 2)}` : '—';
+
+    // ── Objective-specific KPI values ──
+    const purchases = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+    const purchaseValue = accountInsights?.action_values ? (getMetaVal(accountInsights.action_values, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+    const roasRaw = accountInsights?.purchase_roas?.[0]?.value ? parseFloat(accountInsights.purchase_roas[0].value) : 0;
+    const roasStr = roasRaw > 0 ? fmtNum(roasRaw, 1) + 'x' : '—';
+    const cpaStr = parseFloat(purchases) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(purchases), 2)}` : '—';
+    const purchaseValueStr = parseFloat(purchaseValue) > 0 ? `${cur} ${fmtNum(parseFloat(purchaseValue), 0)}` : '—';
+
+    const leadsStr = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0') : '0';
+    const cplStr = parseFloat(leadsStr) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(leadsStr), 2)}` : '—';
+
+    const messagesStr = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply') || '0') : '0';
+    const cpmsgStr = parseFloat(messagesStr) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(messagesStr), 2)}` : '—';
+
+    const engStr = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'post_engagement', 'page_engagement') || '0') : '0';
+    const cpeStr = parseFloat(engStr) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(engStr), 2)}` : '—';
+
+    // ── Build KPI rows per objective ──
+    type KpiItem = { v: string; l: string };
+    let row1: KpiItem[] = [];
+    let row2: KpiItem[] = [];
+
+    if (objType === 'sales') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: purchases, l: 'Compras generadas' }, { v: roasStr, l: 'Retorno (ROAS)' }];
+      row2 = [{ v: cpaStr, l: 'Costo por compra' }, { v: purchaseValueStr, l: 'Valor en ventas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal, l: 'CTR promedio' }];
+    } else if (objType === 'leads') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: leadsStr, l: 'Leads generados' }, { v: cplStr, l: 'Costo por lead' }];
+      row2 = [{ v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+    } else if (objType === 'traffic') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: cpcVal, l: 'Costo por clic' }];
+      row2 = [{ v: ctrVal, l: 'CTR promedio' }, { v: impressionsVal, l: 'Impresiones' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+    } else if (objType === 'messages') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: messagesStr, l: 'Conversaciones iniciadas' }, { v: cpmsgStr, l: 'Costo por conversación' }];
+      row2 = [{ v: clicksVal, l: 'Clics' }, { v: ctrVal, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+    } else if (objType === 'engagement') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: engStr, l: 'Interacciones' }, { v: cpeStr, l: 'Costo por interacción' }];
+      row2 = [{ v: impressionsVal, l: 'Impresiones' }, { v: ctrVal, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+    } else if (objType === 'awareness') {
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: impressionsVal, l: 'Impresiones' }, { v: cpmVal, l: 'CPM' }];
+      row2 = [{ v: freqVal, l: 'Frecuencia' }, { v: ctrVal, l: 'CTR promedio' }, { v: clicksVal, l: 'Clics al sitio' }, { v: cpcVal, l: 'Costo por clic' }];
+    } else {
+      // mixed
+      row1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: purchases, l: 'Compras' }, { v: roasStr, l: 'ROAS' }];
+      row2 = [{ v: leadsStr, l: 'Leads' }, { v: messagesStr, l: 'Mensajes' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal, l: 'CTR promedio' }];
+    }
+
+    const renderKpiRow = (items: KpiItem[]) =>
+      `<div class="kpi-row">${items.map(k => `<div class="kpi"><div class="kv">${k.v}</div><div class="kl">${k.l}</div></div>`).join('')}</div>`;
+
+    // ── AI report text → HTML ──
+    const reportContent = clientReportText
+      ? clientReportText
+          .replace(/## ([^\n]+)/g, '<h2>$1</h2>')
+          .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n{2,}/g, '</p><p>')
+          .replace(/\n/g, ' ')
+          .replace(/^/, '<p>')
+          .replace(/$/, '</p>')
+          .replace(/<p>\s*<h2>/g, '<h2>')
+          .replace(/<\/h2>\s*<\/p>/g, '</h2>')
+      : '';
+
+    pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Reporte — ${accountOverview?.name || ''}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:13px;line-height:1.65;}
+  .page{max-width:820px;margin:0 auto;padding:0 0 60px;}
+  .header{background:#0d1b2a;color:white;padding:32px 40px;text-align:center;margin-bottom:36px;}
+  .header h1{font-size:26px;font-weight:800;color:white;margin-bottom:6px;letter-spacing:-0.3px;}
+  .header .sub{color:#3db3c8;font-size:13px;font-weight:600;margin-bottom:4px;}
+  .header .date{color:#8aa8be;font-size:11px;font-style:italic;}
+  .kpi-section{padding:0 40px;margin-bottom:28px;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #e5e9ed;border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .kpi{padding:18px 12px;text-align:center;border-right:1px solid #e5e9ed;background:#fafbfc;}
+  .kpi:last-child{border-right:none;}
+  .kv{font-size:22px;font-weight:800;color:#14b8a6;line-height:1.1;margin-bottom:5px;}
+  .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;}
+  .content{padding:0 40px;}
+  h2{font-size:11px;font-weight:800;color:#14b8a6;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;}
+  p{font-size:12.5px;color:#2d3748;line-height:1.7;margin-bottom:12px;}
+  strong{font-weight:700;color:#0d1b2a;}
+  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}}
+</style>
+</head><body>
+<div class="page">
+  <div class="header">
+    <h1>${accountOverview?.name || 'Reporte Meta Ads'}</h1>
+    <div class="sub">Reporte Semanal de Publicidad</div>
+    <div class="date">${range.since} &mdash; ${range.until} &nbsp;&middot;&nbsp; Meta Ads</div>
+  </div>
+  <div class="kpi-section">
+    ${renderKpiRow(row1)}
+    ${renderKpiRow(row2)}
+  </div>
+  <div class="content">
+    ${reportContent || '<p>Hacé click en "Generar Reporte" para producir el análisis narrativo.</p>'}
+  </div>
+  <div class="footer">Algoritmia &nbsp;&middot;&nbsp; ${today} &nbsp;&middot;&nbsp; Datos: Meta Ads</div>
+</div>
+</body></html>`);
     pw.document.close();
-    setTimeout(() => pw.print(), 500);
+    setTimeout(() => pw.print(), 600);
   };
 
   // ── Export PDF ─────────────────────────────────────────────────────────────
@@ -2130,9 +2375,9 @@ INICIO: ${planStartDate}
                     {/* Campaign table */}
                     <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
                         {(() => {
-                          const campsWithSpend = campaigns.filter((c: any) => parseFloat(campaignInsights[c.id]?.spend || 0) > 0);
+                          const campsWithSpend = campaigns.filter((c: any) => parseFloat(campaignInsights[c.id]?.spend || '0') > 0);
                           const acctCurr = accountOverview?.currency || '';
-                          const cpmThreshold = acctCurr === 'ARS' ? 10000 : 15;
+                          const cpmThreshold = getCpmThreshold(acctCurr);
                           return (<>
                         <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
                           <h3 className="text-[13px] font-bold text-zinc-900 dark:text-white">Campañas activas ({campsWithSpend.length})</h3>
@@ -2270,7 +2515,7 @@ INICIO: ${planStartDate}
                                   ) : visibleAdSets.length === 0 ? (
                                     <tr key={`${c.id}-empty`}><td colSpan={14} className="px-8 py-2 text-[11px] text-zinc-400 italic bg-zinc-50/30 dark:bg-zinc-800/10">Sin conjuntos con gasto en el período</td></tr>
                                   ) : visibleAdSets.map((adset: any) => {
-                                    const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal);
+                                    const adsetFunnel = classifyFunnel(c.objective || '', adset.optimization_goal, adset.name);
                                     const adsetFStyle = FUNNEL_STYLES[adsetFunnel];
                                     const adsetIns = adSetInsights[adset.id];
                                     const adsetMetric = adsetIns ? getPrimaryMetric(c.objective || '', adsetIns) : null;
@@ -2321,7 +2566,7 @@ INICIO: ${planStartDate}
                                           <tr key={`${adset.id}-empty`}><td colSpan={14} className="px-14 py-2 text-[11px] text-zinc-400 italic bg-zinc-50/20">Sin anuncios con gasto en el período</td></tr>
                                         ) : visibleAds.map((ad: any) => {
                                           const adIns = adInsights[ad.id];
-                                          const adFunnelInfo = getFunnelInfo(c.objective || '', adset.optimization_goal);
+                                          const adFunnelInfo = getFunnelInfo(c.objective || '', adset.optimization_goal, adset.name);
                                           const adFunnel = adFunnelInfo.stage;
                                           const adFStyle = FUNNEL_STYLES[adFunnel];
                                           const adCtr = parseFloat(adIns?.inline_link_click_ctr || 0);
@@ -2372,6 +2617,13 @@ INICIO: ${planStartDate}
                                   </React.Fragment>
                                 );
                               })}
+                              {/* Empty state */}
+                              {campsWithSpend.length === 0 && (
+                                <tr><td colSpan={14} className="px-4 py-10 text-center">
+                                  <p className="text-[12px] font-semibold text-zinc-500 dark:text-zinc-400">Sin campañas con actividad en este período</p>
+                                  <p className="text-[11px] text-zinc-400 dark:text-zinc-600 mt-1">Probá seleccionar un período más amplio (ej: últimos 7 días)</p>
+                                </td></tr>
+                              )}
                               {/* Totals row */}
                               {campsWithSpend.length > 0 && (() => {
                                 const totalSpendSum = campsWithSpend.reduce((acc: number, c: any) => acc + parseFloat(campaignInsights[c.id]?.spend || 0), 0);
@@ -2465,7 +2717,7 @@ INICIO: ${planStartDate}
                   <div className="space-y-3">
                     {Object.entries(campaignAdSets).map(([campId, adsets]) => {
                       const camp = campaigns.find((c: any) => c.id === campId);
-                      const campFunnel = classifyFunnel(camp?.objective || '');
+                      const campFunnel = classifyFunnel(camp?.objective || '', undefined, camp?.name);
                       const campFStyle = FUNNEL_STYLES[campFunnel];
                       return (
                         <div key={campId} className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
@@ -2474,7 +2726,7 @@ INICIO: ${planStartDate}
                             <span className="text-[12px] font-bold text-zinc-800 dark:text-zinc-100 truncate">{camp?.name || campId}</span>
                           </div>
                           {(adsets as any[]).map((adset: any) => {
-                            const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal);
+                            const adsetFunnel = classifyFunnel(camp?.objective || '', adset.optimization_goal, adset.name);
                             const adsetFStyle = FUNNEL_STYLES[adsetFunnel];
                             const adsList = adSetAds[adset.id] || [];
                             const adsetIns = adSetInsights[adset.id];
@@ -2493,7 +2745,7 @@ INICIO: ${planStartDate}
                                   <div className="px-4 pb-3 pt-1 grid grid-cols-1 gap-2">
                                     {[...adsList].sort((a: any, b: any) => parseFloat(adInsights[b.id]?.inline_link_click_ctr || 0) - parseFloat(adInsights[a.id]?.inline_link_click_ctr || 0)).map((ad: any, adRank: number) => {
                                       const adIns = adInsights[ad.id];
-                                      const adFunnelInfo2 = getFunnelInfo(camp?.objective || '', adset.optimization_goal);
+                                      const adFunnelInfo2 = getFunnelInfo(camp?.objective || '', adset.optimization_goal, adset.name);
                                       const adFunnel = adFunnelInfo2.stage;
                                       const adFStyle = FUNNEL_STYLES[adFunnel];
                                       const adCtr = parseFloat(adIns?.inline_link_click_ctr || 0);
@@ -2698,23 +2950,74 @@ INICIO: ${planStartDate}
                   </div>
                 </div>
 
-                {/* KPI Summary for client */}
-                {accountInsights && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      { label: 'Inversión total', value: `${accountOverview?.currency || ''} ${fmtNum(accountInsights.spend, 0)}`, sub: 'en el período' },
-                      { label: 'Personas alcanzadas', value: parseInt(accountInsights.reach || '0').toLocaleString('es-AR'), sub: 'alcance único' },
-                      { label: 'ROAS', value: accountInsights.purchase_roas?.[0]?.value ? fmtNum(accountInsights.purchase_roas[0].value, 2) + 'x' : '—', sub: 'retorno sobre inversión' },
-                      { label: 'Costo por clic', value: accountInsights.cpc && parseFloat(accountInsights.cpc) > 0 ? `${accountOverview?.currency || ''} ${fmtNum(accountInsights.cpc, 0)}` : '—', sub: 'promedio' },
-                    ].map(k => (
-                      <div key={k.label} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 px-4 py-3 shadow-sm">
-                        <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-1">{k.label}</p>
-                        <p className="text-[20px] font-bold text-zinc-900 dark:text-white leading-none">{k.value}</p>
-                        <p className="text-[9px] text-zinc-400 mt-1">{k.sub}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* KPI Summary — 8 KPIs adaptive by objective */}
+                {accountInsights && (() => {
+                  const cur = accountOverview?.currency || '';
+                  const objType = detectDominantObjective(campaigns, campaignInsights);
+                  const spend = `${cur} ${fmtNum(accountInsights.spend, 0)}`;
+                  const reach = parseInt(accountInsights.reach || '0').toLocaleString('es-AR');
+                  const clicks = accountInsights.inline_link_clicks ? parseInt(accountInsights.inline_link_clicks).toLocaleString('es-AR') : '—';
+                  const ctr = fmtNum(accountInsights.inline_link_click_ctr, 2) + '%';
+                  const cpm = `${cur} ${fmtNum(accountInsights.cpm, 0)}`;
+                  const freq = fmtNum(accountInsights.frequency, 2);
+                  const impr = accountInsights.impressions ? parseInt(accountInsights.impressions).toLocaleString('es-AR') : '—';
+                  const cpc = `${cur} ${fmtNum(accountInsights.cpc, 2)}`;
+
+                  const purchasesN = getMetaVal(accountInsights.actions || [], 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0';
+                  const purchaseValN = getMetaVal(accountInsights.action_values || [], 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0';
+                  const roasRaw = accountInsights.purchase_roas?.[0]?.value ? parseFloat(accountInsights.purchase_roas[0].value) : 0;
+                  const roas = roasRaw > 0 ? fmtNum(roasRaw, 1) + 'x' : '—';
+                  const cpa = parseFloat(purchasesN) > 0 ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(purchasesN), 2)}` : '—';
+                  const purchaseValFmt = parseFloat(purchaseValN) > 0 ? `${cur} ${fmtNum(parseFloat(purchaseValN), 0)}` : '—';
+
+                  const leadsN = getMetaVal(accountInsights.actions || [], 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0';
+                  const cpl = parseFloat(leadsN) > 0 ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(leadsN), 2)}` : '—';
+
+                  const msgsN = getMetaVal(accountInsights.actions || [], 'onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply') || '0';
+                  const cpmsg = parseFloat(msgsN) > 0 ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(msgsN), 2)}` : '—';
+
+                  const engN = getMetaVal(accountInsights.actions || [], 'post_engagement', 'page_engagement') || '0';
+                  const cpe = parseFloat(engN) > 0 ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(engN), 2)}` : '—';
+
+                  type K = { label: string; value: string };
+                  let row1: K[] = [], row2: K[] = [];
+                  if (objType === 'sales') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Compras generadas', value: purchasesN }, { label: 'Retorno (ROAS)', value: roas }];
+                    row2 = [{ label: 'Costo por compra', value: cpa }, { label: 'Valor en ventas', value: purchaseValFmt }, { label: 'Clics al sitio', value: clicks }, { label: 'CTR promedio', value: ctr }];
+                  } else if (objType === 'leads') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Leads generados', value: leadsN }, { label: 'Costo por lead', value: cpl }];
+                    row2 = [{ label: 'Clics al sitio', value: clicks }, { label: 'CTR promedio', value: ctr }, { label: 'CPM', value: cpm }, { label: 'Frecuencia', value: freq }];
+                  } else if (objType === 'traffic') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Clics al sitio', value: clicks }, { label: 'Costo por clic', value: cpc }];
+                    row2 = [{ label: 'CTR promedio', value: ctr }, { label: 'Impresiones', value: impr }, { label: 'CPM', value: cpm }, { label: 'Frecuencia', value: freq }];
+                  } else if (objType === 'messages') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Conversaciones', value: msgsN }, { label: 'Costo por conv.', value: cpmsg }];
+                    row2 = [{ label: 'Clics', value: clicks }, { label: 'CTR promedio', value: ctr }, { label: 'CPM', value: cpm }, { label: 'Frecuencia', value: freq }];
+                  } else if (objType === 'engagement') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Interacciones', value: engN }, { label: 'Costo por interac.', value: cpe }];
+                    row2 = [{ label: 'Impresiones', value: impr }, { label: 'CTR promedio', value: ctr }, { label: 'CPM', value: cpm }, { label: 'Frecuencia', value: freq }];
+                  } else if (objType === 'awareness') {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Impresiones', value: impr }, { label: 'CPM', value: cpm }];
+                    row2 = [{ label: 'Frecuencia', value: freq }, { label: 'CTR promedio', value: ctr }, { label: 'Clics al sitio', value: clicks }, { label: 'Costo por clic', value: cpc }];
+                  } else {
+                    row1 = [{ label: 'Inversión', value: spend }, { label: 'Personas alcanzadas', value: reach }, { label: 'Compras', value: purchasesN }, { label: 'ROAS', value: roas }];
+                    row2 = [{ label: 'Leads', value: leadsN }, { label: 'Mensajes', value: msgsN }, { label: 'Clics al sitio', value: clicks }, { label: 'CTR promedio', value: ctr }];
+                  }
+                  return (
+                    <div className="space-y-2">
+                      {[row1, row2].map((row, ri) => (
+                        <div key={ri} className="grid grid-cols-4 gap-2">
+                          {row.map(k => (
+                            <div key={k.label} className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 px-3 py-3 shadow-sm text-center">
+                              <p className="text-[17px] font-bold text-teal-500 leading-none mb-1">{k.value}</p>
+                              <p className="text-[9px] text-zinc-400 uppercase tracking-wider">{k.label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Campaign quick table */}
                 {campaigns.filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0).length > 0 && (

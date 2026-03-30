@@ -83,20 +83,19 @@ export const presetToRange = (preset: DatePreset): TimeRange => {
 // Full insight fields for campaign/adset/account level
 export const INSIGHT_FIELDS = [
   'spend', 'impressions', 'reach', 'frequency',
-  'cpm', 'cpc', 'ctr',
+  'cpm', 'cpc',
   'inline_link_clicks', 'inline_link_click_ctr',
-  'outbound_clicks',
   'actions', 'cost_per_action_type', 'action_values',
   'purchase_roas',
   'video_thruplay_watched_actions',
 ].join(',');
 
-// Lighter fields for ad-level (creative) insights
+// Lighter fields for ad-level (creative) insights — sin campos que no existen a nivel de anuncio
 export const AD_INSIGHT_FIELDS = [
-  'spend', 'impressions', 'reach',
+  'spend', 'impressions', 'reach', 'frequency',
   'inline_link_click_ctr', 'inline_link_clicks',
   'cpc', 'cpm',
-  'actions', 'cost_per_action_type',
+  'actions', 'cost_per_action_type', 'action_values',
   'purchase_roas',
 ].join(',');
 
@@ -104,12 +103,12 @@ const apiGet = async (endpoint: string, params: Record<string, string> = {}): Pr
   const url = new URL(`${BASE}/${endpoint}`);
   url.searchParams.set('access_token', getToken());
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  try {
-    const res = await fetch(url.toString());
-    return res.json();
-  } catch (e) {
-    return { error: e };
+  const res = await fetch(url.toString());
+  const json = await res.json();
+  if (json?.error) {
+    throw new Error(json.error.message || `Meta API error ${res.status}`);
   }
+  return json;
 };
 
 export const metaAds = {
@@ -165,14 +164,14 @@ export const metaAds = {
   // ── ADSETS ────────────────────────────────────────────────
   getAdsets: (campaignId?: string, accountId = META_AD_ACCOUNT) =>
     apiGet(campaignId ? `${campaignId}/adsets` : `${accountId}/adsets`, {
-      fields: 'id,name,status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event',
+      fields: 'id,name,status,campaign_id,daily_budget,lifetime_budget,optimization_goal',
       limit: '50',
     }),
 
   // ── ADS with creative thumbnails ──────────────────────────
   getAds: (adsetId: string) =>
     apiGet(`${adsetId}/ads`, {
-      fields: 'id,name,status,creative{id,name,thumbnail_url,image_url,object_type,effective_instagram_media_id}',
+      fields: 'id,name,status,creative{id,name,thumbnail_url,object_type}',
       limit: '50',
     }),
 
