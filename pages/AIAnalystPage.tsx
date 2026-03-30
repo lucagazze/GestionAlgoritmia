@@ -1355,7 +1355,7 @@ export default function AIAnalystPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [clientReportText, setClientReportText] = useState('');
   const [isGeneratingClientReport, setIsGeneratingClientReport] = useState(false);
-  const [clientReportType, setClientReportType] = useState<'general' | 'demographic'>('general');
+  const [clientReportType, setClientReportType] = useState<'general' | 'complete'>('general');
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [analyzeAllProgress, setAnalyzeAllProgress] = useState('');
 
@@ -1951,18 +1951,19 @@ INICIO: ${planStartDate}
   .header h1{font-size:26px;font-weight:800;color:white;margin-bottom:6px;letter-spacing:-0.3px;}
   .header .sub{color:#B0C4D8;font-size:13px;font-weight:600;margin-bottom:4px;}
   .header .date{color:#8aa8be;font-size:11px;font-style:italic;}
-  .kpi-section{padding:0 40px;margin-bottom:28px;}
-  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #e5e9ed;border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .kpi-section{padding:0 40px;margin-bottom:28px;break-inside:avoid;page-break-inside:avoid;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #e5e9ed;border-radius:10px;overflow:hidden;margin-bottom:12px;break-inside:avoid;page-break-inside:avoid;}
   .kpi{padding:18px 12px;text-align:center;border-right:1px solid #e5e9ed;background:#fafbfc;}
   .kpi:last-child{border-right:none;}
   .kv{font-size:22px;font-weight:800;color:#2196F3;line-height:1.1;margin-bottom:5px;}
   .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;}
   .content{padding:0 40px;}
-  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;}
+  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;break-after:avoid;page-break-after:avoid;}
   p{font-size:12.5px;color:#2d3748;line-height:1.7;margin-bottom:12px;}
   strong{font-weight:700;color:#0d1b2a;}
-  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;}
-  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}}
+  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;break-inside:avoid;page-break-inside:avoid;}
+  p{break-inside:avoid;page-break-inside:avoid;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}@page{margin:15mm 10mm;}}
 </style>
 </head><body>
 <div class="page">
@@ -1991,11 +1992,11 @@ INICIO: ${planStartDate}
     setIsGeneratingClientReport(true);
     try {
       const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
-      const [byAge, byGender, byRegion, byPlatform] = await Promise.all([
+      const [byAge, byGender, byRegion, byPlacement] = await Promise.all([
         metaAds.getInsightsBreakdown(selectedAccountId, 'age', range),
         metaAds.getInsightsBreakdown(selectedAccountId, 'gender', range),
-        metaAds.getInsightsBreakdown(selectedAccountId, 'region', range).catch(() => []),
-        metaAds.getInsightsBreakdown(selectedAccountId, 'publisher_platform', range).catch(() => []),
+        metaAds.getInsightsBreakdown(selectedAccountId, 'region', range).catch(() => [] as any[]),
+        metaAds.getInsightsBreakdown(selectedAccountId, 'publisher_platform,platform_position', range).catch(() => [] as any[]),
       ]);
 
       const pw = window.open('', '_blank');
@@ -2007,7 +2008,84 @@ INICIO: ${planStartDate}
       const period = `${range.since} al ${range.until}`;
       const objType = detectDominantObjective(campaigns, campaignInsights);
 
-      const totalSpend = byAge.reduce((s: number, r: any) => s + parseFloat(r.spend || '0'), 0);
+      const totalSpend = accountInsights ? parseFloat(accountInsights.spend || '0') : byAge.reduce((s: number, r: any) => s + parseFloat(r.spend || '0'), 0);
+
+      // ── KPI rows (top summary) ──
+      const spendVal = accountInsights ? `${cur} ${fmtNum(accountInsights.spend, 0)}` : '—';
+      const reachVal = accountInsights?.reach ? parseInt(accountInsights.reach).toLocaleString('es-AR') : '—';
+      const clicksVal = accountInsights?.inline_link_clicks ? parseInt(accountInsights.inline_link_clicks).toLocaleString('es-AR') : '—';
+      const ctrVal2 = accountInsights ? fmtNum(accountInsights.inline_link_click_ctr, 2) + '%' : '—';
+      const cpmVal = accountInsights ? `${cur} ${fmtNum(accountInsights.cpm, 0)}` : '—';
+      const freqVal = accountInsights ? fmtNum(accountInsights.frequency, 2) : '—';
+      const impressionsVal = accountInsights?.impressions ? parseInt(accountInsights.impressions).toLocaleString('es-AR') : '—';
+      const cpcVal = accountInsights ? `${cur} ${fmtNum(accountInsights.cpc, 2)}` : '—';
+      const purchases = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+      const purchaseValue = accountInsights?.action_values ? (getMetaVal(accountInsights.action_values, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0') : '0';
+      const roasRaw = accountInsights?.purchase_roas?.[0]?.value ? parseFloat(accountInsights.purchase_roas[0].value) : 0;
+      const roasStr = roasRaw > 0 ? fmtNum(roasRaw, 1) + 'x' : '—';
+      const cpaStr = parseFloat(purchases) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(purchases), 2)}` : '—';
+      const purchaseValueStr = parseFloat(purchaseValue) > 0 ? `${cur} ${fmtNum(parseFloat(purchaseValue), 0)}` : '—';
+      const leadsKpi = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0') : '0';
+      const cplKpi = parseFloat(leadsKpi) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(leadsKpi), 2)}` : '—';
+      const msgsKpi = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply') || '0') : '0';
+      const cpmsgKpi = parseFloat(msgsKpi) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(msgsKpi), 2)}` : '—';
+      const engKpi = accountInsights?.actions ? (getMetaVal(accountInsights.actions, 'post_engagement', 'page_engagement') || '0') : '0';
+      const cpeKpi = parseFloat(engKpi) > 0 && accountInsights?.spend ? `${cur} ${fmtNum(parseFloat(accountInsights.spend) / parseFloat(engKpi), 2)}` : '—';
+
+      type KpiItem2 = { v: string; l: string };
+      let kRow1: KpiItem2[] = [], kRow2: KpiItem2[] = [];
+      if (objType === 'sales') {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: purchases, l: 'Compras generadas' }, { v: roasStr, l: 'Retorno (ROAS)' }];
+        kRow2 = [{ v: cpaStr, l: 'Costo por compra' }, { v: purchaseValueStr, l: 'Valor en ventas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal2, l: 'CTR promedio' }];
+      } else if (objType === 'leads') {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: leadsKpi, l: 'Leads generados' }, { v: cplKpi, l: 'Costo por lead' }];
+        kRow2 = [{ v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal2, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+      } else if (objType === 'messages') {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: msgsKpi, l: 'Conversaciones' }, { v: cpmsgKpi, l: 'Costo por conv.' }];
+        kRow2 = [{ v: clicksVal, l: 'Clics' }, { v: ctrVal2, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+      } else if (objType === 'traffic') {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: cpcVal, l: 'Costo por clic' }];
+        kRow2 = [{ v: ctrVal2, l: 'CTR promedio' }, { v: impressionsVal, l: 'Impresiones' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+      } else if (objType === 'engagement') {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: engKpi, l: 'Interacciones' }, { v: cpeKpi, l: 'Costo x interac.' }];
+        kRow2 = [{ v: impressionsVal, l: 'Impresiones' }, { v: ctrVal2, l: 'CTR promedio' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }];
+      } else {
+        kRow1 = [{ v: spendVal, l: 'Inversión' }, { v: reachVal, l: 'Personas alcanzadas' }, { v: clicksVal, l: 'Clics al sitio' }, { v: ctrVal2, l: 'CTR promedio' }];
+        kRow2 = [{ v: impressionsVal, l: 'Impresiones' }, { v: cpmVal, l: 'CPM' }, { v: freqVal, l: 'Frecuencia' }, { v: cpcVal, l: 'CPC' }];
+      }
+      const renderKRow = (items: KpiItem2[]) =>
+        `<div class="kpi-row">${items.map(k => `<div class="kpi"><div class="kv">${k.v}</div><div class="kl">${k.l}</div></div>`).join('')}</div>`;
+
+      // ── Campaigns table ──
+      const campRowsHtml = campaigns
+        .filter(c => parseFloat(campaignInsights[c.id]?.spend || '0') > 0)
+        .map(c => {
+          const ins = campaignInsights[c.id];
+          const metric = ins ? getPrimaryMetric(c.objective || '', ins) : null;
+          const ctr = ins ? fmtNum(parseFloat(ins.inline_link_click_ctr || '0'), 2) : '—';
+          const statusDot = c.status === 'ACTIVE' ? '#22c55e' : '#f59e0b';
+          return `<tr>
+            <td style="text-align:left;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${statusDot};margin-right:6px;"></span>${c.name}
+            </td>
+            <td>${cur} ${fmtNum(ins?.spend, 0)}</td>
+            <td>${ins?.reach ? parseInt(ins.reach).toLocaleString('es-AR') : '—'}</td>
+            <td style="font-weight:700;color:#2196F3;">${metric?.value || '—'}</td>
+            <td>${metric?.cost || '—'}</td>
+            <td style="font-weight:700;${parseFloat(ins?.inline_link_click_ctr || '0') >= 1.5 ? 'color:#16a34a' : parseFloat(ins?.inline_link_click_ctr || '0') >= 1 ? 'color:#d97706' : 'color:#dc2626'}">${ctr}%</td>
+          </tr>`;
+        }).join('');
+
+      // ── AI narrative (if available) ──
+      const narrativeHtml = clientReportText
+        ? clientReportText
+            .replace(/## ([^\n]+)/g, '<h2 style="font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin:24px 0 10px;">$1</h2>')
+            .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n{2,}/g, '</p><p>')
+            .replace(/\n/g, ' ')
+            .replace(/^/, '<p style="font-size:12.5px;color:#2d3748;line-height:1.7;margin-bottom:12px;">')
+            .replace(/$/, '</p>')
+        : '';
 
       // ── Gender helpers ──
       const gLabel: Record<string, string> = { male: 'Masculino', female: 'Femenino', unknown: 'Desconocido' };
@@ -2124,12 +2202,43 @@ INICIO: ${planStartDate}
         return { label: r.region || r.country || '—', pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
       }));
 
-      // ── Platform (placement) ──
-      const platLabel: Record<string, string> = {
-        facebook: 'Facebook', instagram: 'Instagram',
-        audience_network: 'Audience Network', messenger: 'Messenger', unknown: 'Desconocido',
+      // ── Placement (publisher_platform + platform_position combined) ──
+      const placementName = (plat: string, pos: string): string => {
+        const p = (plat || '').toLowerCase();
+        const pp = (pos || '').toLowerCase();
+        if (p === 'instagram') {
+          if (pp === 'reels') return 'Instagram Reels';
+          if (pp === 'story') return 'Instagram Stories';
+          if (pp === 'stream' || pp === 'feed') return 'Instagram Feed';
+          if (pp === 'explore') return 'Instagram Explorar';
+          if (pp === 'explore_home') return 'Instagram Explorar (inicio)';
+          if (pp === 'profile_feed') return 'Instagram Perfil';
+          return `Instagram ${pos}`;
+        }
+        if (p === 'facebook') {
+          if (pp === 'feed') return 'Facebook Feed';
+          if (pp === 'story') return 'Facebook Stories';
+          if (pp === 'reels') return 'Facebook Reels';
+          if (pp === 'right_hand_column') return 'Facebook Columna derecha';
+          if (pp === 'marketplace') return 'Facebook Marketplace';
+          if (pp === 'instant_article') return 'Facebook Artículos';
+          if (pp === 'video_feeds') return 'Facebook Videos';
+          if (pp === 'search') return 'Facebook Búsqueda';
+          return `Facebook ${pos}`;
+        }
+        if (p === 'messenger') {
+          if (pp === 'messenger_inbox') return 'Messenger Inbox';
+          if (pp === 'story') return 'Messenger Stories';
+          return `Messenger ${pos}`;
+        }
+        if (p === 'audience_network') {
+          if (pp === 'classic') return 'Audience Network';
+          if (pp === 'rewarded_video') return 'Audience Network Video';
+          return `Audience Network ${pos}`;
+        }
+        return pos || plat || '—';
       };
-      const sortedPlat = [...byPlatform]
+      const sortedPlat = [...byPlacement]
         .filter((r: any) => parseFloat(r.spend || '0') > 0)
         .sort((a: any, b: any) => parseFloat(b.spend) - parseFloat(a.spend));
       const platRows = sortedPlat.map((r: any) => {
@@ -2140,7 +2249,7 @@ INICIO: ${planStartDate}
         const ctr = fmtNum(r.inline_link_click_ctr, 2) + '%';
         const cpm = `${cur} ${fmtNum(r.cpm, 0)}`;
         const metric = objMetricRow(r);
-        const pName = platLabel[r.publisher_platform] || r.publisher_platform || '—';
+        const pName = placementName(r.publisher_platform, r.platform_position);
         return `<tr>
           <td class="row-label"><strong>${pName}</strong></td>
           <td>${cur} ${fmtNum(sp, 0)}</td>
@@ -2154,117 +2263,87 @@ INICIO: ${planStartDate}
       }).join('');
       const platBars = barHtml(sortedPlat.map((r: any) => {
         const sp = parseFloat(r.spend || '0');
-        const pName = platLabel[r.publisher_platform] || r.publisher_platform || '—';
-        return { label: pName, pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
+        return { label: placementName(r.publisher_platform, r.platform_position), pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
       }));
 
-      // ── Audience segments (TOFU/MOFU/BOFU) — classified at adset level ──
-      type SegKey = 'TOFU' | 'MOFU' | 'BOFU';
-      const segAcc: Record<SegKey, { spend: number; reach: number; impressions: number; clicks: number; actions: any[] }> = {
-        TOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
-        MOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
-        BOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
-      };
-      const adsetInsightFields = 'adset_id,adset_name,campaign_id,spend,reach,impressions,inline_link_clicks,actions,action_values';
-      const [adsetInsightsRaw, adsetStructRaw] = await Promise.all([
-        metaAds.getInsightsAtAdsetLevel(selectedAccountId, adsetInsightFields, range).catch(() => []),
-        metaAds.getAccountAdsets(selectedAccountId).catch(() => ({ data: [] })),
-      ]);
-      // Build optimization_goal lookup: adset_id → optimization_goal
-      const optGoalMap: Record<string, string> = {};
-      for (const ads of (adsetStructRaw?.data || [])) {
-        optGoalMap[ads.id] = ads.optimization_goal || '';
-      }
-      // Build campaign objective lookup
-      const campObjMap: Record<string, string> = {};
-      for (const c of campaigns) campObjMap[c.id] = c.objective || '';
-
-      for (const ins of adsetInsightsRaw) {
-        if (parseFloat(ins.spend || '0') <= 0) continue;
-        const optGoal = optGoalMap[ins.adset_id] || '';
-        const obj = campObjMap[ins.campaign_id] || '';
-        const stage = classifyFunnel(obj, optGoal, ins.adset_name) as SegKey;
-        const seg = segAcc[stage];
-        seg.spend       += parseFloat(ins.spend || '0');
-        seg.reach       += parseInt(ins.reach || '0');
-        seg.impressions += parseInt(ins.impressions || '0');
-        seg.clicks      += parseInt(ins.inline_link_clicks || '0');
-        for (const a of (ins.actions || [])) {
-          const ex = seg.actions.find((x: any) => x.action_type === a.action_type);
-          if (ex) ex.value = String(parseFloat(ex.value || '0') + parseFloat(a.value || '0'));
-          else seg.actions.push({ ...a });
-        }
-      }
-      const segLabels: Record<SegKey, string> = {
-        TOFU: 'Audiencia Nueva (Fría)',
-        MOFU: 'Audiencia Activa (Tibia)',
-        BOFU: 'Clientes / Remarketing (Caliente)',
-      };
-      const segOrder: SegKey[] = ['TOFU', 'MOFU', 'BOFU'];
-      const activeSeg = segOrder.filter(s => segAcc[s].spend > 0);
-      const segRows = activeSeg.map(s => {
-        const seg = segAcc[s];
-        const ctr = seg.impressions > 0 ? fmtNum((seg.clicks / seg.impressions) * 100, 2) + '%' : '—';
-        const cpm = seg.impressions > 0 ? `${cur} ${fmtNum((seg.spend / seg.impressions) * 1000, 0)}` : '—';
-        const spPct = totalSpend > 0 ? ((seg.spend / totalSpend) * 100).toFixed(1) + '%' : '—';
-        const metric = objMetricRow({ spend: String(seg.spend), actions: seg.actions });
-        return `<tr>
-          <td class="row-label"><strong>${segLabels[s]}</strong></td>
-          <td>${cur} ${fmtNum(seg.spend, 0)}</td>
-          <td>${spPct}</td>
-          <td>${seg.reach.toLocaleString('es-AR')}</td>
-          <td>${seg.impressions.toLocaleString('es-AR')}</td>
-          <td>${ctr}</td>
-          <td>${cpm}</td>
-          <td>${metric.val}</td>
-          <td>${metric.cost}</td>
-        </tr>`;
-      }).join('');
-      const segBars = barHtml(activeSeg.map(s => ({
-        label: segLabels[s].split(' (')[0],
-        pct: totalSpend > 0 ? (segAcc[s].spend / totalSpend) * 100 : 0,
-        value: `${cur} ${fmtNum(segAcc[s].spend, 0)}`,
-      })));
 
       pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Reporte Audiencia — ${clientName}</title>
+<title>Reporte Completo — ${clientName}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:13px;line-height:1.65;}
   .page{max-width:860px;margin:0 auto;padding:0 0 60px;}
-  .header{background:#0d1b2a;color:white;padding:32px 40px;text-align:center;margin-bottom:36px;}
+  .header{background:#0d1b2a;color:white;padding:32px 40px;text-align:center;margin-bottom:28px;}
   .header h1{font-size:26px;font-weight:800;color:white;margin-bottom:6px;letter-spacing:-0.3px;}
   .header .sub{color:#B0C4D8;font-size:13px;font-weight:600;margin-bottom:4px;}
   .header .date{color:#8aa8be;font-size:11px;font-style:italic;}
-  .section{padding:0 40px;margin-bottom:36px;}
-  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin-bottom:16px;}
-  .breakdown-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;}
-  .breakdown-table th{background:#0d1b2a;color:white;padding:9px 12px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+  .kpi-section{padding:0 40px;margin-bottom:28px;break-inside:avoid;page-break-inside:avoid;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #e5e9ed;border-radius:10px;overflow:hidden;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid;}
+  .kpi{padding:16px 10px;text-align:center;border-right:1px solid #e5e9ed;background:#fafbfc;}
+  .kpi:last-child{border-right:none;}
+  .kv{font-size:20px;font-weight:800;color:#2196F3;line-height:1.1;margin-bottom:4px;}
+  .kl{font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.07em;}
+  .section{padding:0 40px;margin-bottom:0;padding-top:32px;padding-bottom:32px;break-inside:avoid;page-break-inside:avoid;}
+  .section-break{break-before:page;page-break-before:always;}
+  h2{font-size:11px;font-weight:800;color:#1A3A5C;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e5e9ed;padding-bottom:6px;margin-bottom:14px;break-after:avoid;page-break-after:avoid;}
+  .camp-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:4px;}
+  .camp-table thead{display:table-header-group;}
+  .camp-table th{background:#0d1b2a;color:white;padding:8px 10px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+  .camp-table th:first-child{text-align:left;}
+  .camp-table td{padding:7px 10px;text-align:center;border-bottom:1px solid #f0f2f5;font-size:11px;}
+  .camp-table tr{break-inside:avoid;page-break-inside:avoid;}
+  .camp-table tr:last-child td{border-bottom:none;}
+  .breakdown-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:18px;}
+  .breakdown-table thead{display:table-header-group;}
+  .breakdown-table th{background:#0d1b2a;color:white;padding:8px 10px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
   .breakdown-table th:first-child{text-align:left;}
-  .breakdown-table td{padding:8px 12px;text-align:center;border-bottom:1px solid #f0f2f5;}
-  .breakdown-table td.row-label{text-align:left;color:#4b5563;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:#fafbfc;}
+  .breakdown-table td{padding:7px 10px;text-align:center;border-bottom:1px solid #f0f2f5;}
+  .breakdown-table td.row-label{text-align:left;color:#4b5563;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;background:#fafbfc;}
+  .breakdown-table tr{break-inside:avoid;page-break-inside:avoid;}
   .breakdown-table tr:last-child td{border-bottom:none;}
-  .breakdown-table tr:hover td{background:#f8faff;}
-  .breakdown-table .val-main{font-weight:800;color:#2196F3;font-size:14px;}
-  .bars{margin-top:4px;}
-  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-  .bar-label{width:140px;font-size:11px;color:#4b5563;font-weight:600;flex-shrink:0;}
-  .bar-track{flex:1;height:12px;background:#f0f2f5;border-radius:6px;overflow:hidden;}
-  .bar-fill{height:100%;background:linear-gradient(90deg,#1A3A5C,#2196F3);border-radius:6px;}
-  .bar-meta{width:160px;font-size:11px;color:#374151;text-align:right;flex-shrink:0;}
+  .breakdown-table .val-main{font-weight:800;color:#2196F3;font-size:13px;}
+  .narrative{padding:0 40px;margin-bottom:32px;}
+  .narrative p{font-size:12px;color:#2d3748;line-height:1.7;margin-bottom:10px;}
+  .narrative strong{font-weight:700;color:#0d1b2a;}
+  .bars{margin-top:4px;break-inside:avoid;page-break-inside:avoid;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;break-inside:avoid;page-break-inside:avoid;}
+  .bar-label{width:150px;font-size:10.5px;color:#4b5563;font-weight:600;flex-shrink:0;}
+  .bar-track{flex:1;height:11px;background:#f0f2f5;border-radius:5px;overflow:hidden;}
+  .bar-fill{height:100%;background:linear-gradient(90deg,#1A3A5C,#2196F3);border-radius:5px;}
+  .bar-meta{width:160px;font-size:10.5px;color:#374151;text-align:right;flex-shrink:0;}
   .bar-pct{font-weight:700;color:#2196F3;}
-  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:40px;}
-  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}}
+  .footer{background:#0d1b2a;color:#8aa8be;font-size:10px;text-align:center;padding:12px 40px;font-style:italic;margin-top:0;break-inside:avoid;page-break-inside:avoid;}
+  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.page{padding:0;}
+  @page{margin:15mm 10mm;}}
 </style>
 </head><body>
 <div class="page">
   <div class="header">
-    <div class="sub">REPORTE DE AUDIENCIA</div>
+    <div class="sub">REPORTE COMPLETO DE PUBLICIDAD</div>
     <h1>${clientName}</h1>
     <div class="date">Período: ${period} &nbsp;&middot;&nbsp; Generado: ${today}</div>
   </div>
 
+  <!-- KPI Summary -->
+  <div class="kpi-section">
+    ${renderKRow(kRow1)}
+    ${renderKRow(kRow2)}
+  </div>
+
+  <!-- Campaigns table -->
+  ${campRowsHtml ? `
   <div class="section">
+    <h2>Campañas Activas</h2>
+    <table class="camp-table">
+      <thead><tr><th>Campaña</th><th>Inversión</th><th>Alcance</th><th>Resultado</th><th>Costo/R</th><th>CTR</th></tr></thead>
+      <tbody>${campRowsHtml}</tbody>
+    </table>
+  </div>` : ''}
+
+  <!-- AI narrative if available -->
+  ${narrativeHtml ? `<div class="narrative">${narrativeHtml}</div>` : ''}
+
+  <div class="section section-break">
     <h2>Rendimiento por Género</h2>
     <table class="breakdown-table">
       <thead>
@@ -2290,7 +2369,7 @@ INICIO: ${planStartDate}
     <div class="bars">${gBars}</div>
   </div>
 
-  <div class="section">
+  <div class="section section-break">
     <h2>Rendimiento por Edad</h2>
     <table class="breakdown-table">
       <thead>
@@ -2310,35 +2389,13 @@ INICIO: ${planStartDate}
     <div class="bars">${ageBars}</div>
   </div>
 
-  ${activeSeg.length > 0 ? `
-  <div class="section">
-    <h2>Rendimiento por Segmento de Audiencia</h2>
-    <table class="breakdown-table">
-      <thead>
-        <tr>
-          <th>Segmento</th>
-          <th>Inversión</th>
-          <th>% Gasto</th>
-          <th>Alcance</th>
-          <th>Impresiones</th>
-          <th>CTR</th>
-          <th>CPM</th>
-          <th>${oLabel}</th>
-          <th>${oCostLabel}</th>
-        </tr>
-      </thead>
-      <tbody>${segRows}</tbody>
-    </table>
-    <div class="bars">${segBars}</div>
-  </div>` : ''}
-
   ${sortedPlat.length > 0 ? `
-  <div class="section">
-    <h2>Rendimiento por Plataforma (Ubicación del Anuncio)</h2>
+  <div class="section section-break">
+    <h2>Rendimiento por Ubicación del Anuncio</h2>
     <table class="breakdown-table">
       <thead>
         <tr>
-          <th>Plataforma</th>
+          <th>Placement</th>
           <th>Inversión</th>
           <th>% Gasto</th>
           <th>Alcance</th>
@@ -2354,7 +2411,7 @@ INICIO: ${planStartDate}
   </div>` : ''}
 
   ${sortedRegion.length > 0 ? `
-  <div class="section">
+  <div class="section section-break">
     <h2>Rendimiento por Ubicación Geográfica</h2>
     <table class="breakdown-table">
       <thead>
@@ -3413,7 +3470,7 @@ INICIO: ${planStartDate}
                       </button>
                     )}
                     <button onClick={async () => {
-                        if (clientReportType === 'demographic') {
+                        if (clientReportType === 'complete') {
                           await handleDemographicReportPDF();
                           return;
                         }
@@ -3442,8 +3499,8 @@ INICIO: ${planStartDate}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-violet-500 hover:bg-violet-600 text-white text-[11px] font-semibold transition-all disabled:opacity-40">
                       {isGeneratingClientReport
                         ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Generando...</span></>
-                        : clientReportType === 'demographic'
-                          ? <><FileDown className="w-3.5 h-3.5" /><span>Generar PDF Audiencia</span></>
+                        : clientReportType === 'complete'
+                          ? <><FileDown className="w-3.5 h-3.5" /><span>Generar PDF Completo</span></>
                           : <><BrainCircuit className="w-3.5 h-3.5" /><span>Generar Reporte</span></>}
                     </button>
                   </div>
@@ -3452,7 +3509,7 @@ INICIO: ${planStartDate}
                 {/* Report type selector */}
                 <div className="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl px-3 py-2.5 border border-zinc-100 dark:border-zinc-700/50">
                   <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mr-1">Tipo:</span>
-                  {([['general', '📊 Reporte General'], ['demographic', '👥 Audiencia (Edad & Género)']] as const).map(([type, label]) => (
+                  {([['general', '📊 Reporte General'], ['complete', '📋 Reporte Completo']] as const).map(([type, label]) => (
                     <button key={type} onClick={() => setClientReportType(type)}
                       className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${clientReportType === type ? 'bg-[#0d1b2a] text-white shadow-sm' : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700/50'}`}>
                       {label}
