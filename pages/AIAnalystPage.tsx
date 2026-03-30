@@ -1991,9 +1991,11 @@ INICIO: ${planStartDate}
     setIsGeneratingClientReport(true);
     try {
       const range: TimeRange = dateMode === 'custom' ? { since, until } : presetToRange(preset);
-      const [byAge, byGender] = await Promise.all([
+      const [byAge, byGender, byRegion, byPlatform] = await Promise.all([
         metaAds.getInsightsBreakdown(selectedAccountId, 'age', range),
         metaAds.getInsightsBreakdown(selectedAccountId, 'gender', range),
+        metaAds.getInsightsBreakdown(selectedAccountId, 'region', range).catch(() => []),
+        metaAds.getInsightsBreakdown(selectedAccountId, 'publisher_platform', range).catch(() => []),
       ]);
 
       const pw = window.open('', '_blank');
@@ -2093,6 +2095,122 @@ INICIO: ${planStartDate}
         </tr>`;
       }).join('');
 
+      // ── Region (location) ──
+      const sortedRegion = [...byRegion]
+        .filter((r: any) => parseFloat(r.spend || '0') > 0)
+        .sort((a: any, b: any) => parseFloat(b.spend) - parseFloat(a.spend))
+        .slice(0, 15);
+      const regionRows = sortedRegion.map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        const spPct = totalSpend > 0 ? ((sp / totalSpend) * 100).toFixed(1) + '%' : '—';
+        const reach = parseInt(r.reach || '0').toLocaleString('es-AR');
+        const impr = parseInt(r.impressions || '0').toLocaleString('es-AR');
+        const ctr = fmtNum(r.inline_link_click_ctr, 2) + '%';
+        const cpm = `${cur} ${fmtNum(r.cpm, 0)}`;
+        const metric = objMetricRow(r);
+        return `<tr>
+          <td class="row-label"><strong>${r.region || r.country || '—'}</strong></td>
+          <td>${cur} ${fmtNum(sp, 0)}</td>
+          <td>${spPct}</td>
+          <td>${reach}</td>
+          <td>${impr}</td>
+          <td>${ctr}</td>
+          <td>${cpm}</td>
+          <td>${metric.val}</td>
+        </tr>`;
+      }).join('');
+      const regionBars = barHtml(sortedRegion.slice(0, 10).map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        return { label: r.region || r.country || '—', pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
+      }));
+
+      // ── Platform (placement) ──
+      const platLabel: Record<string, string> = {
+        facebook: 'Facebook', instagram: 'Instagram',
+        audience_network: 'Audience Network', messenger: 'Messenger', unknown: 'Desconocido',
+      };
+      const sortedPlat = [...byPlatform]
+        .filter((r: any) => parseFloat(r.spend || '0') > 0)
+        .sort((a: any, b: any) => parseFloat(b.spend) - parseFloat(a.spend));
+      const platRows = sortedPlat.map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        const spPct = totalSpend > 0 ? ((sp / totalSpend) * 100).toFixed(1) + '%' : '—';
+        const reach = parseInt(r.reach || '0').toLocaleString('es-AR');
+        const impr = parseInt(r.impressions || '0').toLocaleString('es-AR');
+        const ctr = fmtNum(r.inline_link_click_ctr, 2) + '%';
+        const cpm = `${cur} ${fmtNum(r.cpm, 0)}`;
+        const metric = objMetricRow(r);
+        const pName = platLabel[r.publisher_platform] || r.publisher_platform || '—';
+        return `<tr>
+          <td class="row-label"><strong>${pName}</strong></td>
+          <td>${cur} ${fmtNum(sp, 0)}</td>
+          <td>${spPct}</td>
+          <td>${reach}</td>
+          <td>${impr}</td>
+          <td>${ctr}</td>
+          <td>${cpm}</td>
+          <td>${metric.val}</td>
+        </tr>`;
+      }).join('');
+      const platBars = barHtml(sortedPlat.map((r: any) => {
+        const sp = parseFloat(r.spend || '0');
+        const pName = platLabel[r.publisher_platform] || r.publisher_platform || '—';
+        return { label: pName, pct: totalSpend > 0 ? (sp / totalSpend) * 100 : 0, value: `${cur} ${fmtNum(sp, 0)}` };
+      }));
+
+      // ── Audience segments (TOFU/MOFU/BOFU) — from existing campaign data ──
+      type SegKey = 'TOFU' | 'MOFU' | 'BOFU';
+      const segAcc: Record<SegKey, { spend: number; reach: number; impressions: number; clicks: number; actions: any[] }> = {
+        TOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
+        MOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
+        BOFU: { spend: 0, reach: 0, impressions: 0, clicks: 0, actions: [] },
+      };
+      for (const c of campaigns) {
+        const ins = campaignInsights[c.id];
+        if (!ins || parseFloat(ins.spend || '0') <= 0) continue;
+        const stage = classifyFunnel(c.objective || '', undefined, c.name).stage as SegKey;
+        const seg = segAcc[stage];
+        seg.spend      += parseFloat(ins.spend || '0');
+        seg.reach      += parseInt(ins.reach || '0');
+        seg.impressions += parseInt(ins.impressions || '0');
+        seg.clicks     += parseInt(ins.inline_link_clicks || '0');
+        for (const a of (ins.actions || [])) {
+          const ex = seg.actions.find((x: any) => x.action_type === a.action_type);
+          if (ex) ex.value = String(parseFloat(ex.value || '0') + parseFloat(a.value || '0'));
+          else seg.actions.push({ ...a });
+        }
+      }
+      const segLabels: Record<SegKey, string> = {
+        TOFU: 'Audiencia Nueva (Fría)',
+        MOFU: 'Audiencia Activa (Tibia)',
+        BOFU: 'Clientes / Remarketing (Caliente)',
+      };
+      const segOrder: SegKey[] = ['TOFU', 'MOFU', 'BOFU'];
+      const activeSeg = segOrder.filter(s => segAcc[s].spend > 0);
+      const segRows = activeSeg.map(s => {
+        const seg = segAcc[s];
+        const ctr = seg.impressions > 0 ? fmtNum((seg.clicks / seg.impressions) * 100, 2) + '%' : '—';
+        const cpm = seg.impressions > 0 ? `${cur} ${fmtNum((seg.spend / seg.impressions) * 1000, 0)}` : '—';
+        const spPct = totalSpend > 0 ? ((seg.spend / totalSpend) * 100).toFixed(1) + '%' : '—';
+        const metric = objMetricRow({ spend: String(seg.spend), actions: seg.actions });
+        return `<tr>
+          <td class="row-label"><strong>${segLabels[s]}</strong></td>
+          <td>${cur} ${fmtNum(seg.spend, 0)}</td>
+          <td>${spPct}</td>
+          <td>${seg.reach.toLocaleString('es-AR')}</td>
+          <td>${seg.impressions.toLocaleString('es-AR')}</td>
+          <td>${ctr}</td>
+          <td>${cpm}</td>
+          <td>${metric.val}</td>
+          <td>${metric.cost}</td>
+        </tr>`;
+      }).join('');
+      const segBars = barHtml(activeSeg.map(s => ({
+        label: segLabels[s].split(' (')[0],
+        pct: totalSpend > 0 ? (segAcc[s].spend / totalSpend) * 100 : 0,
+        value: `${cur} ${fmtNum(segAcc[s].spend, 0)}`,
+      })));
+
       pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <title>Reporte Audiencia — ${clientName}</title>
 <style>
@@ -2115,7 +2233,7 @@ INICIO: ${planStartDate}
   .breakdown-table .val-main{font-weight:800;color:#2196F3;font-size:14px;}
   .bars{margin-top:4px;}
   .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
-  .bar-label{width:110px;font-size:11px;color:#4b5563;font-weight:600;flex-shrink:0;}
+  .bar-label{width:140px;font-size:11px;color:#4b5563;font-weight:600;flex-shrink:0;}
   .bar-track{flex:1;height:12px;background:#f0f2f5;border-radius:6px;overflow:hidden;}
   .bar-fill{height:100%;background:linear-gradient(90deg,#1A3A5C,#2196F3);border-radius:6px;}
   .bar-meta{width:160px;font-size:11px;color:#374151;text-align:right;flex-shrink:0;}
@@ -2176,6 +2294,70 @@ INICIO: ${planStartDate}
     </table>
     <div class="bars">${ageBars}</div>
   </div>
+
+  ${activeSeg.length > 0 ? `
+  <div class="section">
+    <h2>Rendimiento por Segmento de Audiencia</h2>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th>Segmento</th>
+          <th>Inversión</th>
+          <th>% Gasto</th>
+          <th>Alcance</th>
+          <th>Impresiones</th>
+          <th>CTR</th>
+          <th>CPM</th>
+          <th>${oLabel}</th>
+          <th>${oCostLabel}</th>
+        </tr>
+      </thead>
+      <tbody>${segRows}</tbody>
+    </table>
+    <div class="bars">${segBars}</div>
+  </div>` : ''}
+
+  ${sortedPlat.length > 0 ? `
+  <div class="section">
+    <h2>Rendimiento por Plataforma (Ubicación del Anuncio)</h2>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th>Plataforma</th>
+          <th>Inversión</th>
+          <th>% Gasto</th>
+          <th>Alcance</th>
+          <th>Impresiones</th>
+          <th>CTR</th>
+          <th>CPM</th>
+          <th>${oLabel}</th>
+        </tr>
+      </thead>
+      <tbody>${platRows}</tbody>
+    </table>
+    <div class="bars">${platBars}</div>
+  </div>` : ''}
+
+  ${sortedRegion.length > 0 ? `
+  <div class="section">
+    <h2>Rendimiento por Ubicación Geográfica</h2>
+    <table class="breakdown-table">
+      <thead>
+        <tr>
+          <th>Región / Ciudad</th>
+          <th>Inversión</th>
+          <th>% Gasto</th>
+          <th>Alcance</th>
+          <th>Impresiones</th>
+          <th>CTR</th>
+          <th>CPM</th>
+          <th>${oLabel}</th>
+        </tr>
+      </thead>
+      <tbody>${regionRows}</tbody>
+    </table>
+    <div class="bars">${regionBars}</div>
+  </div>` : ''}
 
   <div class="footer">Algoritmia &nbsp;&middot;&nbsp; ${today} &nbsp;&middot;&nbsp; Datos: Meta Ads</div>
 </div>
