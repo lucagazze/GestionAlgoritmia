@@ -325,3 +325,96 @@ Debes llamar manage_tasks con:
         }
     }
 };
+
+// ── GPT Optimizer: Análisis Charley T ─────────────────────────────────────────
+export interface GPTAdData {
+  ad_name: string;
+  campaign: string;
+  adset: string;
+  spend: number;
+  cpa: number;
+  gpt: number;
+  results: number;
+  revenue: number;
+  roas: number;
+}
+
+export async function analyzeGPTEcosystem(
+  ads: GPTAdData[],
+  period: string,
+  avgCpa: number,
+  avgGpt: number,
+): Promise<string> {
+  const client = await getClient();
+
+  const totalSpend   = ads.reduce((s, a) => s + a.spend, 0);
+  const totalRevenue = ads.reduce((s, a) => s + a.revenue, 0);
+  const totalResults = ads.reduce((s, a) => s + a.results, 0);
+
+  const getQuad = (a: GPTAdData) => {
+    if (a.cpa <= avgCpa && a.gpt >= avgGpt) return 'SCALER';
+    if (a.cpa >  avgCpa && a.gpt >= avgGpt) return 'RELIABLE';
+    if (a.cpa <= avgCpa && a.gpt <  avgGpt) return 'FAKE WIN';
+    return 'LIABILITY';
+  };
+
+  const f = (n: number) => `$${n.toFixed(2)}`;
+
+  const adsText = [...ads]
+    .sort((a, b) => b.gpt - a.gpt)
+    .map((ad, i) => {
+      const pct = totalSpend > 0 ? ((ad.spend / totalSpend) * 100).toFixed(1) : '0';
+      const conv = ad.results > 0 ? ad.results : '0 (sin ventas)';
+      const roas = ad.roas > 0 ? ` | ROAS: ${ad.roas.toFixed(2)}x` : '';
+      return `${i + 1}. "${ad.ad_name}" [${getQuad(ad)}]\n   Gasto: ${f(ad.spend)} (${pct}% del total) | CPA: ${f(ad.cpa)} | GPT: ${f(ad.gpt)} | Conversiones: ${conv}${roas}`;
+    })
+    .join('\n\n');
+
+  const systemPrompt = `Eres DisconIA, un Media Buyer experto operando bajo la metodología "Andromeda" del Profesor Charley T (Disrupter School).
+Tu único objetivo es MAXIMIZAR EL VOLUMEN DE GANANCIA BRUTA (GPT) y estabilizar el flujo de caja del negocio.
+
+FILOSOFÍA:
+- No reaccionas de forma exagerada. No eres un "day-trader" de cuentas.
+- El algoritmo es más inteligente que el anunciante. Colaborar, no microgestionar.
+- Un anuncio con CPA bajo pero GPT bajo no es un ganador: es un "ladrón de crédito" que atrae cazadores de ofertas.
+- Simplicidad escala, complejidad falla.
+
+REGLAS POR CUADRANTE:
+SCALER (CPA ≤ promedio + GPT ≥ promedio): El ganador. Recomendar escalar el presupuesto CBO un 5% cada 3-5 días. NUNCA tocar el anuncio en sí.
+RELIABLE (CPA > promedio + GPT ≥ promedio): La columna vertebral. Trae clientes premium. NO apagar por CPA alto. Dejar correr y proteger.
+FAKE WIN (CPA ≤ promedio + GPT < promedio): PELIGRO SILENCIOSO. Meta lo muestra como ganador pero destruye rentabilidad. No usar para justificar escalado del presupuesto.
+LIABILITY (CPA > promedio + GPT < promedio): Evaluar según % del gasto total. Si consume >25% del presupuesto → apagar hoy (Prueba de Estrés). Si consume poco → monitorear.
+
+EL MATIZ CRUCIAL: Si un anuncio está en el borde (CPA un poco alto, GPT un poco bajo pero positivo), NO recomiendes apagarlo. Un anuncio caro pero rentable paga las facturas del negocio.
+
+FORMATO OBLIGATORIO:
+## 🔍 Diagnóstico del Ecosistema
+[2-3 oraciones sobre la salud general]
+
+## 📋 Plan de Acción
+[Para cada anuncio: nombre, cuadrante, acción concreta con razón]
+
+## ⚡ Palanca Principal
+[La 1 acción más impactante a ejecutar HOY, con instrucción exacta]
+
+Responde en español. Sé directo y preciso. Usa **negritas** para nombres y números clave.
+IMPORTANTE: El período de análisis es "${period}". Usa EXACTAMENTE esa frase al referirte al período. No inventes ni cambies el período.`;
+
+  const userMessage = `Período de análisis: ${period}
+CPA Promedio: ${f(avgCpa)} | GPT Promedio: ${f(avgGpt)}
+Total gasto: ${f(totalSpend)} | Total ventas: ${totalResults} | Total ingresos: ${f(totalRevenue)}
+
+ANUNCIOS (${ads.length} con gasto):
+
+${adsText}
+
+Dame el diagnóstico completo y el plan de acción para los ${period}.`;
+
+  const response = await (client as any).models.generateContent({
+    model: MODEL_NAME,
+    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    config: { systemInstruction: systemPrompt },
+  });
+
+  return (response as any).text || 'No se pudo generar el análisis.';
+}

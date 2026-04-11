@@ -3,8 +3,9 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
-import { Target, TrendingDown, TrendingUp, Layers, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Target, TrendingDown, TrendingUp, Layers, Loader2, RefreshCw, AlertCircle, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { metaAds, daysAgo, today } from '../../services/metaAds';
+import { analyzeGPTEcosystem } from '../../services/ai-new';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AdPoint {
@@ -106,21 +107,26 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
   const [selCampaign, setSelCampaign] = useState('All');
   const [selAdset,    setSelAdset]    = useState('All');
 
-  const [loading,  setLoading]  = useState(false);
-  const [loadMsg,  setLoadMsg]  = useState('');
-  const [error,    setError]    = useState<string | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [loadMsg,     setLoadMsg]     = useState('');
+  const [error,       setError]       = useState<string | null>(null);
+  const [aiAnalysis,  setAiAnalysis]  = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiExpanded,  setAiExpanded]  = useState(true);
+
 
   // Determine which account to query
   const accountToUse = accountId || '';
 
-  // ── Load all data ──────────────────────────────────────────────────────────
-  const loadData = useCallback(async () => {
+  // ── Load all data — period passed as explicit param (no stale closure) ────────
+  const loadData = useCallback(async (activePeriod: Period) => {
     if (!accountToUse) { setError('No hay cuenta seleccionada.'); return; }
     setLoading(true);
     setError(null);
     setAdPoints([]);
     setCampaigns([]);
     setAdsets([]);
+    setAiAnalysis(null);
     setSelCampaign('All');
     setSelAdset('All');
 
@@ -143,8 +149,9 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
       const adsetNameMap: Record<string, string> = {};
       allAdsets.forEach(a => { adsetNameMap[a.id] = a.name; });
 
-      // Use date_preset to exactly match Meta's predefined ranges (which usually exclude today)
-      const datePreset = `last_${PERIODS.find(p => p.value === period)?.days ?? 7}d`;
+      // activePeriod passed explicitly — no closure ambiguity
+      const days = PERIODS.find(p => p.value === activePeriod)?.days ?? 7;
+      const datePreset = `last_${days}d`;
 
       setLoadMsg('Cargando insights de anuncios…');
       const insFields = [
@@ -169,22 +176,11 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
           const actions:      any[] = ins.actions       || [];
           const actionValues: any[] = ins.action_values || [];
 
-          // Revenue from action_values (purchase pixel value)
           const revenue    = getPurchaseRevenue(actionValues);
           const hasRevenue = revenue > 0;
-
-          // Purchases from actions — checked directly, NOT gated by revenue tracking
-          // This avoids the bug where hasPurchaseRevenue=false caused link_click fallback
-          const purchases = getPurchaseCount(actions);
-
-          // Conversions: purchases first, then leads. NEVER link_click (inflates count 10-100x)
+          const purchases  = getPurchaseCount(actions);
           const conversions = purchases > 0 ? purchases : getLeadCount(actions);
-
-          // CPA = spend / conversions
           const cpa = conversions > 0 ? spend / conversions : spend;
-
-          // GPT = (revenue − spend) / conversions [gross profit per transaction]
-          // If no revenue tracked → GPT = −CPA (full spend loss per result)
           const gpt = hasRevenue && conversions > 0
             ? (revenue - spend) / conversions
             : -cpa;
@@ -216,12 +212,12 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
       setLoading(false);
       setLoadMsg('');
     }
-  }, [accountToUse, period]);
+  }, [accountToUse]);   // period removed from deps — passed as param instead
 
-
+  // Re-fetch whenever account or period changes
   useEffect(() => {
-    if (accountToUse) loadData();
-  }, [accountToUse, loadData]);
+    if (accountToUse) loadData(period);
+  }, [accountToUse, period]);
 
   // ── Filtered options ───────────────────────────────────────────────────────
   const campaignOptions = useMemo(() =>
@@ -289,6 +285,22 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
     return '#ef4444';
   };
 
+  // No useCallback — reads period/filteredData/avgCpa/avgGpt at click time (always fresh)
+  const handleAnalyze = async () => {
+    if (!filteredData.length) return;
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+    setAiExpanded(true);
+    const currentPeriod = PERIODS.find(p => p.value === period)?.label ?? period;
+    try {
+      const result = await analyzeGPTEcosystem(filteredData, currentPeriod, avgCpa, avgGpt);
+      setAiAnalysis(result);
+    } catch (e: any) {
+      setAiAnalysis(`Error al analizar: ${e?.message || 'Intenta de nuevo.'}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -311,7 +323,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
           </div>
         </div>
         <button
-          onClick={loadData}
+          onClick={() => loadData(period)}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 text-[12px] font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-all"
         >
@@ -466,7 +478,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 28, right: 48, bottom: 32, left: 8 }}>
+                <ScatterChart margin={{ top: 28, right: 48, bottom: 32, left: 56 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.1} vertical={false} />
 
                   <XAxis
@@ -481,7 +493,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                     axisLine={{ strokeOpacity: 0.08 }} tickLine={false}
                     tick={{ fill: '#71717a', fontSize: 11 }}
                     tickFormatter={v => fmt(v)}
-                    label={{ value: 'GPT (Ganancia Bruta)', angle: -90, position: 'insideLeft', offset: 16, fill: '#71717a', fontSize: 11, fontWeight: 600 }}
+                    label={{ value: 'GPT (Ganancia Bruta)', angle: -90, position: 'insideLeft', offset: -40, fill: '#71717a', fontSize: 11, fontWeight: 600 }}
                   />
 
                   <Tooltip
@@ -614,6 +626,71 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+          {/* DisconIA Analysis Button */}
+          <div className="flex justify-center pt-1">
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing || filteredData.length === 0}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-[12px] bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-[13px] font-bold shadow-md disabled:opacity-40 transition-all active:scale-[0.98]"
+            >
+              <Sparkles className={`w-4 h-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
+              {isAnalyzing ? 'Analizando ecosistema…' : 'DisconIA: Auditoría Profunda'}
+            </button>
+          </div>
+
+          {/* AI Analysis Panel */}
+          {(isAnalyzing || aiAnalysis) && (
+            <div className="rounded-[16px] border border-violet-200/60 dark:border-violet-800/40 bg-gradient-to-br from-violet-50/80 to-purple-50/50 dark:from-violet-950/30 dark:to-purple-950/20 overflow-hidden">
+              {/* Panel header */}
+              <button
+                onClick={() => setAiExpanded(v => !v)}
+                className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-violet-100/40 dark:hover:bg-violet-900/20 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-[13px] font-bold text-violet-800 dark:text-violet-300">DisconIA — Auditoría del Ecosistema</span>
+                  {isAnalyzing && <span className="text-[11px] text-violet-500 font-medium animate-pulse">pensando…</span>}
+                </div>
+                {aiExpanded
+                  ? <ChevronUp className="w-4 h-4 text-violet-400" />
+                  : <ChevronDown className="w-4 h-4 text-violet-400" />}
+              </button>
+
+              {/* Panel body */}
+              {aiExpanded && (
+                <div className="px-5 pb-5">
+                  {isAnalyzing ? (
+                    <div className="flex items-center gap-2 text-violet-500 py-4">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-[12px]">Aplicando metodología Andromeda…</span>
+                    </div>
+                  ) : aiAnalysis ? (
+                    <div className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-1">
+                      {aiAnalysis.split('\n').map((line, i) => {
+                        if (line.startsWith('## ')) {
+                          return <h3 key={i} className="text-[14px] font-bold text-violet-800 dark:text-violet-300 mt-4 mb-1 first:mt-0">{line.replace('## ', '')}</h3>;
+                        }
+                        if (line.trim() === '') return <div key={i} className="h-1" />;
+                        // Render **bold**
+                        const parts = line.split(/\*\*(.+?)\*\*/g);
+                        return (
+                          <p key={i}>
+                            {parts.map((part, j) =>
+                              j % 2 === 1
+                                ? <strong key={j} className="font-semibold text-zinc-900 dark:text-white">{part}</strong>
+                                : part
+                            )}
+                          </p>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </div>
           )}
         </>
