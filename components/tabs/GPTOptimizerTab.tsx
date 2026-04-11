@@ -3,9 +3,11 @@ import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts';
-import { Target, TrendingDown, TrendingUp, Layers, Loader2, RefreshCw, AlertCircle, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Target, TrendingDown, TrendingUp, Layers, Loader2, RefreshCw, AlertCircle, Sparkles, ChevronDown, ChevronUp, AlertTriangle, CheckCircle, ExternalLink } from 'lucide-react';
 import { metaAds, daysAgo, today } from '../../services/metaAds';
 import { analyzeGPTEcosystem } from '../../services/ai-new';
+import { db } from '../../services/db';
+import { TaskStatus } from '../../types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AdPoint {
@@ -24,10 +26,10 @@ interface AdPoint {
 }
 
 type Period = '7d' | '14d' | '28d';
-const PERIODS: { label: string; value: Period; days: number }[] = [
-  { label: 'Últimos 7 días',  value: '7d',  days: 7  },
+const PERIODS: { label: string; value: Period; days: number; viewLabel?: string }[] = [
+  { label: 'Últimos 7 días',  value: '7d',  days: 7,  viewLabel: 'Táctica'     },
   { label: 'Últimos 14 días', value: '14d', days: 14 },
-  { label: 'Últimos 28 días', value: '28d', days: 28 },
+  { label: 'Últimos 28 días', value: '28d', days: 28, viewLabel: 'Estratégica' },
 ];
 
 interface Campaign { id: string; name: string; status: string; }
@@ -110,10 +112,12 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
   const [loading,     setLoading]     = useState(false);
   const [loadMsg,     setLoadMsg]     = useState('');
   const [error,       setError]       = useState<string | null>(null);
-  const [aiAnalysis,   setAiAnalysis]   = useState<string | null>(null);
-  const [isAnalyzing,  setIsAnalyzing]  = useState(false);
-  const [aiExpanded,   setAiExpanded]   = useState(true);
-  const [activities,   setActivities]   = useState<any[]>([]);
+  const [aiAnalysis,     setAiAnalysis]     = useState<string | null>(null);
+  const [isAnalyzing,    setIsAnalyzing]    = useState(false);
+  const [aiExpanded,     setAiExpanded]     = useState(true);
+  const [activities,     setActivities]     = useState<any[]>([]);
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+  const [tasksCreated,   setTasksCreated]   = useState<number | null>(null);
 
 
   // Determine which account to query
@@ -306,6 +310,39 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
     }
   };
 
+  // ── Convert Algor output to tasks ─────────────────────────────────────────
+  const handleConvertToTasks = async () => {
+    if (!aiAnalysis) return;
+    setIsCreatingTasks(true);
+    setTasksCreated(null);
+    const lines = aiAnalysis.split('\n');
+    const startIdx = lines.findIndex(l => l.includes('Próximo Paso'));
+    const endIdx   = lines.findIndex((l, i) => i > startIdx && l.trim() === '---');
+    const section  = lines.slice(startIdx + 1, endIdx > startIdx ? endIdx : undefined);
+    const actions  = section.filter(l => /^\d+\.\s/.test(l.trim())).map(l => l.trim().replace(/^\d+\.\s/, '').trim());
+    let created = 0;
+    for (const title of actions) {
+      if (!title || title === 'No toques nada más.') continue;
+      try {
+        await db.tasks.create({
+          title: `[Algor] ${title}`,
+          status: TaskStatus.TODO,
+          priority: 'HIGH',
+          description: `Generado por Algor GPT Optimizer · Período: ${PERIODS.find(p => p.value === period)?.label}`,
+        });
+        created++;
+      } catch {}
+    }
+    setTasksCreated(created);
+    setIsCreatingTasks(false);
+  };
+
+  // ── Deep link helper ──────────────────────────────────────────────────────
+  const metaDeepLink = (adId: string) => {
+    const numericId = accountToUse.replace('act_', '');
+    return `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${numericId}&selected_ad_ids=${adId}`;
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="animate-in fade-in space-y-5 max-w-5xl mx-auto">
@@ -341,13 +378,14 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
             <button
               key={p.value}
               onClick={() => { setPeriod(p.value as Period); }}
-              className={`px-2.5 py-1 text-[11px] font-semibold rounded-[6px] transition-all ${
+              className={`px-2.5 py-1 rounded-[6px] transition-all flex flex-col items-center leading-none ${
                 period === p.value
                   ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
               }`}
             >
-              {p.value.toUpperCase()}
+              <span className="text-[11px] font-bold">{p.value.toUpperCase()}</span>
+              {p.viewLabel && <span className="text-[9px] font-medium opacity-70 mt-0.5">{p.viewLabel}</span>}
             </button>
           ))}
         </div>
@@ -606,10 +644,25 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                           d.cpa <= avgCpa && d.gpt >= avgGpt ? 'Scaler' :
                           d.cpa >  avgCpa && d.gpt >= avgGpt ? 'Reliable' :
                           d.cpa <= avgCpa && d.gpt <  avgGpt ? 'Fake Win' : 'Liability';
+                        const validNomenclature = d.ad_name.split('|').length >= 3;
                         return (
                           <tr key={d.ad_id} className={`border-b border-zinc-50 dark:border-zinc-800/50 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors ${i % 2 === 0 ? '' : 'bg-zinc-50/30 dark:bg-white/[0.01]'}`}>
                             <td className="px-5 py-2.5 font-medium text-zinc-800 dark:text-zinc-200 max-w-[200px]">
-                              <p className="truncate">{d.ad_name}</p>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {!validNomenclature && (
+                                  <span title="Nomenclatura inválida: usar Formato | Ángulo | Protagonista"><AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" /></span>
+                                )}
+                                <a
+                                  href={metaDeepLink(d.ad_id)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="truncate hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline transition-colors flex items-center gap-1 min-w-0"
+                                  title="Abrir en Meta Ads Manager"
+                                >
+                                  <span className="truncate">{d.ad_name}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 opacity-40 flex-shrink-0" />
+                                </a>
+                              </div>
                               <p className="text-[10px] text-zinc-400 truncate md:hidden">{d.adset}</p>
                             </td>
                             <td className="px-3 py-2.5 hidden md:table-cell text-zinc-500 dark:text-zinc-400 max-w-[150px]">
@@ -673,6 +726,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                       <span className="text-[12px]">Aplicando metodología Andromeda…</span>
                     </div>
                   ) : aiAnalysis ? (
+                    <>
                     <div className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-1.5">
                       {aiAnalysis.split('\n').map((line, i) => {
                         // Section headings: ## 🔍 ...
@@ -739,6 +793,27 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                         );
                       })}
                     </div>
+
+                    {/* Convert to Tasks */}
+                    <div className="mt-4 pt-4 border-t border-violet-200/40 dark:border-violet-800/30 flex items-center gap-3 flex-wrap">
+                      <button
+                        onClick={handleConvertToTasks}
+                        disabled={isCreatingTasks}
+                        className="flex items-center gap-2 px-4 py-2 rounded-[10px] bg-indigo-600 hover:bg-indigo-500 text-white text-[12px] font-bold disabled:opacity-40 transition-all active:scale-[0.98] shadow-sm"
+                      >
+                        {isCreatingTasks
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creando tareas…</>
+                          : <><CheckCircle className="w-3.5 h-3.5" /> Convertir en Tareas</>
+                        }
+                      </button>
+                      {tasksCreated !== null && (
+                        <span className="flex items-center gap-1.5 text-[12px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          {tasksCreated} {tasksCreated === 1 ? 'tarea creada' : 'tareas creadas'} en el gestor
+                        </span>
+                      )}
+                    </div>
+                    </>
                   ) : null}
                 </div>
               )}
