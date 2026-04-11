@@ -6,6 +6,7 @@ import {
 } from '../services/metaAds';
 import { ai } from '../services/ai';
 import { useToast } from '../components/Toast';
+import { GPTOptimizerTab } from '../components/tabs/GPTOptimizerTab';
 type ClaudeMessage = { role: 'user' | 'assistant'; content: string };
 import {
   PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer,
@@ -1305,7 +1306,7 @@ export default function AIAnalystPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'REPORTES' | 'ANALISIS' | 'CREATIVOS' | 'CREATIVIDAD' | 'PLAN' | 'CLIENTE'>('REPORTES');
+  const [activeTab, setActiveTab] = useState<'REPORTES' | 'ANALISIS' | 'CREATIVOS' | 'CREATIVIDAD' | 'PLAN' | 'CLIENTE' | 'GPT_OPTIMIZER'>('REPORTES');
 
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
@@ -2704,12 +2705,13 @@ INICIO: ${planStartDate}
         {/* Tabs */}
         <div className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b border-black/[0.06] dark:border-white/[0.05] px-4 flex items-center">
           {([
-            { id: 'REPORTES',    label: '📈 Datos' },
-            { id: 'ANALISIS',    label: '📊 Análisis' },
-            { id: 'CREATIVOS',   label: '🖼️ Creativos' },
-            { id: 'CLIENTE',     label: '📄 Reporte Cliente' },
-            { id: 'CREATIVIDAD', label: '🎨 Estrategia' },
-            { id: 'PLAN',        label: '📋 Plan' },
+            { id: 'REPORTES',      label: '📈 Datos' },
+            { id: 'ANALISIS',      label: '📊 Análisis' },
+            { id: 'CREATIVOS',     label: '🖼️ Creativos' },
+            { id: 'CLIENTE',       label: '📄 Reporte Cliente' },
+            { id: 'CREATIVIDAD',   label: '🎨 Estrategia' },
+            { id: 'PLAN',          label: '📋 Plan' },
+            { id: 'GPT_OPTIMIZER', label: '🎯 GPT Optimizer' },
           ] as const).map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2.5 text-[12px] font-semibold border-b-2 transition-all -mb-px ${
@@ -3782,6 +3784,14 @@ INICIO: ${planStartDate}
                 )}
               </div>
             )}
+
+            {/* ── GPT OPTIMIZER ─────────────────────────────────────────── */}
+            {activeTab === 'GPT_OPTIMIZER' && (
+              <div className="p-4 pb-28">
+                <GPTOptimizerTab accountId={selectedAccountId} />
+              </div>
+            )}
+
           </div>
 
           {/* ── CHAT PANEL — toggleable ──────────── */}
