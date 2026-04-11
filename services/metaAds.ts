@@ -245,4 +245,14 @@ export const metaAds = {
       fields: 'id,caption,media_type,timestamp,like_count,comments_count,permalink,thumbnail_url,media_url',
       limit: String(limit),
     }),
+
+  // Recent account activity — changes made in the last N days (pauses, budget edits, new ads)
+  getAccountActivities: (accountId: string, days = 7) => {
+    const since = Math.floor(Date.now() / 1000) - days * 86400;
+    return apiGet(`${accountId}/activities`, {
+      fields: 'event_type,event_time,object_name,object_type,translated_payload,extra_data',
+      since:  String(since),
+      limit:  '60',
+    });
+  },
 };

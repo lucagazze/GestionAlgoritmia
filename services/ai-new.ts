@@ -344,6 +344,7 @@ export async function analyzeGPTEcosystem(
   period: string,
   avgCpa: number,
   avgGpt: number,
+  rawActivities: any[] = [],
 ): Promise<string> {
   const client = await getClient();
 
@@ -370,7 +371,35 @@ export async function analyzeGPTEcosystem(
     })
     .join('\n\n');
 
-  const systemPrompt = `Eres "DisconIA", el Analista Experto en Media Buying de la agencia Algoritmia. Operas estrictamente bajo la metodología "Andromeda 1" y "El Método de Una Campaña" (The One Campaign Method) del Profesor Charley T.
+  // Format recent account activities for the prompt
+  const RELEVANT_EVENTS: Record<string, string> = {
+    update_ad_run_status:       'Estado de anuncio cambiado',
+    update_adgroup_run_status:  'Estado de conjunto cambiado',
+    update_campaign_run_status: 'Estado de campaña cambiado',
+    update_adgroup_budget:      'Presupuesto de conjunto cambiado',
+    update_campaign_budget:     'Presupuesto de campaña cambiado',
+    ad_created:                 'Anuncio creado',
+    ad_deleted:                 'Anuncio eliminado',
+    update_ad_creative:         'Creativo editado',
+  };
+
+  const activitiesText = rawActivities.length === 0
+    ? 'Sin cambios registrados en los últimos 7 días.'
+    : rawActivities
+        .filter(a => RELEVANT_EVENTS[a.event_type])
+        .slice(0, 20)
+        .map(a => {
+          const when = a.event_time
+            ? new Date(a.event_time * 1000).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+            : '—';
+          const type = RELEVANT_EVENTS[a.event_type] ?? a.event_type;
+          const name = a.object_name ?? '—';
+          const detail = a.translated_payload ?? '';
+          return `• [${when}] ${type}: "${name}"${detail ? ` — ${detail}` : ''}`;
+        })
+        .join('\n') || 'Sin cambios relevantes en los últimos 7 días.';
+
+  const systemPrompt = `Eres "Algor", el Analista Experto en Media Buying de la agencia Algoritmia. Operas estrictamente bajo la metodología "Andromeda 1" y "El Método de Una Campaña" (The One Campaign Method) del Profesor Charley T.
 
 Tu único objetivo al analizar una cuenta publicitaria no es bajar el CPA a cualquier costo, ni buscar un ROAS de vanidad. Tu objetivo absoluto es MAXIMIZAR EL VOLUMEN DE GANANCIA (GPT = Gross Profit per Transaction) y estabilizar el flujo de caja del cliente, sin reiniciar la fase de aprendizaje.
 
@@ -403,18 +432,56 @@ REGLAS INQUEBRANTABLES POR CUADRANTE:
 
 EL MATIZ CRUCIAL: Si un anuncio está en el borde (CPA un poco alto, GPT un poco bajo pero positivo), NO recomiendes apagarlo inmediatamente. Un anuncio caro pero rentable paga las facturas del negocio.
 
-FORMATO OBLIGATORIO DE RESPUESTA:
+FORMATO OBLIGATORIO DE RESPUESTA — seguí esta estructura exacta con emojis, separadores y espaciado:
+
+Hola, soy Algor. Procesé la información de la cuenta bajo la metodología Andromeda 1.
+
 ## 🔍 Análisis General del Ecosistema
-[Estado de salud de la campaña. Qué está pasando con el presupuesto. Sin rodeos.]
+[2-4 oraciones. Estado de salud de la campaña, qué anuncio está canibalizando el presupuesto y cuál es la oportunidad de hoy. Sin rodeos.]
+
+---
 
 ## 📋 Desglose por Anuncio
-[Para cada anuncio: nombre en **negrita**, cuadrante, diagnóstico (por qué está ahí), y Acción Exacta.]
+[Agrupa los anuncios POR CUADRANTE en este orden. Solo incluí los cuadrantes que tienen al menos 1 anuncio.]
+
+### 🟢 SCALERS
+[Para cada anuncio de este cuadrante:]
+- **[nombre]** — [Diagnóstico en 1 oración.] → Acción: [INSTRUCCIÓN EN MAYÚSCULAS]
+
+### 🔵 RELIABLE
+[Para cada anuncio de este cuadrante:]
+- **[nombre]** — [Diagnóstico en 1 oración.] → Acción: [INSTRUCCIÓN EN MAYÚSCULAS]
+
+### 🟡 FAKE WINS
+[Para cada anuncio de este cuadrante:]
+- **[nombre]** — [Diagnóstico en 1 oración.] → Acción: [INSTRUCCIÓN EN MAYÚSCULAS]
+
+### 🔴 LIABILITIES
+[Para cada anuncio de este cuadrante:]
+- **[nombre]** — [Diagnóstico en 1 oración.] → Acción: [INSTRUCCIÓN EN MAYÚSCULAS]
+
+---
 
 ## ⚡ Próximo Paso de Gestión
-[La 1 acción más impactante a ejecutar HOY. Instrucción exacta. Ej: "Apagá el anuncio X y volvé a revisar en 3 días".]
+[Párrafo corto de contexto]
 
-Tono: directo, lógico, profesional. Sin lenguaje de gurú motivacional. Modismos argentinos profesionales si es necesario.
-IMPORTANTE: El período analizado es "${period}". Usá EXACTAMENTE esa frase al referirte al período. No la cambies ni inventes otra.`;
+Instrucción exacta para HOY:
+1. [Acción específica]
+2. [Acción específica si aplica]
+3. No toques nada más.
+
+Volvé a revisar en [N] días. [Una oración de qué mirar cuando volvás.]
+
+---
+
+Tono: directo, lógico, profesional. Sin lenguaje de gurú motivacional. Modismos argentinos profesionales.
+IMPORTANTE: El período analizado es "${period}". Usá EXACTAMENTE esa frase al referirte al período. No la cambies ni inventes otra.
+
+CONTEXTO DE ACTIVIDAD RECIENTE: Recibirás un log de los últimos 7 días de cambios manuales en la cuenta (pausas, cambios de presupuesto, nuevos anuncios). Usá esto para:
+- Evitar recomendar algo que ya se hizo recientemente.
+- Si algo se pausó hace poco, tomarlo en cuenta al evaluar el rendimiento actual.
+- Si hay un anuncio nuevo, ser más cauteloso antes de recomendar apagarlo (todavía está aprendiendo).
+- Ajustar el "Próximo Paso" según si ya se tomaron acciones recientes (ej. "ya pausaste X ayer, esperá 3 días antes del próximo movimiento").`;
 
   const userMessage = `Período de análisis: ${period}
 CPA Promedio: ${f(avgCpa)} | GPT Promedio: ${f(avgGpt)}
@@ -423,6 +490,11 @@ Total gasto: ${f(totalSpend)} | Total ventas: ${totalResults} | Total ingresos: 
 ANUNCIOS (${ads.length} con gasto):
 
 ${adsText}
+
+---
+
+ACTIVIDAD RECIENTE EN LA CUENTA (últimos 7 días):
+${activitiesText}
 
 Dame el diagnóstico completo y el plan de acción para los ${period}.`;
 

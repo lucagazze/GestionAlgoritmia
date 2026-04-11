@@ -110,9 +110,10 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
   const [loading,     setLoading]     = useState(false);
   const [loadMsg,     setLoadMsg]     = useState('');
   const [error,       setError]       = useState<string | null>(null);
-  const [aiAnalysis,  setAiAnalysis]  = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiExpanded,  setAiExpanded]  = useState(true);
+  const [aiAnalysis,   setAiAnalysis]   = useState<string | null>(null);
+  const [isAnalyzing,  setIsAnalyzing]  = useState(false);
+  const [aiExpanded,   setAiExpanded]   = useState(true);
+  const [activities,   setActivities]   = useState<any[]>([]);
 
 
   // Determine which account to query
@@ -126,16 +127,19 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
     setAdPoints([]);
     setCampaigns([]);
     setAdsets([]);
+    setActivities([]);
     setAiAnalysis(null);
     setSelCampaign('All');
     setSelAdset('All');
 
     try {
-      setLoadMsg('Cargando campañas y conjuntos…');
-      const [campsRes, adsetsRes] = await Promise.all([
+      setLoadMsg('Cargando campañas, conjuntos y actividad reciente…');
+      const [campsRes, adsetsRes, activitiesRes] = await Promise.all([
         metaAds.getCampaigns(accountToUse).catch(() => ({ data: [] })),
         metaAds.getAccountAdsets(accountToUse).catch(() => ({ data: [] })),
+        metaAds.getAccountActivities(accountToUse, 7).catch(() => ({ data: [] })),
       ]);
+      setActivities(activitiesRes.data || []);
       const allCamps: Campaign[] = (campsRes.data || []).filter(
         (c: any) => c.status === 'ACTIVE' || c.status === 'PAUSED'
       );
@@ -293,7 +297,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
     setAiExpanded(true);
     const currentPeriod = PERIODS.find(p => p.value === period)?.label ?? period;
     try {
-      const result = await analyzeGPTEcosystem(filteredData, currentPeriod, avgCpa, avgGpt);
+      const result = await analyzeGPTEcosystem(filteredData, currentPeriod, avgCpa, avgGpt, activities);
       setAiAnalysis(result);
     } catch (e: any) {
       setAiAnalysis(`Error al analizar: ${e?.message || 'Intenta de nuevo.'}`);
@@ -628,7 +632,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
               </div>
             </div>
           )}
-          {/* DisconIA Analysis Button */}
+          {/* Algor Analysis Button */}
           <div className="flex justify-center pt-1">
             <button
               onClick={handleAnalyze}
@@ -636,7 +640,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
               className="flex items-center gap-2 px-5 py-2.5 rounded-[12px] bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-[13px] font-bold shadow-md disabled:opacity-40 transition-all active:scale-[0.98]"
             >
               <Sparkles className={`w-4 h-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-              {isAnalyzing ? 'Analizando ecosistema…' : 'DisconIA: Auditoría Profunda'}
+              {isAnalyzing ? 'Analizando ecosistema…' : 'Algor: Auditoría Profunda'}
             </button>
           </div>
 
@@ -652,7 +656,7 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                   <div className="w-7 h-7 rounded-[8px] bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center">
                     <Sparkles className="w-3.5 h-3.5 text-white" />
                   </div>
-                  <span className="text-[13px] font-bold text-violet-800 dark:text-violet-300">DisconIA — Auditoría del Ecosistema</span>
+                  <span className="text-[13px] font-bold text-violet-800 dark:text-violet-300">Algor — Auditoría del Ecosistema</span>
                   {isAnalyzing && <span className="text-[11px] text-violet-500 font-medium animate-pulse">pensando…</span>}
                 </div>
                 {aiExpanded
@@ -669,13 +673,60 @@ export function GPTOptimizerTab({ accountId, clientId }: GPTOptimizerTabProps) {
                       <span className="text-[12px]">Aplicando metodología Andromeda…</span>
                     </div>
                   ) : aiAnalysis ? (
-                    <div className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-1">
+                    <div className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-1.5">
                       {aiAnalysis.split('\n').map((line, i) => {
+                        // Section headings: ## 🔍 ...
                         if (line.startsWith('## ')) {
-                          return <h3 key={i} className="text-[14px] font-bold text-violet-800 dark:text-violet-300 mt-4 mb-1 first:mt-0">{line.replace('## ', '')}</h3>;
+                          return <h3 key={i} className="text-[14px] font-bold text-violet-800 dark:text-violet-300 mt-5 mb-1.5 first:mt-0">{line.replace('## ', '')}</h3>;
                         }
+                        // Quadrant sub-headings: ### 🟢 SCALERS
+                        if (line.startsWith('### ')) {
+                          const label = line.replace('### ', '');
+                          const colorMap: Record<string, string> = {
+                            'SCALER': 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40',
+                            'RELIABLE': 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800/40',
+                            'FAKE WIN': 'text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800/40',
+                            'LIABILITY': 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40',
+                          };
+                          const key = Object.keys(colorMap).find(k => label.toUpperCase().includes(k)) ?? '';
+                          const cls = colorMap[key] ?? 'text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/40 border-zinc-200 dark:border-zinc-700';
+                          return <div key={i} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[12px] font-bold mt-4 mb-1.5 ${cls}`}>{label}</div>;
+                        }
+                        // Horizontal separator ---
+                        if (line.trim() === '---') {
+                          return <hr key={i} className="border-violet-200/50 dark:border-violet-800/30 my-3" />;
+                        }
+                        // Bullet lines starting with -
+                        if (line.trim().startsWith('- ')) {
+                          const content = line.trim().slice(2);
+                          const parts = content.split(/\*\*(.+?)\*\*/g);
+                          return (
+                            <p key={i} className="pl-4 flex gap-1.5">
+                              <span className="text-violet-400 mt-0.5 flex-shrink-0">•</span>
+                              <span>{parts.map((part, j) =>
+                                j % 2 === 1
+                                  ? <strong key={j} className="font-semibold text-zinc-900 dark:text-white">{part}</strong>
+                                  : part
+                              )}</span>
+                            </p>
+                          );
+                        }
+                        // Numbered lines: 1. 2. 3.
+                        if (/^\d+\.\s/.test(line.trim())) {
+                          const parts = line.split(/\*\*(.+?)\*\*/g);
+                          return (
+                            <p key={i} className="pl-2 font-medium text-zinc-800 dark:text-zinc-200">
+                              {parts.map((part, j) =>
+                                j % 2 === 1
+                                  ? <strong key={j} className="font-semibold text-zinc-900 dark:text-white">{part}</strong>
+                                  : part
+                              )}
+                            </p>
+                          );
+                        }
+                        // Empty line → spacer
                         if (line.trim() === '') return <div key={i} className="h-1" />;
-                        // Render **bold**
+                        // Default paragraph with **bold** support
                         const parts = line.split(/\*\*(.+?)\*\*/g);
                         return (
                           <p key={i}>
