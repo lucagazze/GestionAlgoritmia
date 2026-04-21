@@ -315,78 +315,62 @@ function getPrimaryMetric(objective: string, ins: any): { label: string; value: 
     const n = parseFloat(val);
     return spend > 0 && n > 0 ? '$' + (spend / n).toFixed(0) : '—';
   };
-  const first = (v: string | null) => v || '0';
+  const first = (v: string | null | undefined) => v || '0';
+  const getV = (...types: string[]) => first(getMetaVal(actions, ...types));
 
-  // SALES / CONVERSIONS
+  let label = 'Resultado';
+  let v = '0';
+
   if (obj.includes('sales') || obj.includes('conversion')) {
-    const v = first(getMetaVal(actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase'));
-    return { label: 'Compras', value: v, cost: costPer(v) };
-  }
-
-  // LEADS
-  if (obj.includes('lead')) {
-    const v = first(getMetaVal(actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped'));
-    return { label: 'Leads', value: v, cost: costPer(v) };
-  }
-
-  // TRAFFIC
-  if (obj.includes('traffic') || obj.includes('link_click')) {
-    const profileVisit = getMetaVal(actions, 'instagram_profile_visit');
-    const landingView  = getMetaVal(actions, 'landing_page_view');
-    const linkClicks   = ins?.inline_link_clicks || '0';
-    const candidates = [
-      { v: profileVisit || '0', label: 'Visitas perfil' },
-      { v: landingView  || '0', label: 'Visitas landing' },
-      { v: linkClicks,          label: 'Clics' },
-    ].sort((a, b) => parseFloat(b.v) - parseFloat(a.v));
-    return { label: candidates[0].label, value: candidates[0].v, cost: costPer(candidates[0].v) };
-  }
-
-  // AWARENESS / REACH
-  if (obj.includes('awareness') || obj.includes('reach')) {
-    const v = String(parseInt(ins?.reach || 0));
-    return { label: 'Alcance', value: v, cost: '—' };
-  }
-
-  // VIDEO VIEWS
-  if (obj.includes('video')) {
-    const v = first(ins?.video_thruplay_watched_actions?.[0]?.value);
-    return { label: 'ThruPlays', value: v, cost: costPer(v) };
-  }
-
-  // APP PROMOTION
-  if (obj.includes('app')) {
-    const v = first(getMetaVal(actions, 'mobile_app_install', 'app_install'));
-    return { label: 'Instalaciones', value: v, cost: costPer(v) };
-  }
-
-  // ENGAGEMENT — prioritize messaging conversations (WhatsApp/Click-to-Message campaigns
-  // use OUTCOME_ENGAGEMENT but optimize for conversations, not post_engagement)
-  if (obj.includes('engagement')) {
-    const postEng = getMetaVal(actions, 'post_engagement', 'page_engagement');
-    const msgs    = getMetaVal(actions,
-      'onsite_conversion.messaging_conversation_started_7d',
-      'onsite_conversion.messaging_first_reply',
-    );
-    const postN = parseFloat(postEng || '0');
-    const msgN  = parseFloat(msgs   || '0');
-    // If any messaging conversations exist, this is a WhatsApp campaign — use that metric
-    if (msgN > 0) {
-      return { label: 'Mensajes', value: String(msgN), cost: costPer(String(msgN)) };
+    v = getV('offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase', 'onsite_conversion.purchase');
+    label = 'Compras';
+  } else if (obj.includes('lead')) {
+    v = getV('lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped');
+    label = 'Leads';
+  } else if (obj.includes('engagement')) {
+    const msgs = getV('onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply');
+    if (parseFloat(msgs) > 0) {
+      v = msgs; label = 'Mensajes';
+    } else {
+      v = getV('post_engagement', 'page_engagement');
+      label = 'Interacciones';
     }
-    if (postN > 0) {
-      return { label: 'Interacciones', value: String(postN), cost: costPer(String(postN)) };
+  } else if (obj.includes('traffic') || obj.includes('link_click')) {
+    v = ins?.inline_link_clicks || '0';
+    label = 'Clics';
+  } else if (obj.includes('awareness') || obj.includes('reach')) {
+    v = String(parseInt(ins?.reach || 0));
+    label = 'Alcance';
+  } else if (obj.includes('video')) {
+    v = first(ins?.video_thruplay_watched_actions?.[0]?.value);
+    label = 'ThruPlays';
+  } else if (obj.includes('app')) {
+    v = getV('mobile_app_install', 'app_install');
+    label = 'Instalaciones';
+  }
+
+  // Fallback inteligente: si la métrica principal dio 0 (ej. Sales sin compras sino mensajes, o Leads en 0)
+  // priorizamos conversiones secundarias reales que sí ocurrieron en la campaña
+  if (parseFloat(v) === 0) {
+    const purch = getV('offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase', 'onsite_conversion.purchase');
+    if (parseFloat(purch) > 0) { v = purch; label = 'Compras'; } else {
+      const msgs = getV('onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply');
+      if (parseFloat(msgs) > 0) { v = msgs; label = 'Mensajes'; } else {
+        const leads = getV('lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped');
+        if (parseFloat(leads) > 0) { v = leads; label = 'Leads'; } else {
+          const clicks = ins?.inline_link_clicks || '0';
+          if (parseFloat(clicks) > 0) { v = clicks; label = 'Clics'; } else {
+            if (actions.length > 0) { v = actions[0]?.value || '0'; label = 'Resultado'; }
+          }
+        }
+      }
     }
-    return { label: 'Interacciones', value: '0', cost: '—' };
   }
 
-  // Fallback: primera accion disponible
-  if (actions.length > 0) {
-    const v = actions[0]?.value || '0';
-    return { label: 'Resultado', value: v, cost: costPer(v) };
+  if (label === 'Alcance' || label === 'Impresiones') {
+    return { label, value: v, cost: '—' };
   }
-
-  return { label: '—', value: '—', cost: '—' };
+  return { label, value: v, cost: costPer(v) };
 }
 
 function buildCampDataString(camps: any[], insights: Record<string, any>): string {
@@ -2124,15 +2108,15 @@ INICIO: ${planStartDate}
         return { val: v > 0 ? String(v) : '—', cost };
       };
       const objLabel: Record<string, [string, string]> = {
-        sales: ['Compras', 'Costo por compra'],
+        sales: ['Resultados', 'Costo/Res.'],
         leads: ['Leads', 'Costo por lead'],
         messages: ['Conversaciones', 'Costo por conv.'],
         traffic: ['Clics', 'CPC'],
         engagement: ['Interacciones', 'Costo x interac.'],
         awareness: ['Impresiones', 'CPM'],
-        mixed: ['Resultado', 'Costo/resultado'],
+        mixed: ['Resultados', 'Costo/Res.'],
       };
-      const [oLabel, oCostLabel] = objLabel[objType] || ['Resultado', 'Costo'];
+      const [oLabel, oCostLabel] = objLabel[objType] || ['Resultados', 'Costo/Res.'];
 
       // ── Bar HTML ──
       const barHtml = (items: { label: string; pct: number; value: string }[]) =>
@@ -2371,8 +2355,8 @@ INICIO: ${planStartDate}
         ${gRow('Impresiones', r => parseInt(r.impressions || '0').toLocaleString('es-AR'))}
         ${gRow('CTR', r => fmtNum(r.inline_link_click_ctr, 2) + '%')}
         ${gRow('CPM', r => `${cur} ${fmtNum(r.cpm, 0)}`)}
-        ${['sales','leads','messages','traffic'].includes(objType) ? gRow(oLabel, r => objMetricRow(r).val) : ''}
-        ${['sales','leads','messages','traffic'].includes(objType) ? gRow(oCostLabel, r => objMetricRow(r).cost) : ''}
+        ${gRow(oLabel, r => objMetricRow(r).val)}
+        ${gRow(oCostLabel, r => objMetricRow(r).cost)}
       </tbody>
     </table>
     <div class="bars">${gBars}</div>
