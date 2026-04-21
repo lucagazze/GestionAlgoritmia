@@ -1943,7 +1943,7 @@ INICIO: ${planStartDate}
       : '';
 
     pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Reporte — ${accountOverview?.name || ''}</title>
+<title>Reporte — ${accountOverview?.name || ''} — ${range.since} al ${range.until}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:13px;line-height:1.65;}
@@ -2100,22 +2100,28 @@ INICIO: ${planStartDate}
       const objMetricRow = (r: any) => {
         const spend = parseFloat(r.spend || '0');
         const actions = r.actions || [];
+        const getV = (types: string[]) => parseFloat(getMetaVal(actions, ...types) || '0');
+
+        let v = 0;
         if (objType === 'sales') {
-          const v = parseFloat(getMetaVal(actions, 'offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase') || '0');
-          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
-          return { val: v > 0 ? String(v) : '—', cost };
+          v = getV(['offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase', 'onsite_conversion.purchase']);
+        } else if (objType === 'leads') {
+          v = getV(['lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped']);
+        } else if (objType === 'messages') {
+          v = getV(['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply']);
         }
-        if (objType === 'leads') {
-          const v = parseFloat(getMetaVal(actions, 'lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped') || '0');
-          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
-          return { val: v > 0 ? String(v) : '—', cost };
+
+        // Si no encontró (o si objType es traffic/engagement/mixed), intentar en orden de valor:
+        if (v === 0) {
+          v = getV(['offsite_conversion.fb_pixel_purchase', 'omni_purchase', 'purchase', 'onsite_conversion.purchase']);
+          if (v === 0) v = getV(['lead', 'offsite_conversion.fb_pixel_lead', 'onsite_conversion.lead_grouped']);
+          if (v === 0) v = getV(['onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply']);
+          if (v === 0 && (objType === 'traffic' || objType === 'mixed' || objType === 'awareness')) v = parseFloat(r.inline_link_clicks || '0');
+          if (v === 0 && objType === 'engagement') v = getV(['post_engagement', 'page_engagement']);
         }
-        if (objType === 'messages') {
-          const v = parseFloat(getMetaVal(actions, 'onsite_conversion.messaging_conversation_started_7d', 'onsite_conversion.messaging_first_reply') || '0');
-          const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
-          return { val: v > 0 ? String(v) : '—', cost };
-        }
-        return { val: '—', cost: '—' };
+
+        const cost = v > 0 ? `${cur} ${fmtNum(spend / v, 0)}` : '—';
+        return { val: v > 0 ? String(v) : '—', cost };
       };
       const objLabel: Record<string, [string, string]> = {
         sales: ['Compras', 'Costo por compra'],
@@ -2196,6 +2202,7 @@ INICIO: ${planStartDate}
           <td>${ctr}</td>
           <td>${cpm}</td>
           <td>${metric.val}</td>
+          <td>${metric.cost}</td>
         </tr>`;
       }).join('');
       const regionBars = barHtml(sortedRegion.slice(0, 10).map((r: any) => {
@@ -2260,6 +2267,7 @@ INICIO: ${planStartDate}
           <td>${ctr}</td>
           <td>${cpm}</td>
           <td>${metric.val}</td>
+          <td>${metric.cost}</td>
         </tr>`;
       }).join('');
       const platBars = barHtml(sortedPlat.map((r: any) => {
@@ -2269,7 +2277,7 @@ INICIO: ${planStartDate}
 
 
       pw.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-<title>Reporte Completo — ${clientName}</title>
+<title>Reporte Completo — ${clientName} — ${period}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;background:#fff;font-size:13px;line-height:1.65;}
@@ -2404,6 +2412,7 @@ INICIO: ${planStartDate}
           <th>CTR</th>
           <th>CPM</th>
           <th>${oLabel}</th>
+          <th>${oCostLabel}</th>
         </tr>
       </thead>
       <tbody>${platRows}</tbody>
@@ -2425,6 +2434,7 @@ INICIO: ${planStartDate}
           <th>CTR</th>
           <th>CPM</th>
           <th>${oLabel}</th>
+          <th>${oCostLabel}</th>
         </tr>
       </thead>
       <tbody>${regionRows}</tbody>
