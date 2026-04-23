@@ -39,7 +39,7 @@ const sections = [
     items: [
       { path: '/ai-studio',          icon: Sparkles,         label: 'AI Studio',  ai: true },
       { path: '/sales-copilot',      icon: MessageSquareMore,label: 'Copiloto IA' },
-      { path: '/hero-product',       icon: TrendingUp,       label: 'Producto Héroe' },
+      { path: '/hero-product',       icon: TrendingUp,       label: 'Analizador de Producto' },
       { path: '/lab',                icon: Rocket,           label: 'The Lab' },
       { path: '/playbooks',          icon: Book,             label: 'Playbooks' },
     ],
