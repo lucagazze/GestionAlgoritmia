@@ -1290,7 +1290,7 @@ export default function AIAnalystPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeTab, setActiveTab] = useState<'REPORTES' | 'ANALISIS' | 'CREATIVOS' | 'CREATIVIDAD' | 'PLAN' | 'CLIENTE' | 'GPT_OPTIMIZER'>('REPORTES');
+  const [activeTab, setActiveTab] = useState<'REPORTES' | 'CREATIVOS' | 'CLIENTE' | 'GPT_OPTIMIZER'>('REPORTES');
 
   const [isFetchingData, setIsFetchingData] = useState(false);
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
@@ -1647,7 +1647,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
       if (aResult.status === 'fulfilled') { setAnalysisText(aResult.value); setAdActions(parseActionsFromAnalysis(aResult.value, campaigns)); }
       if (cResult.status === 'fulfilled') setCreativityText(cResult.value);
       if (rResult.status === 'fulfilled') setClientReportText(rResult.value);
-      setActiveTab('ANALISIS');
+      setActiveTab('CREATIVOS');
     } catch (e: any) {
       setAnalysisError('Error en análisis: ' + e.message);
     } finally {
@@ -1763,7 +1763,7 @@ Ordenadas por impacto. Nombrá conjuntos y anuncios exactos. Sin vaguedades.`;
     } finally {
       setIsAnalyzingAI(false);
       setAnalysisProgress('');
-      setActiveTab('ANALISIS');
+      setActiveTab('CREATIVOS');
     }
   };
 
@@ -1809,10 +1809,9 @@ INICIO: ${planStartDate}
   // ── Chat ───────────────────────────────────────────────────────────────────
   const handleChat = async (msg: string) => {
     if (!msg.trim() || isChatting) return;
-    const isPlanTab = activeTab === 'PLAN';
-    const chatHistory = isPlanTab ? planChat : analysisChat;
-    const setChat = isPlanTab ? setPlanChat : setAnalysisChat;
-    const context = isPlanTab ? planText : analysisText + '\n\n' + creativityText;
+    const chatHistory = analysisChat;
+    const setChat = setAnalysisChat;
+    const context = analysisText + '\n\n' + creativeAnalysisText;
 
     setIsChatting(true);
     setChatInput('');
@@ -2442,7 +2441,7 @@ INICIO: ${planStartDate}
   const handleExportPDF = () => {
     const pw = window.open('', '_blank');
     if (!pw) { showToast('El navegador bloqueó el popup. Permitir popups para exportar PDF.', 'error'); return; }
-    const content = activeTab === 'PLAN' ? planText : activeTab === 'CREATIVIDAD' ? creativityText : activeTab === 'CREATIVOS' ? creativeAnalysisText : activeTab === 'CLIENTE' ? clientReportText : analysisText;
+    const content = activeTab === 'CREATIVOS' ? (creativeAnalysisText || analysisText) : activeTab === 'CLIENTE' ? clientReportText : analysisText;
     const campRows = campaigns.map(c => {
       const ins = campaignInsights[c.id];
       const purchases = ins ? (getMetaVal(ins.actions || [], 'offsite_conversion.fb_pixel_purchase', 'purchase', 'omni_purchase') || '0') : '—';
@@ -2493,14 +2492,71 @@ INICIO: ${planStartDate}
     parseFloat(accountInsights?.spend || 0) || campaigns.reduce((s, c) => s + parseFloat(campaignInsights[c.id]?.spend || 0), 0),
   [accountInsights, campaigns, campaignInsights]);
 
+  const adPerformanceData = useMemo(() => {
+    const allItems: Array<{
+      ad: any; ins: any; adset: any; camp: any;
+      spend: number; roas: number; freq: number; ctr: number; cpa: number;
+      spendPct: number;
+      classification: 'SCALER' | 'RELIABLE' | 'FAKE WIN' | 'LIABILITY';
+      classReason: string;
+      fatigueLevel: 'ok' | 'warning' | 'danger';
+    }> = [];
+    for (const [campId, adsets] of Object.entries(campaignAdSets)) {
+      const camp = campaigns.find((c: any) => c.id === campId);
+      for (const adset of adsets as any[]) {
+        const adsList = adSetAds[adset.id] || [];
+        for (const ad of adsList) {
+          const ins = adInsights[ad.id];
+          if (!ins || parseFloat(ins.spend || 0) === 0) continue;
+          const spend = parseFloat(ins.spend || 0);
+          const roas = ins.purchase_roas?.[0]?.value ? parseFloat(ins.purchase_roas[0].value) : 0;
+          const freq = parseFloat(ins.frequency || 0);
+          const ctr = parseFloat(ins.inline_link_click_ctr || 0);
+          const purchases = parseFloat(getMetaVal(ins.actions || [], 'omni_purchase', 'offsite_conversion.fb_pixel_purchase', 'purchase') || '0');
+          const cpa = purchases > 0 ? spend / purchases : 0;
+          allItems.push({ ad, ins, adset, camp, spend, roas, freq, ctr, cpa, spendPct: 0, classification: 'RELIABLE', classReason: '', fatigueLevel: 'ok' });
+        }
+      }
+    }
+    if (allItems.length === 0) return null;
+    const totalAdSpend = allItems.reduce((s, a) => s + a.spend, 0);
+    const withRoas = allItems.filter(a => a.roas > 0);
+    const avgRoas = withRoas.length > 0 ? withRoas.reduce((s, a) => s + a.roas, 0) / withRoas.length : 0;
+    const withCpa = allItems.filter(a => a.cpa > 0);
+    const avgCpa = withCpa.length > 0 ? withCpa.reduce((s, a) => s + a.cpa, 0) / withCpa.length : 0;
+    for (const item of allItems) {
+      item.spendPct = totalAdSpend > 0 ? (item.spend / totalAdSpend) * 100 : 0;
+      item.fatigueLevel = item.freq > 3.5 ? 'danger' : item.freq > 2.5 ? 'warning' : 'ok';
+      if (avgRoas > 0 && item.roas > 0) {
+        if (item.roas >= avgRoas * 1.25 && item.spend >= totalAdSpend * 0.08) {
+          item.classification = 'SCALER';
+          item.classReason = `ROAS ${item.roas.toFixed(1)}x — ${Math.round((item.roas / avgRoas - 1) * 100)}% sobre promedio de la cuenta`;
+        } else if (item.spendPct >= 15 && item.roas < avgRoas * 0.75) {
+          item.classification = 'LIABILITY';
+          item.classReason = `Consume ${item.spendPct.toFixed(0)}% del presupuesto con ROAS ${item.roas.toFixed(1)}x vs promedio ${avgRoas.toFixed(1)}x`;
+        } else if (item.roas < avgRoas * 0.9 && item.cpa > 0 && avgCpa > 0 && item.cpa <= avgCpa) {
+          item.classification = 'FAKE WIN';
+          item.classReason = `CPA parece bueno pero ROAS ${item.roas.toFixed(1)}x está bajo el promedio de la cuenta (${avgRoas.toFixed(1)}x)`;
+        }
+      } else if (item.roas === 0 && item.spendPct >= 12) {
+        item.classification = 'LIABILITY';
+        item.classReason = `Consume ${item.spendPct.toFixed(0)}% del presupuesto sin generar conversiones`;
+      }
+    }
+    const funnelSpend = { TOFU: 0, MOFU: 0, BOFU: 0 };
+    for (const item of allItems) {
+      const stage = classifyFunnel(item.camp?.objective || '', item.adset.optimization_goal, item.adset.name);
+      funnelSpend[stage] += item.spend;
+    }
+    return { items: allItems, totalAdSpend, avgRoas, avgCpa, funnelSpend };
+  }, [campaignAdSets, adSetAds, adInsights, campaigns]);
+
   const hasData = campaigns.length > 0;
   const hasAnalysis = analysisText.length > 0;
   const isLoading = isFetchingData || isAnalyzingAI;
 
-  const currentChat = activeTab === 'PLAN' ? planChat : analysisChat;
-  const currentQuickPrompts: string[] = activeTab === 'PLAN'
-    ? ['¿Es realista el objetivo?', '¿Cómo distribuir el presupuesto?', '¿Qué hacer si no se cumplen las metas?', '¿Qué KPI mirar primero?']
-    : ['¿Por qué no se vende?', '¿Qué campaña pausar primero?', '¿Hay fatiga de audiencia?', '¿Dónde hay fuga de presupuesto?'];
+  const currentChat = analysisChat;
+  const currentQuickPrompts: string[] = ['¿Por qué no se vende?', '¿Qué campaña pausar primero?', '¿Hay fatiga de audiencia?', '¿Dónde hay fuga de presupuesto?'];
 
   return (
     <div className="flex h-[calc(100vh-60px)] overflow-hidden bg-[#f5f5f7] dark:bg-[#0a0a0a]">
@@ -2700,11 +2756,8 @@ INICIO: ${planStartDate}
         <div className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b border-black/[0.06] dark:border-white/[0.05] px-4 flex items-center">
           {([
             { id: 'REPORTES',      label: '📈 Datos' },
-            { id: 'ANALISIS',      label: '📊 Análisis' },
-            { id: 'CREATIVOS',     label: '🖼️ Creativos' },
+            { id: 'CREATIVOS',     label: '🧠 Análisis Creativo' },
             { id: 'CLIENTE',       label: '📄 Reporte Cliente' },
-            { id: 'CREATIVIDAD',   label: '🎨 Estrategia' },
-            { id: 'PLAN',          label: '📋 Plan' },
             { id: 'GPT_OPTIMIZER', label: '🎯 GPT Optimizer' },
           ] as const).map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -3230,19 +3283,124 @@ INICIO: ${planStartDate}
               </div>
             )}
 
-            {/* ── CREATIVOS ─────────────────────────────────────────── */}
+            {/* ── CREATIVOS + ANALISIS (merged) ─────────────────────── */}
             {activeTab === 'CREATIVOS' && (
               <div className="p-4 space-y-4 overflow-y-auto pb-28">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-[15px] font-bold text-zinc-900 dark:text-white">Creativos por Rol en el Funnel</h2>
-                    <p className="text-[11px] text-zinc-500 mt-0.5">Expandí campañas en Reportes → click en conjuntos → los creativos aparecen acá con su etapa del funnel.</p>
+                    <h2 className="text-[15px] font-bold text-zinc-900 dark:text-white">Análisis Creativo</h2>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">Diagnóstico automático + análisis IA por rol en el funnel.</p>
                   </div>
-                  <button onClick={analyzeCreatives} disabled={isAnalyzingCreatives}
+                  <button onClick={analyzeCreatives} disabled={isAnalyzingCreatives || Object.keys(campaignAdSets).length === 0}
                     className="flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 disabled:opacity-50 text-white text-[12px] font-semibold rounded-xl transition-colors shadow-sm">
                     {isAnalyzingCreatives ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /><span>Analizando...</span></> : <><BrainCircuit className="w-3.5 h-3.5" /><span>Analizar con IA</span></>}
                   </button>
                 </div>
+
+                {/* ── AUTO-DETECTION PANEL ── */}
+                {adPerformanceData && adPerformanceData.items.length > 0 && (
+                  <div className="space-y-3">
+                    {/* Funnel Distribution */}
+                    <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 p-4 shadow-sm">
+                      <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3">Distribución del presupuesto por funnel</p>
+                      <div className="flex rounded-lg overflow-hidden h-2.5 mb-3 bg-zinc-100 dark:bg-zinc-800">
+                        {(['TOFU', 'MOFU', 'BOFU'] as const).map(stage => {
+                          const pct = adPerformanceData.totalAdSpend > 0 ? (adPerformanceData.funnelSpend[stage] / adPerformanceData.totalAdSpend) * 100 : 0;
+                          const colors = { TOFU: 'bg-blue-400', MOFU: 'bg-amber-400', BOFU: 'bg-emerald-500' };
+                          return <div key={stage} className={`${colors[stage]}`} style={{ width: `${pct}%` }} />;
+                        })}
+                      </div>
+                      <div className="flex gap-5">
+                        {(['TOFU', 'MOFU', 'BOFU'] as const).map(stage => {
+                          const spend = adPerformanceData.funnelSpend[stage];
+                          const pct = adPerformanceData.totalAdSpend > 0 ? (spend / adPerformanceData.totalAdSpend) * 100 : 0;
+                          const { badge } = FUNNEL_STYLES[stage];
+                          return (
+                            <div key={stage} className="flex items-center gap-1.5">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${badge}`}>{stage}</span>
+                              <span className="text-[13px] font-bold text-zinc-700 dark:text-zinc-300">{pct.toFixed(0)}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {adPerformanceData.totalAdSpend > 0 && adPerformanceData.funnelSpend.BOFU / adPerformanceData.totalAdSpend > 0.6 && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                          <span>Sobre-indexado en BOFU — necesitás más TOFU para alimentar el funnel.</span>
+                        </div>
+                      )}
+                      {adPerformanceData.totalAdSpend > 0 && adPerformanceData.funnelSpend.TOFU / adPerformanceData.totalAdSpend > 0.5 && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                          <span>Mayoría del presupuesto en TOFU — revisá si hay suficientes anuncios de cierre.</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Ad classification */}
+                    {adPerformanceData.items.some(i => i.classification !== 'RELIABLE') && (
+                      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 p-4 shadow-sm">
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3">Clasificación de anuncios</p>
+                        <div className="space-y-2">
+                          {(['SCALER', 'RELIABLE', 'FAKE WIN', 'LIABILITY'] as const).map(cls => {
+                            const items = adPerformanceData.items.filter(i => i.classification === cls);
+                            if (items.length === 0) return null;
+                            const clsStyles: Record<string, { bg: string; badge: string; icon: string }> = {
+                              SCALER:     { bg: 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', icon: '🟢' },
+                              RELIABLE:   { bg: 'bg-zinc-50 dark:bg-zinc-800/30 border-zinc-200 dark:border-zinc-700', badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300', icon: '🔵' },
+                              'FAKE WIN': { bg: 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', icon: '🟡' },
+                              LIABILITY:  { bg: 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800', badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', icon: '🔴' },
+                            };
+                            const s = clsStyles[cls];
+                            return (
+                              <div key={cls} className={`rounded-xl border px-3 py-2.5 ${s.bg}`}>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${s.badge}`}>{s.icon} {cls}</span>
+                                  <span className="text-[10px] text-zinc-400">{items.length} anuncio{items.length > 1 ? 's' : ''}</span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  {items.map(item => (
+                                    <div key={item.ad.id} className="flex items-start justify-between gap-3">
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-100 truncate">{item.ad.name}</p>
+                                        {item.classReason && <p className="text-[9px] text-zinc-500 mt-0.5">{item.classReason}</p>}
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[9px] text-zinc-400 flex-shrink-0 font-mono">
+                                        {item.roas > 0 && <span className="font-bold text-zinc-600 dark:text-zinc-300">ROAS {item.roas.toFixed(1)}x</span>}
+                                        <span>{item.spendPct.toFixed(0)}% pres.</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fatigue alerts */}
+                    {adPerformanceData.items.some(i => i.fatigueLevel !== 'ok') && (
+                      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 p-4 shadow-sm">
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-3">Señales de fatiga creativa</p>
+                        <div className="space-y-1.5">
+                          {adPerformanceData.items.filter(i => i.fatigueLevel !== 'ok').sort((a, b) => b.freq - a.freq).map(item => (
+                            <div key={item.ad.id} className={`flex items-center justify-between rounded-lg px-3 py-2 border ${item.fatigueLevel === 'danger' ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' : 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'}`}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[12px]">{item.fatigueLevel === 'danger' ? '🔴' : '🟡'}</span>
+                                <span className="text-[11px] font-medium text-zinc-800 dark:text-zinc-200 truncate">{item.ad.name}</span>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0 text-[10px]">
+                                <span className={`font-bold font-mono ${item.fatigueLevel === 'danger' ? 'text-red-600' : 'text-amber-600'}`}>Freq {item.freq.toFixed(2)}</span>
+                                <span className="text-zinc-400 uppercase tracking-wide text-[9px]">{item.fatigueLevel === 'danger' ? 'Fatiga crítica' : 'Atención'}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   {(['TOFU', 'MOFU', 'BOFU'] as const).map(stage => {
                     const s = FUNNEL_STYLES[stage];
@@ -3797,7 +3955,7 @@ INICIO: ${planStartDate}
                     <BrainCircuit className="w-3 h-3 text-white" />
                   </div>
                   <p className="text-[12px] font-bold text-zinc-900 dark:text-white">
-                    {activeTab === 'PLAN' ? 'Chat estratégico' : 'Chat analista'}
+                    Chat analista
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-2">
