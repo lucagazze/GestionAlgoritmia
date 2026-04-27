@@ -32,6 +32,7 @@ const sections = [
       { path: '/quotations',         icon: FileText,         label: 'Presupuestos' },
       { path: '/marketing-proposal', icon: Megaphone,        label: 'Propuesta Ads' },
       { path: '/audit',              icon: Activity,         label: 'Auditoría' },
+      { path: '/hero-product',       icon: TrendingUp,       label: 'Analizar Productos' },
     ],
   },
   {
