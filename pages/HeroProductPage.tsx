@@ -38,12 +38,14 @@ type MetaPeriod = 'last_7d' | 'last_14d' | 'last_30d';
 // ─── CSV Parsing ──────────────────────────────────────────────────────────────
 
 function parseCSVText(text: string): string[][] {
+  const firstLine = text.split('\n')[0] || '';
+  const separator = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
   const rows: string[][] = [];
   let row: string[] = [], field = '', inQ = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i], n = text[i + 1];
     if (c === '"') { if (inQ && n === '"') { field += '"'; i++; } else inQ = !inQ; }
-    else if (c === ',' && !inQ) { row.push(field); field = ''; }
+    else if (c === separator && !inQ) { row.push(field); field = ''; }
     else if ((c === '\n' || c === '\r') && !inQ) {
       if (c === '\r' && n === '\n') i++;
       row.push(field); field = '';
@@ -63,22 +65,45 @@ interface RawOrder {
 function buildOrders(rows: string[][]): RawOrder[] {
   if (rows.length < 2) return [];
   const h = rows[0];
-  const idx = (col: string) => h.indexOf(col);
-  const iN = idx('Name'), iE = idx('Email'), iSt = idx('Financial Status');
-  const iD = idx('Created at'), iQ = idx('Lineitem quantity');
-  const iIN = idx('Lineitem name'), iIP = idx('Lineitem price');
+  const findIdx = (tests: RegExp[]) => h.findIndex(col => tests.some(regex => regex.test(col)));
+
+  const iN = findIdx([/^name$/i, /orden/i]);
+  const iE = findIdx([/^email$/i]);
+  const iSt = findIdx([/^financial status$/i, /estado del pago/i]);
+  const iD = findIdx([/^created at$/i, /^fecha$/i]);
+  const iQ = findIdx([/^lineitem quantity$/i, /cantidad del producto/i]);
+  const iIN = findIdx([/^lineitem name$/i, /nombre del producto/i]);
+  const iIP = findIdx([/^lineitem price$/i, /precio del producto/i]);
+
   const map = new Map<string, RawOrder>();
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const name = r[iN]?.trim(); if (!name) continue;
     const email = r[iE]?.trim().toLowerCase();
-    const status = r[iSt]?.trim();
+    
+    let status = r[iSt]?.trim().toLowerCase() || '';
+    if (status === 'recibido' || status === 'paid') status = 'paid';
+    
     const dateStr = r[iD]?.trim();
     const itemName = r[iIN]?.trim();
-    const price = parseFloat(r[iIP]) || 0;
+    const price = parseFloat((r[iIP] || '0').replace(',', '.')) || 0;
     const qty = parseInt(r[iQ]) || 1;
-    if (!map.has(name)) map.set(name, { name, email: email || '', date: dateStr ? new Date(dateStr) : new Date(0), status: status || '', items: [] });
-    else if (status) map.get(name)!.status = status;
+    
+    if (!map.has(name)) {
+      let d = new Date(0);
+      if (dateStr) {
+        const tnMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+        if (tnMatch) {
+          d = new Date(parseInt(tnMatch[3]), parseInt(tnMatch[2]) - 1, parseInt(tnMatch[1]), parseInt(tnMatch[4]||'0'), parseInt(tnMatch[5]||'0'), parseInt(tnMatch[6]||'0'));
+        } else {
+          d = new Date(dateStr);
+        }
+      }
+      map.set(name, { name, email: email || '', date: d, status, items: [] });
+    } else if (status) {
+      map.get(name)!.status = status;
+    }
+    
     if (itemName) map.get(name)!.items.push({ productName: itemName, price, qty });
   }
   return [...map.values()];
