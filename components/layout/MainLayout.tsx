@@ -33,6 +33,7 @@ import NewClientPage from '../../pages/NewClientPage';
 import AIStudioPage from '../../pages/AIStudioPage';
 import AIAnalystPage from '../../pages/AIAnalystPage';
 import HeroProductPage from '../../pages/HeroProductPage';
+import CreativeTesterPage from '../../pages/CreativeTesterPage';
 
 export const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -117,6 +118,7 @@ export const MainLayout = () => {
             <Route path="/ai-studio"            element={<AIStudioPage />} />
             <Route path="/ai-analyst"           element={<AIAnalystPage />} />
             <Route path="/hero-product"         element={<HeroProductPage />} />
+            <Route path="/creative-tester"      element={<CreativeTesterPage />} />
           </Routes>
         </div>
 

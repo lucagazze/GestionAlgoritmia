@@ -33,6 +33,7 @@ const sections = [
       { path: '/marketing-proposal', icon: Megaphone,        label: 'Propuesta Ads' },
       { path: '/audit',              icon: Activity,         label: 'Auditoría' },
       { path: '/hero-product',       icon: TrendingUp,       label: 'Analizar Productos' },
+      { path: '/creative-tester',    icon: Target,           label: 'Test Creativos', ai: true },
     ],
   },
   {
