@@ -9,6 +9,7 @@ export default function SettingsPage() {
     const navigate = useNavigate();
     const [apiKey, setApiKey] = useState('');
     const [claudeApiKey, setClaudeApiKey] = useState('');
+    const [openAiApiKey, setOpenAiApiKey] = useState('');
     const [oauthClientId, setOauthClientId] = useState('');
     const [metaAdsToken, setMetaAdsToken] = useState('');
     const [loading, setLoading] = useState(true);
@@ -28,6 +29,9 @@ export default function SettingsPage() {
             const claudeKey = await db.settings.getApiKey('claude_api_key');
             if (claudeKey) setClaudeApiKey(claudeKey.slice(0, 10) + '••••••••••••••••••••••••');
 
+            const openAiKey = await db.settings.getApiKey('openai_api_key');
+            if (openAiKey) setOpenAiApiKey(openAiKey.slice(0, 10) + '••••••••••••••••••••••••');
+
             const clientId = await db.settings.getApiKey('google_oauth_client_id');
             if (clientId) setOauthClientId(clientId);
 
@@ -45,6 +49,7 @@ export default function SettingsPage() {
         try {
             if (apiKey.trim()) await db.settings.setApiKey(apiKey.trim(), 'google_api_key');
             if (claudeApiKey.trim() && !claudeApiKey.includes('••')) await db.settings.setApiKey(claudeApiKey.trim(), 'claude_api_key');
+            if (openAiApiKey.trim() && !openAiApiKey.includes('••')) await db.settings.setApiKey(openAiApiKey.trim(), 'openai_api_key');
             if (oauthClientId.trim()) await db.settings.setApiKey(oauthClientId.trim(), 'google_oauth_client_id');
             if (metaAdsToken.trim() && !metaAdsToken.includes('••')) {
                 await db.settings.setApiKey(metaAdsToken.trim(), 'meta_ads_token');
@@ -234,6 +239,29 @@ create policy "Enable all for ChatSession" on "aichatsession" for all using (tru
                                 className="font-mono text-[12px]"
                             />
                             <p className="text-[11px] text-zinc-400">Conseguila en <span className="text-zinc-600 dark:text-zinc-300 font-medium">console.anthropic.com</span></p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* OpenAI API Key */}
+                <Card className="overflow-visible">
+                    <CardHeader className="border-b border-zinc-100 dark:border-zinc-800">
+                        <CardTitle className="flex items-center gap-2 text-[14px] font-semibold text-zinc-900 dark:text-white">
+                            <Sparkles className="w-4 h-4 text-emerald-500" /> OpenAI (GPT-4o)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-5">
+                        <p className="text-[12px] text-zinc-400">Usado para el análisis de video ultra-preciso en Creative Tester.</p>
+                        <div className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input
+                                type="password"
+                                value={openAiApiKey}
+                                onChange={(e) => setOpenAiApiKey(e.target.value)}
+                                placeholder="sk-proj-..."
+                                className="font-mono text-[12px]"
+                            />
+                            <p className="text-[11px] text-zinc-400">Conseguila en <span className="text-zinc-600 dark:text-zinc-300 font-medium">platform.openai.com</span></p>
                         </div>
                     </CardContent>
                 </Card>

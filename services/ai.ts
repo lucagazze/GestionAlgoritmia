@@ -601,4 +601,109 @@ REGLAS:
           return null;
       }
   },
+
+  /**
+   * Analiza frames de un video o una imagen para generar el reporte de Neuromarketing
+   */
+  analyzeCreative: async (base64Images: string[], isVideo: boolean) => {
+      try {
+          const openAiKey = await db.settings.getApiKey('openai_api_key');
+          
+          const prompt = `
+          ERES: TRIBE v2, un simulador neuro-computacional implacable usado por agencias de marketing de élite.
+          OBJETIVO: Analizar estas imágenes ${isVideo ? '(fotogramas clave de un video)' : '(anuncio estático)'} y destruir sus debilidades visuales o exaltar sus aciertos técnicos.
+          
+          REGLA DE ORO: ESTÁ ESTRICTAMENTE PROHIBIDO DAR CONSEJOS GENÉRICOS. Nada de "usa colores llamativos" o "añade expresiones faciales". DEBES referirte a los elementos literales y exactos que estás viendo en la imagen. 
+          Ejemplos correctos: "El sujeto tiene una expresión neutra que no conecta", "La tipografía blanca en la esquina superior izquierda se pierde con el cielo", "El producto aparece muy tarde o es muy pequeño frente a la madera del fondo", "El texto 'Compra ahora' tiene poco contraste".
+          
+          DEBES EVALUAR:
+          1. Retención de Atención (0-99): Velocidad de asimilación visual en 3s.
+          2. Impacto Emocional (0-99): Nivel de activación de la amígdala (microexpresiones, colores).
+          3. Carga Cognitiva (0-99): Nivel de confusión o sobrecarga. Ideal <30. Si hay mucho texto o ruido, sube a 50+.
+          4. Región Principal: Elige UNA: "V1" (Visual Puro), "A1" (Texto/Audio), "FFA" (Rostros), "EBA" (Cuerpos), "Amígdala" (Emoción).
+          
+          FORMATO JSON ESTRICTO OBLIGATORIO:
+          {
+            "attentionPct": 85,
+            "emotionPct": 72,
+            "cogLoad": 25,
+            "highestRegion": "FFA",
+            "textInsight": "Análisis ultra-crítico de 3 líneas. Menciona colores exactos, iluminación, encuadre o fallas de jerarquía visual detectadas.",
+            "actionItems": [
+               "Táctica milimétrica 1 (ej: 'Agrandar la fuente roja del CTA un 20% y centrarla')",
+               "Táctica milimétrica 2",
+               "Táctica milimétrica 3",
+               "Genera entre 3 y 6 tácticas según sean necesarias..."
+            ]
+          }
+          `;
+
+          // SI HAY LLAVE DE OPENAI, USA GPT-4o (PRIORIDAD ALTA)
+          if (openAiKey) {
+              const content: any[] = [{ type: 'text', text: prompt }];
+              for (const b64 of base64Images) {
+                  // Ensure base64 string has data URI prefix
+                  const fullB64 = b64.includes(',') ? b64 : `data:image/jpeg;base64,${b64}`;
+                  content.push({
+                      type: 'image_url',
+                      image_url: { url: fullB64, detail: 'high' }
+                  });
+              }
+
+              const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${openAiKey}`
+                  },
+                  body: JSON.stringify({
+                      model: 'gpt-4o',
+                      messages: [{ role: 'user', content }],
+                      temperature: 0,
+                      response_format: { type: 'json_object' }
+                  })
+              });
+
+              if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error("OpenAI API Error:", errorText);
+                  throw new Error("OpenAI falló, retrocediendo a Gemini...");
+              }
+              
+              const data = await response.json();
+              const text = data.choices[0]?.message?.content;
+              if (!text) return null;
+              return JSON.parse(text);
+          }
+
+          // SI NO HAY OPENAI, USA GEMINI (FALLBACK)
+          const client = await getClient();
+          const parts: any[] = [{ text: prompt }];
+          for (const b64 of base64Images) {
+              const base64Data = b64.includes(',') ? b64.split(',')[1] : b64;
+              parts.push({
+                  inlineData: {
+                      mimeType: 'image/jpeg',
+                      data: base64Data
+                  }
+              });
+          }
+
+          const response = await client.models.generateContent({
+              model: MODEL_NAME,
+              contents: [{ role: 'user', parts }],
+              config: { 
+                  responseMimeType: 'application/json',
+                  temperature: 0 // Garantiza que los resultados sean determinísticos
+              }
+          });
+
+          const text = response.text;
+          if (!text) return null;
+          return JSON.parse(text);
+      } catch (error) {
+          console.error("Creative Analysis Error:", error);
+          return null;
+      }
+  }
 };

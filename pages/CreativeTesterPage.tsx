@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Video, Image as ImageIcon, BrainCircuit, Activity, Eye, Zap, BarChart3, RefreshCw, FileAudio, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { ai } from '../services/ai';
 
 const generateMockData = (file: File, duration: number) => {
   const fileType = file.type || '';
@@ -53,9 +54,16 @@ const generateMockData = (file: File, duration: number) => {
     };
   });
 
-  const attentionPct = Math.floor(seededRandom() * 40) + 55;
-  const emotionPct = Math.floor(seededRandom() * 45) + 45;
-  const cogLoad = Math.floor(seededRandom() * 50) + 15;
+  // Hacemos que los resultados dependan más de la metadata real para mayor coherencia
+  const baseAttention = isVideo ? (v1Base + a1Base) / 2 : v1Base;
+  const attentionPct = Math.min(99, Math.floor(baseAttention * 0.8 + seededRandom() * 20));
+  
+  // Videos suelen tener mayor impacto emocional por defecto debido a la música y movimiento
+  const emotionPct = isVideo ? Math.min(99, Math.floor(seededRandom() * 20) + 75) : Math.min(99, amygdalaBase + Math.floor(seededRandom() * 15));
+  
+  // Carga cognitiva penaliza videos muy largos o archivos extremadamente pesados (mal optimizados)
+  const sizeInMb = file.size / (1024 * 1024);
+  const cogLoad = Math.max(12, Math.min(85, Math.floor(duration * 0.4 + sizeInMb * 0.5 + seededRandom() * 15)));
   
   // Score Global makes sense: 40% Attention + 40% Emotion + 20% (100-CognitiveLoad)
   const finalScore = Math.floor((attentionPct * 0.4) + (emotionPct * 0.4) + ((100 - cogLoad) * 0.2));
@@ -156,6 +164,58 @@ const analyzeSteps = [
   { threshold: 90, label: "Generando métricas de neuromarketing..." },
 ];
 
+const extractMediaFrames = async (file: File): Promise<string[]> => {
+  return new Promise((resolve) => {
+    const isVideo = file.type.startsWith('video');
+    
+    if (!isVideo) {
+       const reader = new FileReader();
+       reader.onload = (e) => resolve([e.target?.result as string]);
+       reader.readAsDataURL(file);
+       return;
+    }
+
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(file);
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.playsInline = true;
+    
+    const frames: string[] = [];
+    const numFrames = 3;
+    let currentFrame = 1;
+    
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      
+      video.onseeked = () => {
+         const canvas = document.createElement('canvas');
+         canvas.width = video.videoWidth;
+         canvas.height = video.videoHeight;
+         const ctx = canvas.getContext('2d');
+         ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+         frames.push(canvas.toDataURL('image/jpeg', 0.8));
+         
+         currentFrame++;
+         if (currentFrame <= numFrames) {
+            video.currentTime = (duration / (numFrames + 1)) * currentFrame;
+         } else {
+            URL.revokeObjectURL(video.src);
+            resolve(frames);
+         }
+      };
+      
+      // trigger first seek
+      video.currentTime = duration / (numFrames + 1);
+    };
+    
+    video.onerror = () => {
+       URL.revokeObjectURL(video.src);
+       resolve([]);
+    }
+  });
+};
+
 export default function CreativeTesterPage() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -206,25 +266,27 @@ export default function CreativeTesterPage() {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!file) return;
     setStatus('analyzing');
     setProgress(0);
 
-    const { newBrainData, newAttentionData, finalScore, insights: newInsights } = generateMockData(file, mediaDuration);
-    setBrainData(newBrainData);
-    setAttentionData(newAttentionData);
-    setScore(finalScore);
-    setInsights(newInsights);
+    let { newBrainData, newAttentionData, finalScore, insights: newInsights } = generateMockData(file, mediaDuration);
+    const isVideo = file.type.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov)$/i);
 
-    const duration = 4000; // 4 seconds fake loading
+    const duration = 4000; // 4 seconds fake loading min
     const intervalTime = 50;
     const increment = 100 / (duration / intervalTime);
+    
+    let isApiDone = false;
 
     const interval = setInterval(() => {
       setProgress(p => {
         const next = p + increment;
-        if (next >= 100) {
+        if (next >= 95 && !isApiDone) {
+          return 95; // Stall at 95% if API is still running
+        }
+        if (next >= 100 && isApiDone) {
           clearInterval(interval);
           setStatus('complete');
           return 100;
@@ -232,6 +294,64 @@ export default function CreativeTesterPage() {
         return next;
       });
     }, intervalTime);
+
+    try {
+      const frames = await extractMediaFrames(file);
+      if (frames.length > 0) {
+          const aiResult = await ai.analyzeCreative(frames, isVideo);
+          if (aiResult && typeof aiResult.attentionPct === 'number') {
+             // Override mock data with REAL AI analysis
+             finalScore = Math.floor((aiResult.attentionPct * 0.4) + (aiResult.emotionPct * 0.4) + ((100 - aiResult.cogLoad) * 0.2));
+             const isApproved = finalScore >= 75;
+             const verdictStatus = finalScore >= 80 ? 'Excelente' : finalScore >= 60 ? 'Aceptable' : 'Deficiente';
+             const conclusionText = `Basado en el análisis profundo de los fotogramas reales mediante IA, el activo genera un nivel de retención atencional del ${aiResult.attentionPct}% y un impacto emocional del ${aiResult.emotionPct}%. La mayor estimulación ocurre en la región ${aiResult.highestRegion}. ${aiResult.textInsight} En términos neuro-comerciales, el desempeño es ${verdictStatus.toLowerCase()}.`;
+             
+             newInsights = {
+                 attention: aiResult.attentionPct >= 75 ? 'Alto' : aiResult.attentionPct >= 60 ? 'Medio' : 'Bajo',
+                 attentionPct: aiResult.attentionPct,
+                 emotion: aiResult.emotionPct >= 70 ? 'Alto' : aiResult.emotionPct >= 50 ? 'Medio-Alto' : 'Bajo',
+                 emotionPct: aiResult.emotionPct,
+                 cogLoad: aiResult.cogLoad,
+                 cogLoadStatus: aiResult.cogLoad <= 30 ? 'Óptima' : aiResult.cogLoad <= 45 ? 'Moderada' : 'Alta',
+                 text: aiResult.textInsight,
+                 actionItems: aiResult.actionItems || newInsights.actionItems,
+                 highestRegion: aiResult.highestRegion,
+                 verdictTitle: isApproved ? 'Creativo Optimizado (Aprobado)' : 'Requiere Ajustes Cognitivos',
+                 verdictText: conclusionText,
+                 isApproved
+             };
+
+             // Adjust radar chart to highlight the AI's chosen highestRegion
+             newBrainData = newBrainData.map(d => {
+                 if (d.subject.includes(aiResult.highestRegion)) {
+                     return { ...d, value: Math.max(85, d.value + 20) };
+                 }
+                 return d;
+             });
+
+             // Escalar la gráfica de atención para que coincida exactamente con el promedio real dictado por la IA
+             const currentMockAvgAtt = newAttentionData.reduce((acc, d) => acc + d.attention, 0) / newAttentionData.length;
+             const attRatio = aiResult.attentionPct / currentMockAvgAtt;
+             
+             const currentMockAvgMem = newAttentionData.reduce((acc, d) => acc + d.memory, 0) / newAttentionData.length;
+             const memRatio = aiResult.emotionPct / currentMockAvgMem;
+
+             newAttentionData = newAttentionData.map(d => ({
+                 ...d,
+                 attention: Math.max(10, Math.min(99, Math.floor(d.attention * attRatio))),
+                 memory: Math.max(10, Math.min(99, Math.floor(d.memory * memRatio)))
+             }));
+          }
+      }
+    } catch (e) {
+      console.error("Failed to analyze with AI, falling back to mock", e);
+    } finally {
+      setBrainData(newBrainData);
+      setAttentionData(newAttentionData);
+      setScore(finalScore);
+      setInsights(newInsights);
+      isApiDone = true;
+    }
   };
 
   useEffect(() => {
@@ -403,7 +523,7 @@ export default function CreativeTesterPage() {
                 </h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-zinc-200 dark:divide-white/[0.05]">
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-200 dark:divide-white/[0.05]">
                 {/* Column 1: Score Global */}
                 <div className="p-8 flex flex-col items-center justify-center text-center">
                   <span className="text-[12px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-4">Score Global</span>
@@ -474,25 +594,25 @@ export default function CreativeTesterPage() {
                     <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">Principal estímulo:</strong> La región {insights.highestRegion} es la más activada en el usuario.
                   </p>
                 </div>
+              </div>
 
-                {/* Column 3: Lo que deberías hacer */}
-                <div className="p-8 bg-zinc-50 dark:bg-zinc-800/20">
-                  <h3 className="font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-500" />
-                    Lo que debes hacer
-                  </h3>
-                  <div className="space-y-3">
-                    {insights.actionItems?.map((item: string, idx: number) => (
-                      <div key={idx} className="flex gap-3 items-start bg-white dark:bg-[#161618] p-3.5 rounded-xl border border-zinc-200 dark:border-white/[0.05] shadow-sm">
-                        <div className="w-5 h-5 mt-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 text-[11px] font-bold">
-                          {idx + 1}
-                        </div>
-                        <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                          {item}
-                        </p>
+              {/* Fila Inferior: Lo que deberías hacer */}
+              <div className="p-8 bg-zinc-50 dark:bg-zinc-800/20 border-t border-zinc-200 dark:border-white/[0.05]">
+                <h3 className="font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  Plan de Acción Técnico
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {insights.actionItems?.map((item: string, idx: number) => (
+                    <div key={idx} className="flex gap-3 items-start bg-white dark:bg-[#161618] p-4 rounded-xl border border-zinc-200 dark:border-white/[0.05] shadow-sm">
+                      <div className="w-6 h-6 mt-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 text-[12px] font-bold">
+                        {idx + 1}
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed mt-0.5">
+                        {item}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
