@@ -3,33 +3,49 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Video, Image as ImageIcon, BrainCircuit, Activity, Eye, Zap, BarChart3, RefreshCw, FileAudio, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
-const generateMockData = (fileType: string) => {
-  const isVideo = fileType.startsWith('video');
-  const isImage = fileType.startsWith('image');
+const generateMockData = (file: File, duration: number) => {
+  const fileType = file.type || '';
+  const isVideo = fileType.startsWith('video') || !!file.name.match(/\.(mp4|webm|ogg|mov)$/i);
+  const isImage = fileType.startsWith('image') || !!file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  
+  // Deterministic seed based on file properties
+  const seedString = file.name + file.size + file.lastModified;
+  let seed = 0;
+  for (let i = 0; i < seedString.length; i++) {
+    seed = ((seed << 5) - seed) + seedString.charCodeAt(i);
+    seed |= 0;
+  }
+  
+  // Mulberry32 PRNG
+  const seededRandom = () => {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
   
   const v1Base = isVideo ? 85 : isImage ? 95 : 40;
   const a1Base = isVideo ? 80 : isImage ? 20 : 95;
-  const ffaBase = Math.floor(Math.random() * 40) + 50; 
-  const ebaBase = Math.floor(Math.random() * 40) + 40; 
-  const ppaBase = Math.floor(Math.random() * 40) + 50; 
-  const amygdalaBase = Math.floor(Math.random() * 50) + 40;
+  const ffaBase = Math.floor(seededRandom() * 40) + 50; 
+  const ebaBase = Math.floor(seededRandom() * 40) + 40; 
+  const ppaBase = Math.floor(seededRandom() * 40) + 50; 
+  const amygdalaBase = Math.floor(seededRandom() * 50) + 40;
 
   const newBrainData = [
-    { subject: 'V1 (Visual)', value: v1Base + Math.floor(Math.random() * 10), fullMark: 100 },
-    { subject: 'A1 (Audio)', value: a1Base + Math.floor(Math.random() * 10), fullMark: 100 },
+    { subject: 'V1 (Visual)', value: v1Base + Math.floor(seededRandom() * 10), fullMark: 100 },
+    { subject: 'A1 (Audio)', value: a1Base + Math.floor(seededRandom() * 10), fullMark: 100 },
     { subject: 'FFA (Rostros)', value: ffaBase, fullMark: 100 },
     { subject: 'EBA (Cuerpos)', value: ebaBase, fullMark: 100 },
     { subject: 'PPA (Lugares)', value: ppaBase, fullMark: 100 },
     { subject: 'Amígdala (Emoción)', value: amygdalaBase, fullMark: 100 },
   ];
 
-  const duration = isImage ? 10 : 30;
-  let currentAttention = Math.floor(Math.random() * 20) + 70;
-  let currentMemory = Math.floor(Math.random() * 20) + 50;
+  let currentAttention = Math.floor(seededRandom() * 20) + 70;
+  let currentMemory = Math.floor(seededRandom() * 20) + 50;
 
   const newAttentionData = Array.from({ length: duration }).map((_, i) => {
-    currentAttention = Math.min(100, Math.max(30, currentAttention + (Math.random() * 20 - 10)));
-    currentMemory = Math.min(100, Math.max(20, currentMemory + (Math.random() * 15 - 7.5)));
+    currentAttention = Math.min(100, Math.max(30, currentAttention + (seededRandom() * 20 - 10)));
+    currentMemory = Math.min(100, Math.max(20, currentMemory + (seededRandom() * 15 - 7.5)));
     return {
       time: `${i}s`,
       attention: Math.floor(currentAttention),
@@ -37,23 +53,23 @@ const generateMockData = (fileType: string) => {
     };
   });
 
-  const finalScore = Math.min(99, Math.max(45, Math.floor((v1Base + a1Base + ffaBase + amygdalaBase) / 4) + Math.floor(Math.random() * 10)));
+  const attentionPct = Math.floor(seededRandom() * 40) + 55;
+  const emotionPct = Math.floor(seededRandom() * 45) + 45;
+  const cogLoad = Math.floor(seededRandom() * 50) + 15;
   
-  const attentionPct = Math.floor(Math.random() * 30) + 65;
-  const emotionPct = Math.floor(Math.random() * 40) + 50;
+  // Score Global makes sense: 40% Attention + 40% Emotion + 20% (100-CognitiveLoad)
+  const finalScore = Math.floor((attentionPct * 0.4) + (emotionPct * 0.4) + ((100 - cogLoad) * 0.2));
   
-  const textInsights = [
+  const textInsights = isImage ? [
+    "TRIBE v2 detecta una rápida asimilación de la composición estática. El ojo escanea primero los elementos con mayor contraste visual.",
+    "Al ser una imagen, el esfuerzo recae 100% en la jerarquía visual. Excelente activación del córtex prefrontal asimilando el texto.",
+    "El nivel de atención se centra rápidamente. La paleta cromática estimula áreas de memoria a corto plazo efectivamente.",
+    "Fuerte activación en el área de procesamiento visual (V1) y facial (FFA), indicando que la imagen tiene elementos humanos fuertes."
+  ] : [
     "TRIBE v2 actúa como un gemelo digital, revelando una fuerte activación zero-shot en la corteza visual primaria. El mensaje visual es procesado instantáneamente.",
-    "Resolución predictiva 70x: Se detecta alta coherencia in-silico entre la señal auditiva y visual. La amígdala muestra picos de resonancia emocional profunda.",
-    "El nivel de atención base es estable. La actividad simulada de la red de modo por defecto sugiere que el mensaje se integra sin fricción en los sujetos.",
-    "Fuerte activación en el córtex auditivo primario (A1) sincronizada con picos visuales, validado por los modelos entrenados en más de 700 voluntarios."
-  ];
-
-  const recommendations = [
-    "El pico emocional decae en la segunda mitad. Considerar introducir un cambio de ritmo visual o musical para mantener el engagement.",
-    "La atención visual es excelente. Sugerimos agregar un Call To Action (CTA) justo en el pico de mayor activación de la amígdala.",
-    "Para mejorar la retención, asegúrate de que el logo o mensaje principal aparezca durante los primeros 5 segundos donde la atención está en su máximo.",
-    "El audio lidera la atención. Refuerza los efectos sonoros en las transiciones visuales clave para maximizar el impacto."
+    "Resolución predictiva 70x: Se detecta alta coherencia in-silico entre la señal auditiva y visual en el video. La amígdala muestra picos de resonancia emocional profunda.",
+    "El nivel de atención base es estable a lo largo del metraje. La actividad simulada sugiere que el video se integra sin fricción en los sujetos.",
+    "Fuerte activación en el córtex auditivo primario (A1) sincronizada con picos visuales del video, validado por los modelos entrenados."
   ];
 
   const isApproved = finalScore >= 75;
@@ -63,24 +79,51 @@ const generateMockData = (fileType: string) => {
 
   const conclusionText = `Basado en la simulación predictiva de TRIBE v2 (N=700), el activo genera un nivel de retención atencional del ${attentionPct}% y un impacto emocional del ${emotionPct}%. La mayor estimulación ocurre en la región ${highestRegion}, lo que sugiere un rápido procesamiento cognitivo inicial. En términos neuro-comerciales, el desempeño del gemelo digital es ${verdictStatus.toLowerCase()}, ${isApproved ? 'con altas probabilidades de ser codificado en la memoria a largo plazo del consumidor.' : 'indicando que la sobrecarga cognitiva o la falta de anclajes emocionales limitan su eficacia.'}`;
 
-  const cogLoad = Math.floor((100 - attentionPct) * 0.5 + (100 - emotionPct) * 0.5);
   const cogLoadStatus = cogLoad <= 30 ? 'Óptima' : cogLoad <= 45 ? 'Moderada' : 'Alta';
 
+  let minAttentionTime = 0;
+  let minAttentionValue = 100;
+  let totalMemory = 0;
+  newAttentionData.forEach((d, i) => {
+    totalMemory += d.memory;
+    if (d.attention < minAttentionValue && i > 3) {
+      minAttentionValue = d.attention;
+      minAttentionTime = i;
+    }
+  });
+  const avgMemory = newAttentionData.length > 0 ? totalMemory / newAttentionData.length : 50;
+
   const actionItems = [];
+  if (minAttentionValue < 60 && duration > 5) {
+    if (isImage) {
+      actionItems.push("El ojo del usuario abandona la imagen rápidamente (baja retención). Recomendamos cambiar la jerarquía visual para guiar la mirada hacia el mensaje principal.");
+    } else {
+      actionItems.push(`Caída de atención detectada en el segundo ${minAttentionTime}. Insertar un cambio de plano (B-roll) o un gancho sonoro en el segundo ${minAttentionTime - 1} para retener al usuario.`);
+    }
+  }
   if (attentionPct < 75) {
-    actionItems.push("Añadir ganchos visuales (texto dinámico o cortes rápidos) en los primeros 3 segundos.");
+    actionItems.push(isImage ? "Aumentar el contraste o el tamaño del elemento central. El estímulo visual inicial es débil." : "Añadir ganchos visuales (texto dinámico o cortes rápidos) en los primeros 3 segundos.");
   }
   if (emotionPct < 70) {
-    actionItems.push("Incorporar música más intensa o rostros expresivos para activar la amígdala.");
+    actionItems.push(isImage ? "La imagen es demasiado fría o plana. Utilizar colores cálidos o rostros expresivos para activar la amígdala." : "Incorporar música más intensa o rostros expresivos para activar la amígdala.");
   }
   if (cogLoad > 35) {
-    actionItems.push("Reducir la cantidad de texto en pantalla y ralentizar transiciones para bajar la carga cognitiva.");
+    actionItems.push(isImage ? "Exceso de texto visual. Eliminar al menos 30% del texto para bajar la carga cognitiva y hacer el anuncio más directo." : "Reducir la cantidad de texto en pantalla y ralentizar transiciones para bajar la carga cognitiva.");
   }
   if (highestRegion === 'V1' && attentionPct >= 70) {
-    actionItems.push("Excelente estímulo visual. Mantener la paleta de colores actual.");
+    actionItems.push("Excelente estímulo visual primario. Mantener la paleta de colores actual.");
+  }
+  if (ffaBase > 70) {
+    actionItems.push(isImage ? "El rostro detectado genera buena empatía. Trata de que el titular principal apunte hacia donde mira la persona." : "Los rostros generan gran retención. Mantén a las personas visibles en pantalla y evita taparlos con texto.");
+  }
+  if (a1Base > 75 && isVideo) {
+    actionItems.push("El patrón de audio y voz lidera la atención. Asegúrate de incluir subtítulos dinámicos para la audiencia que ve videos en silencio.");
+  }
+  if (avgMemory < 60) {
+    actionItems.push("El anclaje en memoria es débil. Asegúrate de mostrar el logo de tu marca o producto durante más tiempo para evitar el síndrome del 'video fantasma' (gustó pero olvidaron la marca).");
   }
   if (actionItems.length === 0) {
-    actionItems.push("Escalar pauta publicitaria. El creativo está optimizado.");
+    actionItems.push(isImage ? "La imagen está optimizada para pauta gráfica." : "Escalar pauta publicitaria en video. El creativo está optimizado.");
   }
 
   return { 
@@ -94,8 +137,8 @@ const generateMockData = (fileType: string) => {
       emotionPct,
       cogLoad,
       cogLoadStatus,
-      text: textInsights[Math.floor(Math.random() * textInsights.length)],
-      actionItems: actionItems.slice(0, 3),
+      text: textInsights[Math.floor(seededRandom() * textInsights.length)],
+      actionItems: actionItems,
       highestRegion,
       verdictTitle: isApproved ? 'Creativo Optimizado (Aprobado)' : 'Requiere Ajustes Cognitivos',
       verdictText: conclusionText,
@@ -119,6 +162,7 @@ export default function CreativeTesterPage() {
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'complete'>('idle');
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(analyzeSteps[0].label);
+  const [mediaDuration, setMediaDuration] = useState<number>(30);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [brainData, setBrainData] = useState<any[]>([]);
@@ -126,13 +170,28 @@ export default function CreativeTesterPage() {
   const [score, setScore] = useState(0);
   const [insights, setInsights] = useState<any>({});
 
+  const processFile = (selectedFile: File) => {
+    setFile(selectedFile);
+    setPreviewUrl(URL.createObjectURL(selectedFile));
+    setStatus('idle');
+    setProgress(0);
+    
+    if (selectedFile.type.startsWith('video') || selectedFile.type.startsWith('audio')) {
+      const media = document.createElement(selectedFile.type.startsWith('video') ? 'video' : 'audio');
+      media.preload = 'metadata';
+      media.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(media.src);
+        setMediaDuration(Math.max(1, Math.round(media.duration)));
+      };
+      media.src = URL.createObjectURL(selectedFile);
+    } else {
+      setMediaDuration(10);
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0];
-      setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
-      setStatus('idle');
-      setProgress(0);
+      processFile(e.target.files[0]);
     }
   };
 
@@ -143,11 +202,7 @@ export default function CreativeTesterPage() {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const selectedFile = e.dataTransfer.files[0];
-      setFile(selectedFile);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
-      setStatus('idle');
-      setProgress(0);
+      processFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -156,7 +211,7 @@ export default function CreativeTesterPage() {
     setStatus('analyzing');
     setProgress(0);
 
-    const { newBrainData, newAttentionData, finalScore, insights: newInsights } = generateMockData(file.type);
+    const { newBrainData, newAttentionData, finalScore, insights: newInsights } = generateMockData(file, mediaDuration);
     setBrainData(newBrainData);
     setAttentionData(newAttentionData);
     setScore(finalScore);
@@ -552,6 +607,43 @@ export default function CreativeTesterPage() {
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Metodología / Glosario */}
+            <div className="bg-zinc-50 dark:bg-[#161618] border border-zinc-200 dark:border-white/[0.05] rounded-2xl p-6 sm:p-8 shadow-sm">
+              <h3 className="font-semibold text-zinc-900 dark:text-white text-[16px] mb-6 flex items-center gap-2">
+                <BrainCircuit className="w-5 h-5 text-indigo-500" />
+                ¿Por qué importan estos puntajes? (La ciencia detrás)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <h4 className="text-[14px] font-bold text-zinc-800 dark:text-zinc-200 mb-2 flex items-center gap-1.5">
+                    <Eye className="w-4 h-4 text-emerald-500" />
+                    Retención de Atención
+                  </h4>
+                  <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    Mide si el córtex visual (V1) logra "anclarse" al contenido. Si supera el <strong>75%</strong>, significa que el gancho de los primeros segundos es tan fuerte que detiene el scroll. Si es bajo, la vista del usuario simplemente se resbala y pasa al siguiente video.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-[14px] font-bold text-zinc-800 dark:text-zinc-200 mb-2 flex items-center gap-1.5">
+                    <Zap className="w-4 h-4 text-amber-500" />
+                    Impacto Emocional
+                  </h4>
+                  <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    Refleja la activación de la <strong>Amígdala</strong>. Un mensaje sin emoción se olvida a los 5 minutos. Si el impacto supera el <strong>70%</strong>, ya sea por intriga, risa o impacto visual, el cerebro lo cataloga como una "memoria a largo plazo" (clave para que luego compren).
+                  </p>
+                </div>
+                <div>
+                  <h4 className="text-[14px] font-bold text-zinc-800 dark:text-zinc-200 mb-2 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-red-500" />
+                    Carga Cognitiva (Debe ser &lt;30%)
+                  </h4>
+                  <p className="text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    Representa el "esfuerzo mental" necesario para entender tu anuncio. Si hay mucho texto, ruidos y cortes bruscos a la vez, la carga sube demasiado. <strong>Si supera el 30%</strong>, el usuario se frustra inconscientemente y lo descarta. El mejor creativo es el que se entiende "sin pensar".
+                  </p>
                 </div>
               </div>
             </div>
