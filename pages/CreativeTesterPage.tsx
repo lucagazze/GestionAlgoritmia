@@ -156,12 +156,12 @@ const generateMockData = (file: File, duration: number) => {
 };
 
 const analyzeSteps = [
-  { threshold: 0, label: "Inicializando modelo TRIBE v2..." },
-  { threshold: 15, label: "Extrayendo características visuales (V-JEPA)..." },
-  { threshold: 35, label: "Procesando componentes de audio (Wav2Vec-BERT)..." },
-  { threshold: 55, label: "Analizando semántica de texto (LLaMA)..." },
-  { threshold: 75, label: "Prediciendo respuestas BOLD fMRI en el córtex..." },
-  { threshold: 90, label: "Generando métricas de neuromarketing..." },
+  { threshold: 0,  label: "Inicializando modelo TRIBE v2..." },
+  { threshold: 10, label: "Extrayendo fotogramas clave del creativo..." },
+  { threshold: 25, label: "Enviando frames al motor de visión GPT-4o..." },
+  { threshold: 50, label: "Analizando jerarquía visual y respuesta emocional..." },
+  { threshold: 75, label: "Calibrando métricas fMRI y carga cognitiva..." },
+  { threshold: 90, label: "Generando plan de acción personalizado..." },
 ];
 
 const extractMediaFrames = async (file: File): Promise<string[]> => {
@@ -182,31 +182,38 @@ const extractMediaFrames = async (file: File): Promise<string[]> => {
     video.playsInline = true;
     
     const frames: string[] = [];
-    const numFrames = 3;
-    let currentFrame = 1;
     
     video.onloadedmetadata = () => {
-      const duration = video.duration;
+      const dur = video.duration;
+      
+      // 1 frame per second, max 20 frames — covers the whole video timeline
+      const totalFrames = Math.min(20, Math.max(5, Math.ceil(dur)));
+      const frameTimestamps = Array.from({ length: totalFrames }, (_, i) =>
+        (dur / totalFrames) * i + (dur / totalFrames / 2)
+      );
+      
+      let currentIdx = 0;
       
       video.onseeked = () => {
          const canvas = document.createElement('canvas');
-         canvas.width = video.videoWidth;
-         canvas.height = video.videoHeight;
+         // Scale to max 512px wide — enough detail, keeps token count low
+         const scale = Math.min(1, 512 / video.videoWidth);
+         canvas.width = Math.floor(video.videoWidth * scale);
+         canvas.height = Math.floor(video.videoHeight * scale);
          const ctx = canvas.getContext('2d');
          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-         frames.push(canvas.toDataURL('image/jpeg', 0.8));
+         frames.push(canvas.toDataURL('image/jpeg', 0.65));
          
-         currentFrame++;
-         if (currentFrame <= numFrames) {
-            video.currentTime = (duration / (numFrames + 1)) * currentFrame;
+         currentIdx++;
+         if (currentIdx < totalFrames) {
+            video.currentTime = frameTimestamps[currentIdx];
          } else {
             URL.revokeObjectURL(video.src);
             resolve(frames);
          }
       };
       
-      // trigger first seek
-      video.currentTime = duration / (numFrames + 1);
+      video.currentTime = frameTimestamps[0];
     };
     
     video.onerror = () => {
@@ -223,6 +230,7 @@ export default function CreativeTesterPage() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(analyzeSteps[0].label);
   const [mediaDuration, setMediaDuration] = useState<number>(30);
+  const [extractedFrames, setExtractedFrames] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [brainData, setBrainData] = useState<any[]>([]);
@@ -296,32 +304,37 @@ export default function CreativeTesterPage() {
     }, intervalTime);
 
     try {
+      setCurrentStep('Extrayendo fotogramas clave del creativo...');
       const frames = await extractMediaFrames(file);
+      setExtractedFrames(frames);
+
       if (frames.length > 0) {
+          setCurrentStep('Enviando frames al motor de visión GPT-4o...');
           const aiResult = await ai.analyzeCreative(frames, isVideo);
           if (aiResult && typeof aiResult.attentionPct === 'number') {
-             // Override mock data with REAL AI analysis
              finalScore = Math.floor((aiResult.attentionPct * 0.4) + (aiResult.emotionPct * 0.4) + ((100 - aiResult.cogLoad) * 0.2));
              const isApproved = finalScore >= 75;
              const verdictStatus = finalScore >= 80 ? 'Excelente' : finalScore >= 60 ? 'Aceptable' : 'Deficiente';
-             const conclusionText = `Basado en el análisis profundo de los fotogramas reales mediante IA, el activo genera un nivel de retención atencional del ${aiResult.attentionPct}% y un impacto emocional del ${aiResult.emotionPct}%. La mayor estimulación ocurre en la región ${aiResult.highestRegion}. ${aiResult.textInsight} En términos neuro-comerciales, el desempeño es ${verdictStatus.toLowerCase()}.`;
+             const conclusionText = `Basado en el análisis de ${frames.length} fotogramas reales mediante IA, el activo genera un nivel de retención atencional del ${aiResult.attentionPct}% y un impacto emocional del ${aiResult.emotionPct}%. La mayor estimulación ocurre en la región ${aiResult.highestRegion}. ${aiResult.textInsight} En términos neuro-comerciales, el desempeño es ${verdictStatus.toLowerCase()}.`;
              
              newInsights = {
                  attention: aiResult.attentionPct >= 75 ? 'Alto' : aiResult.attentionPct >= 60 ? 'Medio' : 'Bajo',
                  attentionPct: aiResult.attentionPct,
+                 attentionReason: aiResult.attentionReason || '',
                  emotion: aiResult.emotionPct >= 70 ? 'Alto' : aiResult.emotionPct >= 50 ? 'Medio-Alto' : 'Bajo',
                  emotionPct: aiResult.emotionPct,
+                 emotionReason: aiResult.emotionReason || '',
                  cogLoad: aiResult.cogLoad,
+                 cogLoadReason: aiResult.cogLoadReason || '',
                  cogLoadStatus: aiResult.cogLoad <= 30 ? 'Óptima' : aiResult.cogLoad <= 45 ? 'Moderada' : 'Alta',
                  text: aiResult.textInsight,
                  actionItems: aiResult.actionItems || newInsights.actionItems,
                  highestRegion: aiResult.highestRegion,
-                 verdictTitle: isApproved ? 'Creativo Optimizado (Aprobado)' : 'Requiere Ajustes Cognitivos',
+                 verdictTitle: isApproved ? 'Creativo Optimizado ✓' : finalScore >= 60 ? 'Requiere Ajustes Menores' : 'Revisar Antes de Pautar',
                  verdictText: conclusionText,
                  isApproved
              };
 
-             // Adjust radar chart to highlight the AI's chosen highestRegion
              newBrainData = newBrainData.map(d => {
                  if (d.subject.includes(aiResult.highestRegion)) {
                      return { ...d, value: Math.max(85, d.value + 20) };
@@ -329,10 +342,8 @@ export default function CreativeTesterPage() {
                  return d;
              });
 
-             // Escalar la gráfica de atención para que coincida exactamente con el promedio real dictado por la IA
              const currentMockAvgAtt = newAttentionData.reduce((acc, d) => acc + d.attention, 0) / newAttentionData.length;
              const attRatio = aiResult.attentionPct / currentMockAvgAtt;
-             
              const currentMockAvgMem = newAttentionData.reduce((acc, d) => acc + d.memory, 0) / newAttentionData.length;
              const memRatio = aiResult.emotionPct / currentMockAvgMem;
 
@@ -366,6 +377,7 @@ export default function CreativeTesterPage() {
     setPreviewUrl(null);
     setStatus('idle');
     setProgress(0);
+    setExtractedFrames([]);
   };
 
   const fileType = file?.type || '';
@@ -523,6 +535,17 @@ export default function CreativeTesterPage() {
                 </h2>
               </div>
 
+            {/* File info bar */}
+            <div className="flex flex-wrap items-center gap-3 px-8 py-4 border-b border-zinc-100 dark:border-white/[0.04] bg-zinc-50/50 dark:bg-white/[0.01] text-[12px] text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium text-zinc-700 dark:text-zinc-200 truncate max-w-[200px]">{file?.name}</span>
+              <span className="text-zinc-300 dark:text-zinc-700">·</span>
+              <span>{(file?.size ?? 0) > 1024*1024 ? `${((file?.size ?? 0)/1024/1024).toFixed(1)} MB` : `${((file?.size ?? 0)/1024).toFixed(0)} KB`}</span>
+              {mediaDuration > 1 && <><span className="text-zinc-300 dark:text-zinc-700">·</span><span>{mediaDuration}s de duración</span></>}
+              <span className="text-zinc-300 dark:text-zinc-700">·</span>
+              <span className="font-medium">{isVideo ? '🎬 Video Vertical' : isImage ? '🖼️ Imagen Estática' : '🎵 Audio'}</span>
+              <span className="ml-auto text-zinc-400 dark:text-zinc-500">{extractedFrames.length} frames analizados por IA</span>
+            </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-200 dark:divide-white/[0.05]">
                 {/* Column 1: Score Global */}
                 <div className="p-8 flex flex-col items-center justify-center text-center">
@@ -560,6 +583,7 @@ export default function CreativeTesterPage() {
                         <span title="Entre 60% y 74%">Medio (60-74%)</span>
                         <span title="Mayor a 75%">Excelente (&gt;75%)</span>
                       </div>
+                      {insights.attentionReason && <p className="text-[12px] text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">{insights.attentionReason}</p>}
                     </li>
                     <li>
                       <div className="flex justify-between text-[13px] mb-1.5">
@@ -574,6 +598,7 @@ export default function CreativeTesterPage() {
                         <span title="Entre 50% y 69%">Medio (50-69%)</span>
                         <span title="Mayor a 70%">Excelente (&gt;70%)</span>
                       </div>
+                      {insights.emotionReason && <p className="text-[12px] text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">{insights.emotionReason}</p>}
                     </li>
                     <li>
                       <div className="flex justify-between text-[13px] mb-1.5">
@@ -588,6 +613,7 @@ export default function CreativeTesterPage() {
                         <span title="Entre 30% y 45%">Moderada (30-45%)</span>
                         <span title="Mayor a 45%">Excesiva (&gt;45%)</span>
                       </div>
+                      {insights.cogLoadReason && <p className="text-[12px] text-zinc-500 dark:text-zinc-400 mt-2 leading-relaxed">{insights.cogLoadReason}</p>}
                     </li>
                   </ul>
                   <p className="text-[12px] text-zinc-500 dark:text-zinc-400 mt-5 leading-relaxed bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-800">
@@ -596,36 +622,45 @@ export default function CreativeTesterPage() {
                 </div>
               </div>
 
-              {/* Fila Inferior: Lo que deberías hacer */}
+              {/* Fila Inferior: Plan de Acción */}
               <div className="p-8 bg-zinc-50 dark:bg-zinc-800/20 border-t border-zinc-200 dark:border-white/[0.05]">
                 <h3 className="font-semibold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-amber-500" />
                   Plan de Acción Técnico
+                  <span className="ml-auto text-[11px] font-normal text-zinc-400">🔴 Crítico · 🟡 Importante · ✅ Correcto</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {insights.actionItems?.map((item: string, idx: number) => (
-                    <div key={idx} className="flex gap-3 items-start bg-white dark:bg-[#161618] p-4 rounded-xl border border-zinc-200 dark:border-white/[0.05] shadow-sm">
-                      <div className="w-6 h-6 mt-0.5 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 text-[12px] font-bold">
-                        {idx + 1}
+                  {insights.actionItems?.map((item: string, idx: number) => {
+                    const isCritical = /regrabar|cambiar.*música|no.*salvación|cambiar.*talento|critico|iluminación.*deficiente/i.test(item);
+                    const isGood = /excelente|correcto|funciona|óptimo|mantener/i.test(item);
+                    const badge = isCritical ? { label: '🔴 Crítico', cls: 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20' } 
+                                 : isGood    ? { label: '✅ Bien', cls: 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20' } 
+                                            : { label: '🟡 Importante', cls: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20' };
+                    return (
+                      <div key={idx} className={`flex gap-3 items-start p-4 rounded-xl border shadow-sm ${badge.cls}`}>
+                        <div className="w-6 h-6 mt-0.5 rounded-full bg-white/60 dark:bg-black/20 text-zinc-700 dark:text-zinc-200 flex items-center justify-center shrink-0 text-[12px] font-bold border border-black/5">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{badge.label}</span>
+                          <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed mt-1">{item}</p>
+                        </div>
                       </div>
-                      <p className="text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed mt-0.5">
-                        {item}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left Column: Preview & Summary */}
+              {/* Left Column: Preview + Frames */}
               <div className="lg:col-span-1 space-y-6">
                 <div className="bg-white dark:bg-[#161618] border border-zinc-200 dark:border-white/[0.05] rounded-2xl overflow-hidden shadow-sm">
-                  <div className="aspect-video bg-black flex items-center justify-center relative">
+                  <div className="relative bg-black flex items-center justify-center" style={{ aspectRatio: '9/16', maxHeight: '500px' }}>
                     {isVideo ? (
-                      <video src={previewUrl!} controls className="w-full h-full object-cover" />
+                      <video src={previewUrl!} controls className="w-full h-full object-contain" />
                     ) : isImage ? (
-                      <img src={previewUrl!} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain" />
                     ) : (
                       <div className="text-zinc-500 flex flex-col items-center">
                         <FileAudio className="w-12 h-12 mb-2 opacity-50" />
@@ -637,6 +672,16 @@ export default function CreativeTesterPage() {
                       <span className="text-white text-[10px] font-medium">Analizado</span>
                     </div>
                   </div>
+                  {extractedFrames.length > 1 && (
+                    <div className="p-3 border-t border-zinc-100 dark:border-white/[0.04]">
+                      <p className="text-[10px] text-zinc-400 mb-2 font-medium uppercase tracking-wider">Fotogramas Analizados</p>
+                      <div className="flex gap-2 overflow-x-auto">
+                        {extractedFrames.map((f, i) => (
+                          <img key={i} src={f} alt={`Frame ${i+1}`} className="h-14 w-auto rounded-md border border-zinc-200 dark:border-zinc-700 object-cover shrink-0" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg">

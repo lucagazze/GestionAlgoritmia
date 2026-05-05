@@ -610,30 +610,33 @@ REGLAS:
           const openAiKey = await db.settings.getApiKey('openai_api_key');
           
           const prompt = `
-          ERES: TRIBE v2, un simulador neuro-computacional implacable usado por agencias de marketing de élite.
-          OBJETIVO: Analizar estas imágenes ${isVideo ? '(fotogramas clave de un video)' : '(anuncio estático)'} y destruir sus debilidades visuales o exaltar sus aciertos técnicos.
+          ERES: TRIBE v2, un experto en neuromarketing y análisis de creativos publicitarios para redes sociales (Instagram Reels, TikTok, Facebook Ads).
           
-          REGLA DE ORO: ESTÁ ESTRICTAMENTE PROHIBIDO DAR CONSEJOS GENÉRICOS. Nada de "usa colores llamativos" o "añade expresiones faciales". DEBES referirte a los elementos literales y exactos que estás viendo en la imagen. 
-          Ejemplos correctos: "El sujeto tiene una expresión neutra que no conecta", "La tipografía blanca en la esquina superior izquierda se pierde con el cielo", "El producto aparece muy tarde o es muy pequeño frente a la madera del fondo", "El texto 'Compra ahora' tiene poco contraste".
+          SE TE ESTÁN PASANDO: ${base64Images.length} imágenes que son capturas de pantalla de un ${isVideo ? 'VIDEO PUBLICITARIO completo, una por cada segundo aproximadamente. Deben usarse en conjunto para entender el video como pieza creativa completa' : 'ANUNCIO ESTÁTICO'}. NO las analices como fotos individuales. Úsalas para entender la narrativa, el ritmo, el gancho, la estructura y el mensaje del creativo.
+          
+          TU OBJETIVO: Evaluar este creativo como lo haría el director creativo de una agencia top. Analizar si tiene gancho, si sostiene la atención, si el mensaje es claro, si la música o el ritmo acompañan, si el CTA es efectivo, si la persona en cámara conecta.
+          
+          REGLA CLAVE: Los consejos deben ser sobre EL VIDEO COMO PIEZA, no sobre la calidad técnica de una imagen. No menciones "fotograma borroso" o "sobreexposición de imagen". Sí menciona: "El gancho en los primeros 3 segundos es débil porque...", "La música no genera urgencia", "No hay CTA visible", "La persona habla demasiado sin acción que acompañe".
           
           DEBES EVALUAR:
-          1. Retención de Atención (0-99): Velocidad de asimilación visual en 3s.
-          2. Impacto Emocional (0-99): Nivel de activación de la amígdala (microexpresiones, colores).
-          3. Carga Cognitiva (0-99): Nivel de confusión o sobrecarga. Ideal <30. Si hay mucho texto o ruido, sube a 50+.
-          4. Región Principal: Elige UNA: "V1" (Visual Puro), "A1" (Texto/Audio), "FFA" (Rostros), "EBA" (Cuerpos), "Amígdala" (Emoción).
+          1. Retención de Atención (0-99): ¿El gancho de los primeros 3 segundos detiene el scroll? ¿El ritmo del video mantiene la atención hasta el final?
+          2. Impacto Emocional (0-99): ¿Genera una reacción emocional? (curiosidad, deseo, humor, impacto visual). ¿Hay conexión con quien aparece en cámara?
+          3. Carga Cognitiva (0-99): ¿El mensaje es simple y claro, o requiere esfuerzo mental para entenderlo? Ideal <30.
+          4. Región Principal: "V1" (Visual fuerte), "A1" (voz/música dominante), "FFA" (persona que conecta), "EBA" (movimiento/cuerpo), "Amígdala" (emoción/shock).
           
-          FORMATO JSON ESTRICTO OBLIGATORIO:
+          FORMATO JSON ESTRICTO OBLIGATORIO (sin texto extra fuera del JSON):
           {
-            "attentionPct": 85,
-            "emotionPct": 72,
-            "cogLoad": 25,
+            "attentionPct": 72,
+            "attentionReason": "Explicación de 1-2 líneas de POR QUÉ la atención es ese número. Qué funciona y qué falla.",
+            "emotionPct": 65,
+            "emotionReason": "Explicación de 1-2 líneas de POR QUÉ el impacto emocional es ese número.",
+            "cogLoad": 28,
+            "cogLoadReason": "Explicación de 1-2 líneas de POR QUÉ la carga cognitiva es ese número.",
             "highestRegion": "FFA",
-            "textInsight": "Análisis ultra-crítico de 3 líneas. Menciona colores exactos, iluminación, encuadre o fallas de jerarquía visual detectadas.",
+            "textInsight": "Diagnóstico general del video como pieza creativa: narrativa, ritmo, gancho y efectividad del mensaje en 2-3 líneas.",
             "actionItems": [
-               "Táctica milimétrica 1 (ej: 'Agrandar la fuente roja del CTA un 20% y centrarla')",
-               "Táctica milimétrica 2",
-               "Táctica milimétrica 3",
-               "Genera entre 3 y 6 tácticas según sean necesarias..."
+               "Consejo 1 sobre el video completo (puede incluir segundo aproximado si aplica)",
+               "Entre 4 y 6 consejos. Priorizados por impacto. Pueden ser radicales si el video lo necesita (regrabar, cambiar música, cambiar estructura)."
             ]
           }
           `;

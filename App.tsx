@@ -5,6 +5,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import PublicContentIdeaPage from './pages/PublicContentIdeaPage'; // Future implementation
+import PublicCreativeTesterPage from './pages/PublicCreativeTesterPage';
 
 // Protected Route Component
 const ProtectedRoute = () => {
@@ -39,6 +40,7 @@ export default function App() {
             
             {/* Public Routes - defined here to bypass MainLayout authentication check */}
             <Route path="/p/:id" element={<PublicContentIdeaPage />} />
+            <Route path="/creative-tester" element={<PublicCreativeTesterPage />} />
 
             {/* Application Routes - Wrapped in MainLayout */}
             {/* Note: MainLayout currently contains the Routes logic, which is duplicating/conflicting if we nest Routes here */}
