@@ -141,10 +141,13 @@ const generateMockData = (file: File, duration: number) => {
     insights: {
       attention: attentionPct >= 75 ? 'Alto' : attentionPct >= 60 ? 'Medio' : 'Bajo',
       attentionPct,
+      attentionReason: '',
       emotion: emotionPct >= 70 ? 'Alto' : emotionPct >= 50 ? 'Medio-Alto' : 'Bajo',
       emotionPct,
+      emotionReason: '',
       cogLoad,
       cogLoadStatus,
+      cogLoadReason: '',
       text: textInsights[Math.floor(seededRandom() * textInsights.length)],
       actionItems: actionItems,
       highestRegion,
